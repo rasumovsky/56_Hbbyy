@@ -54,11 +54,17 @@ void BkgModel::addBkgToCateWS(RooWorkspace *&workspace, RooArgSet *&nuisParams,
   RooArgSet *currArgs = currBkgModel->getVariables();
   TIterator *iterArgs = currArgs->createIterator();
   RooRealVar* currIter = NULL;
-  while ((currIter = (RooRealVar*)iterArgs->Next())) nuisParams->add(*currIter);
-  
-  // Finally, include a normalization parameter for the background:
-  workspace->factory("nBkg[100,0,1000000]");
-  nuisParams->add(*workspace->var("nBkg"));
+  while ((currIter = (RooRealVar*)iterArgs->Next())) {
+    TString obsName = m_obs->GetName();
+    TString currName = (*currIter).GetName();
+    std::cout << "obs name is " << obsName << " and other is " << currName 
+	      << std::endl;
+    if (!currName.Contains(obsName)) {
+      nuisParams->add(*currIter);
+      std::cout << "Adding NP " << currName << std::endl;
+    }
+  }
+  // The normalization will be provided in the workspace program. 
   
   std::cout << "BkgModel: Finished adding background model" << std::endl;
 }

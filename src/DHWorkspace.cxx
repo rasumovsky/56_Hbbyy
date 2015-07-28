@@ -17,7 +17,7 @@
 //    - "NonRes", "Res"
 //                                                                            //
 //  options:                                                                  //
-//    - "ResOnly": only generate the resonant search workspace.               //
+//    - "ResonantOnly": only generate the resonant search workspace.          //
 //    - "NonResOnly": only generate the nonresonant search workspace.         //
 //                                                                            //
 //  Job options: "New", "FromFile" determine whether to create a new workspace//
@@ -160,13 +160,19 @@ void DHWorkspace::createNewWS() {
     currNCategories = DHAnalysis::getNumCategories(m_cateScheme, currAna); 
     
     // Check to see if the analysis should be implemented:
-    if ((m_options.Contains("ResOnly") && currAna.EqualTo("NonRes")) ||
-	(m_options.Contains("NonResOnly") && currAna.EqualTo("Res"))) continue;
+    if ((m_options.Contains("NonResOnly") && currAna.EqualTo("Res")) ||
+	(m_options.Contains("ResonantOnly") && currAna.EqualTo("NonRes"))) {
+      continue;
+    }
     
     // Go ahead and built that analysis model!
     createNewModel();
   }
-
+  
+  // Print the workspace before saving:
+  std::cout << "DHWorkspace: Printing the workspace to be saved." << std::endl;
+  m_combinedWS->Print("v");
+  
   // Write workspace to file:
   m_combinedWS->writeToFile(Form("%s/rootfiles/workspaceDH.root",
 				 m_outputDir.Data()));
@@ -293,9 +299,9 @@ void DHWorkspace::createNewModel() {
     DHAnalysis::sigDHModes[0] : DHAnalysis::sigDHModes[1];
   
   DHTestStat *dhts = new DHTestStat(m_jobName, currDHSignal, m_cateScheme,
-				    "new", m_combinedWS);
+				    "FromFile", m_combinedWS);
   dhts->saveSnapshots(true);
-  dhts->setPlotDirectory(Form("%s/Plots/", m_outputDir.Data()));
+  //dhts->setPlotDirectory(Form("%s/Plots/", m_outputDir.Data()));
   
   m_dataToPlot = (DHAnalysis::doBlind) ?
     Form("asimovDataMu1_%s",currAna.Data()) : Form("obsData_%s",currAna.Data());
@@ -342,8 +348,9 @@ void DHWorkspace::createNewModel() {
 
 /**
    -----------------------------------------------------------------------------
-   Create the workspace for a single analysis category.
-   @param currCategory
+   Create the workspace for a single analysis category. Note: currAna, 
+   currNCategories, currCateIndex, and currCateName are defined with a global 
+   scope and updated in each call to this method.
 */
 RooWorkspace* DHWorkspace::createNewCategoryWS() {
     
@@ -373,17 +380,17 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   // Create the individual channel workspace:
   RooWorkspace *tempWS = new RooWorkspace(Form("tmpWS_%s",currCateName.Data()));
   
-  // nuispara:
-  RooArgSet *nuisParams = new RooArgSet();
+  // Nuisance parameters:
   RooArgSet *nuisParamsBkg = new RooArgSet();
-  RooArgSet *nuisParamsUncorrelated = new RooArgSet();
-  // constraints:
+  RooArgSet *nuisParamsCorr = new RooArgSet();
+  RooArgSet *nuisParamsUncorr = new RooArgSet();
+  // Constraint parameters:
   RooArgSet *constraints = new RooArgSet();
   RooArgSet *constraintsBias = new RooArgSet();
-  // globobs:
+  // Global observables:
   RooArgSet *globalObs = new RooArgSet();
   RooArgSet *globalObsProc = new RooArgSet();
-  // expected:
+  // Expected terms:
   RooArgSet *expectedShape = new RooArgSet();
   RooArgSet *expectedBias = new RooArgSet();
   RooArgSet *expected = new RooArgSet();
@@ -398,19 +405,19 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   // Normalization systematics:
   if (m_norm) {
     double setupLumi[4] = {0.036, 0, 1, 1};
-    makeNP("Luminosity", setupLumi, *&nuisParams, *&constraints, *&globalObs,
-	   *&expected);
+    makeNP("Luminosity", setupLumi, *&nuisParamsCorr, *&constraints, 
+	   *&globalObs, *&expected);
     double setupTrigger[4] = {0.005, 0, 1, 1};
-    makeNP("Trigger", setupTrigger, *&nuisParams, *&constraints, *&globalObs,
-	   *&expected);
+    makeNP("Trigger", setupTrigger, *&nuisParamsCorr, *&constraints, 
+	   *&globalObs, *&expected);
     double setupIsEM[4] = {0.0526, 0, 1, 1};
-    makeNP("PhotonID", setupIsEM, *&nuisParams, *&constraints, *&globalObs,
+    makeNP("PhotonID", setupIsEM, *&nuisParamsCorr, *&constraints, *&globalObs,
 	   *&expected);
     double setupIso[4] = {0.004, 0, 1, 1};
-    makeNP("Isolation", setupIso, *&nuisParams, *&constraints, *&globalObs,
+    makeNP("Isolation", setupIso, *&nuisParamsCorr, *&constraints, *&globalObs,
 	   *&expected);
     double setupESCALE[4] = {0.003, 0, 1, 1};
-    makeNP("ESCALE", setupESCALE, *&nuisParams, *&constraints, *&globalObs,
+    makeNP("ESCALE", setupESCALE, *&nuisParamsCorr, *&constraints, *&globalObs,
 	   *&expected);
   }
   
@@ -423,9 +430,9 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   //--------------------------------------//
   // SYSTEMATICS: Spurious signal
   if (m_bgm) {
-    double ssEvents = 0.1;//spuriousSignal function;
+    double ssEvents = 0.1;//need a spuriousSignal function;
     double setupBias[4] = {ssEvents, -999, 1, 0}; //Gaussian constraint
-    makeNP("bias", setupBias, *&nuisParamsUncorrelated, *&constraintsBias,
+    makeNP("bias", setupBias, *&nuisParamsUncorr, *&constraintsBias,
 	   *&globalObs, *&expectedBias);
     RooProduct sigBias("sigBias","sigBias",*expectedBias);
     tempWS->import(sigBias);
@@ -446,9 +453,9 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
       setupPER[0] = per->getValue(currPERSource, currCateIndex);
       setupPER[2] = per->getSign(currPERSource, currCateIndex);
       // Resolution on the inclusive shape:
-      makeShapeNP(currPERName, "DH", setupPER, *&nuisParams, *&constraints,
+      makeShapeNP(currPERName, "DH", setupPER, *&nuisParamsCorr, *&constraints,
 		  *&globalObs, *&expectedShape);
-      makeShapeNP(currPERName, "SH", setupPER, *&nuisParams, *&constraints,
+      makeShapeNP(currPERName, "SH", setupPER, *&nuisParamsCorr, *&constraints,
 		  *&globalObs, *&expectedShape);
     }
   }
@@ -466,8 +473,8 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
       pesList.push_back(currPESName);
       setupPES[0] = pes->getValue(currPESSource, currCateIndex);
       setupPES[2] = pes->getSign(currPESSource, currCateIndex);
-      makeNP(currPESName, setupPES, *&nuisParams, *&constraints, *&globalObs,
-	     *&expectedShape);
+      makeNP(currPESName, setupPES, *&nuisParamsCorr, *&constraints, 
+	     *&globalObs, *&expectedShape);
     }
   }
   
@@ -480,8 +487,8 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   expectedSH->add(RooArgSet(*mu_SH));
   
   // Expectation values:
-  RooProduct expectationDH("expectationDH","expectationDH", *expectedDH);
-  RooProduct expectationSH("expectationSH","expectationSH", *expectedSH);
+  RooProduct expectationDH("expectationDH", "expectationDH", *expectedDH);
+  RooProduct expectationSH("expectationSH", "expectationSH", *expectedSH);
   RooProduct expectationCommon("expectationCommon","expectationCommon",
 			       *expected);
   
@@ -506,27 +513,29 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   
   // Construct the background PDF (present in every category):
   std::cout << "DHWorkspace: Constructing background model" << std::endl;
-  BkgModel *currBkgModel = new BkgModel(tempWS->var(Form("%s",obsName.Data())));
+  BkgModel *currBkgModel = new BkgModel(tempWS->var(obsName));
   TString bkgFuncName = DHAnalysis::cateToBkgFunc(currCateName);
   currBkgModel->addBkgToCateWS(tempWS, nuisParamsBkg, bkgFuncName);
-  
-  // Add bkg params to correlated collection (SR and CR have same shape):
-  nuisParams->add(*nuisParamsBkg);
+    
+  std::cout << "DHWorkspace: Printing corr. bkg. nuisance params." << std::endl;
+  nuisParamsBkg->Print("v");
   
   // Start to construct the statistical model, add components one by one:
-  TString modelForm = "SUM::modelSB(nBkg*bkgPdf";
-  
+  TString modelForm = "SUM::modelSB(nBkg[100,0,1000000]*bkgPdf";
+    
   // Construct SH and DH signals (depending on categories):
   std::cout << "DHWorkspace: Constructing signal model" << std::endl;
   if (currAna.EqualTo("NonRes")) {
     
     // SH (Single-Higgs) signal:
-    if (DHAnalysis::cateHasComponent(currCateName, "SH")) {
+    if (DHAnalysis::cateHasComponent(currCateName, "BkgSingleHiggs")) {
+      std::cout << "DHWorkspace: Add single Higgs model component for category "
+		<< currCateName << std::endl;
       // jj CR first, bb SR second
       double normSH[2] = {0.00868, 0.186};
       tempWS->factory(Form("RooCBShape::pdfCB_SH(%s, prod::muCB_SH(muCBNom_SH[124.96]%s), prod::sigmaCB_SH(sigmaCBNom_SH[1.53]%s), alphaCB_SH[1.56], nCB_SH[10.0])", obsName.Data(), m_listMSS.Data(), m_listMRS.Data()));
       tempWS->factory(Form("RooGaussian::pdfGA_SH(%s, prod::muGA_SH(muCBNom_SH%s), prod::sigmaGA_SH(sigmaGANom_SH[23.98]%s))", obsName.Data(), m_listMSS.Data(), m_listMRS.Data()));
-      tempWS->factory(Form("SUM::sigPdf_SH(fracCB_SH[1.00]*pdfCB_SH,pdfGA_SH)"));
+      tempWS->factory(Form("SUM::sigPdfSH(fracCB_SH[1.00]*pdfCB_SH,pdfGA_SH)"));
       tempWS->factory(Form("nSH[%f]", normSH[currCateIndex]));
       
       // Normalization for SH (expectationCommon = mu*isEM*lumi*migr):
@@ -537,11 +546,14 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
     }
     
     // Now BSM (Di-Higgs) signal:
-    if (DHAnalysis::cateHasComponent(currCateName, "DH")) {
+    if (DHAnalysis::cateHasComponent(currCateName, "Signal")) {
+      std::cout << "DHWorkspace: Add di-Higgs model component for category "
+		<< currCateName << std::endl;
       tempWS->factory(Form("RooCBShape::pdfCB_DH(%s, prod::muCB_DH(muCBNom_DH[124.95]%s), prod::sigmaCB_DH(sigmaCBNom_DH[1.31]%s), alphaCB_DH[1.56], nCB_DH[10.0])", obsName.Data(), m_listMSS.Data(), m_listMRS.Data()));
       tempWS->factory(Form("RooGaussian::pdfGA_DH(%s, prod::muGA_DH(muCBNom_DH%s), prod::sigmaGA_DH(sigmaGANom_DH[2.84]%s))", obsName.Data(), m_listMSS.Data(), m_listMRS.Data()));
-      tempWS->factory(Form("SUM::sigPdf_DH(fracCB_DH[0.94]*pdfCB_DH,pdfGA_DH)"));
-      tempWS->factory("nDH[5,0,100]");
+      tempWS->factory(Form("SUM::sigPdfDH(fracCB_DH[0.94]*pdfCB_DH,pdfGA_DH)"));
+      //tempWS->factory("nDH[1,0,100]");
+      tempWS->factory("nDH[1.0]");
       
       // Normalization for DH (expectationCommon = mu*isEM*lumi*migr):
       tempWS->factory("prod::nSigDH(nDH,expectationCommon,expectationDH)");
@@ -589,19 +601,27 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
     Specify the group of nuisance parameters that are correlated between
     categories. Technically, this is done by sharing the same name for nuisance
     parameter between sub-channels. Their respective global observables should
-    also share the same name. nuisParams should contain all correlated nuisance
-    parameters. All uncorrelated nuisance parameters should be included in
-    nuisParamsUncorrelated.
+    also share the same name. nuisParamsCorr should contain all correlated 
+    nuisance parameters. All uncorrelated nuisance parameters should be included
+    in nuisParamsUncorr.
   */
   TString corrNPNames = "mu_DH,mu_SH";
   
   // Iterate over nuisance parameters:
-  TIterator *iterNuis = nuisParams->createIterator();
+  TIterator *iterNuis = nuisParamsCorr->createIterator();
   RooRealVar* currNuis;
   while ((currNuis = (RooRealVar*)iterNuis->Next())) {
     std::cout << "\t" << currNuis->GetName() << std::endl;
     corrNPNames += Form(",nuisPar_%s,globOb_%s",currNuis->GetName(),
 			currNuis->GetName());
+  }
+  
+  // Iterate over correlated nuisance parameters:
+  TIterator *iterBkgNuis = nuisParamsBkg->createIterator();
+  RooRealVar* currBkgNuis;
+  while ((currBkgNuis = (RooRealVar*)iterBkgNuis->Next())) {
+    std::cout << "\t" << currBkgNuis->GetName() << std::endl;
+    corrNPNames += Form(",%s",currBkgNuis->GetName());
   }
   std::cout << "For category " << currCateName << ", correlate variables: "
 	    << corrNPNames << std::endl;
@@ -625,7 +645,7 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   }
   
   // Adding uncorrelated nuisance parameters to nuisanceParameters:
-  TIterator *iterNuisUncorrelated = nuisParamsUncorrelated->createIterator();
+  TIterator *iterNuisUncorrelated = nuisParamsUncorr->createIterator();
   RooRealVar* currNuisUncorrelated;
   while ((currNuisUncorrelated = (RooRealVar*)iterNuisUncorrelated->Next())) {
     TString nuisName = (currNuisUncorrelated->GetName() 
@@ -633,13 +653,21 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
     nuisCateWS->add(*(RooRealVar*)categoryWS->obj(nuisName));
   }
   
+
+
+
+  /**
+     SHOULD THIS BE nuisCateWS
+   */
+
   // Adding unconstrained NPs from the background pdf:
   RooArgSet* nuisBkgCateWS = new RooArgSet();
   TIterator *iterNuisBkg = nuisParamsBkg->createIterator();
   RooRealVar* currNuisBkg;
   while ((currNuisBkg = (RooRealVar*)iterNuisBkg->Next())) {
-    TString parName = currNuisBkg->GetName()+(TString)"_"+currCateName;
-    nuisBkgCateWS->add(*categoryWS->var(parName));
+    //TString parName = currNuisBkg->GetName()+(TString)"_"+currCateName;
+    //nuisBkgCateWS->add(*categoryWS->var(parName));
+    nuisBkgCateWS->add(*categoryWS->var(currNuisBkg->GetName()));
   }
   
   /*
@@ -669,9 +697,9 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   TIterator *iterObs = tempWS->set("obsprelim")->createIterator();
   RooRealVar *currObs;
   while ((currObs = (RooRealVar*)iterObs->Next())) {
-    TString obsName = currObs->GetName()+(TString)"_"+currCateName;
-    if ((bool)categoryWS->obj(obsName)) {
-      obsCateWS->add(*(RooRealVar*)categoryWS->obj(obsName));
+    TString anObsName = currObs->GetName()+(TString)"_"+currCateName;
+    if ((bool)categoryWS->obj(anObsName)) {
+      obsCateWS->add(*(RooRealVar*)categoryWS->obj(anObsName));
     }
     else {
       obsCateWS->add(*(RooRealVar*)categoryWS->obj(currObs->GetName()));
@@ -701,7 +729,7 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   
   //--------------------------------------//
   // Import the observed data set, and create a binned version:
-  DHDataReader *dhdr = new DHDataReader(categoryWS->var(obsName));
+  DHDataReader *dhdr = new DHDataReader(categoryWS->var(Form("%s_%s",obsName.Data(),currCateName.Data())));
   RooDataSet *obsData = NULL;
   if (currAna.EqualTo("NonRes")) {
     obsData = dhdr->loadNonResData(currCateName);
@@ -721,6 +749,8 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   (*categoryWS->var("nBkg_"+currCateName)).setVal(obsData->sumEntries());
   
   categoryWS->import(*obsData);
+  
+  plotSingleCateFit(categoryWS, obsDataName, obsName);
   
   std::cout << "DHWorkspace: Printing workspace for category:" << currCateName
 	    << std::endl;
@@ -891,4 +921,48 @@ void DHWorkspace::makeShapeNP(TString varNameNP, TString process,
   constraints->add(*workspace->pdf(Form("constrPdf_%s",varNameNP.Data())));
   globalObs->add(*workspace->var(Form("globOb_%s",varNameNP.Data())));
   expected->add(*workspace->function(Form("expected_%s",varName.Data())));
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Plot the data and fit in a single category
+*/
+void DHWorkspace::plotSingleCateFit(RooWorkspace *cateWS, TString dataset, 
+				    TString observableName) {
+  std::cout << "DMWorkspace: Plot single category fit for "
+	    << currCateName << std::endl;
+  TCanvas *can = new TCanvas("can", "can", 800, 800);
+  RooPlot* frame = (*cateWS->var(observableName+"_"+currCateName)).frame(50);
+  cateWS->data(dataset)->plotOn(frame);
+  (*cateWS->pdf("model_"+currCateName)).plotOn(frame, LineColor(2));
+  (*cateWS->pdf("model_"+currCateName)).plotOn(frame, Components((*cateWS->pdf("bkgPdf_"+currCateName))), LineColor(4), LineStyle(2));
+  (*cateWS->pdf("model_"+currCateName)).plotOn(frame, Components((*cateWS->pdf("sigPdfDH_"+currCateName))), LineColor(3), LineStyle(2));
+  (*cateWS->pdf("model_"+currCateName)).plotOn(frame, Components((*cateWS->pdf("sigPdfSH_"+currCateName))), LineColor(6), LineStyle(2));
+  
+  //double chi2 = frame->chiSquare();
+  frame->SetYTitle("Events / GeV");
+  frame->SetXTitle("Mass [GeV]");
+  frame->Draw();
+  
+  TLatex text; text.SetNDC(); text.SetTextColor(1);
+  text.DrawLatex(0.2, 0.81, Form("Category %d", currCateIndex));
+  TH1F *histSH = new TH1F("histSH", "histSH", 1, 0, 1);
+  TH1F *histDH = new TH1F("histDH", "histDH", 1, 0, 1);
+  TH1F *histNR = new TH1F("histNR", "histNR", 1, 0, 1);
+  TH1F *histSig = new TH1F("histSig", "histSig", 1, 0, 1);
+  histDH->SetLineColor(3);
+  histSH->SetLineColor(6);
+  histNR->SetLineColor(4);
+  histSig->SetLineColor(2);
+  TLegend leg(0.61, 0.6, 0.89, 0.77);
+  leg.SetFillColor(0);
+  leg.SetTextSize(0.04);
+  leg.SetBorderSize(0);
+  leg.AddEntry(histSig, "Sig. + bkg.", "l");
+  leg.AddEntry(histDH, "Di-Higgs", "l");
+  leg.AddEntry(histSH, "Single Higgs", "l");
+  leg.AddEntry(histNR, "Non-resonant", "l");
+  leg.Draw("SAME");
+  can->Print(Form("%s/Plots/cateFit_%s.eps",m_outputDir.Data(),dataset.Data()));
+  delete can;
 }

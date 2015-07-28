@@ -1498,7 +1498,7 @@ int main(int argc, char* argv[]) {
   system(Form("mkdir -vp %s", outputDir.Data()));
   
   // Copy the input file locally:
-  TString localInputFileName = Form("workspaceDH.root", inputDHSignal.Data());
+  TString localInputFileName = "workspaceDH.root";
   system(Form("cp %s %s", inputFileName.Data(), localInputFileName.Data()));
   
   TString wname = "combinedWS";

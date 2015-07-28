@@ -211,7 +211,8 @@ int DHAnalysis::getMediatorMass(TString sampleName) {
     return currSampleName.Atoi();
   }
   else {
-    std::cout << "DHAnalysis: Request for mediator mass failed!" << std::endl;
+    std::cout << "DHAnalysis: Request for mediator mass failed. sampleName="
+	      << sampleName << std::endl;
     return 0;
   }
 }

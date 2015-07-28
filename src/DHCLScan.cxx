@@ -22,9 +22,13 @@ int main(int argc, char **argv) {
   }
   
   TString jobName = argv[1];
-  TString cateScheme = argv[2];
-  TString options = argv[3];
+  TString DHSignal = argv[2];
+  TString cateScheme = argv[3];
+  TString options = argv[4];
   
+  DHTestStat *dhts = new DHTestStat(jobName, DHSignal, cateScheme,
+				    "FromFile", m_combinedWS);
+
   DHWorkspace *dmw = new DHWorkspace(jobName, cateScheme, options);
   if (dmw->fitsAllConverged()) {
     std::cout << "DMWorkspaceWrapper: All OK!" << std::endl;

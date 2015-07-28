@@ -46,11 +46,8 @@ class DHWorkspace {
   void makeShapeNP(TString varnameNP, TString process, double setup[4],
 		   RooArgSet *&nuisParams, RooArgSet *&constraints,
 		   RooArgSet *&globalObs, RooArgSet *&expected);
-  void plotSingleCateFit(RooWorkspace *cateWS, TString dataset);
-  void plotFinalFits(RooWorkspace *combWS, TString fitType);
-  void plotNuisParams(RooArgSet nuisParams, TString type);
-  void profileAndSnapshot(TString muDHValue, double &nllValue,
-			  double &profiledMu);
+  void plotSingleCateFit(RooWorkspace *cateWS, TString dataset, 
+			 TString observableName);
   
   // Member variables:
   TString m_jobName;

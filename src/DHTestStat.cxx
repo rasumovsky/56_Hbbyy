@@ -45,14 +45,15 @@ DHTestStat::DHTestStat(TString newJobName, TString newDHSignal,
     Form("obsData_%s", m_anaType.Data());
   m_dataForExp = Form("asimovDataMu0_%s", m_anaType.Data());
   
-  TFile inputFile(Form("%s/%s/DHWorkspace/rootfiles/workspaceDH.root",
+  // Load from file if the pointer passed is NULL:
+  if (newWorkspace == NULL) {
+    inputFile
+      = new TFile(Form("%s/%s/DHWorkspace/rootfiles/workspaceDH.root",
 		       DHAnalysis::masterOutput.Data(), m_jobName.Data()),
 		  "read");
-  
-  if (newWorkspace == NULL) {
-    if (inputFile.IsOpen()) {
+    if (inputFile->IsOpen()) {
       std::cout << "DHTestStat: Loading workspace." << std::endl;
-      m_workspace = (RooWorkspace*)inputFile.Get("combinedWS");
+      m_workspace = (RooWorkspace*)inputFile->Get("combinedWS");
     }
     else {
       std::cout << "DHTestStat: Error loading file, accessing with WS tool."
@@ -269,10 +270,12 @@ RooDataSet* DHTestStat::createAsimovData(int valMuDH, int valMuSH) {
   m_workspace->var("mu_DH")->setConstant(true);
   
   // Also use m_DHSignal to set the resonance mass.
-  int mediatorMass = DHAnalysis::getMediatorMass(m_DHSignal);
-  if (m_DHSignal.EqualTo("Res") && mediatorMass > 0) {
-    m_workspace->var("resMassDH")->setVal(mediatorMass);
-    m_workspace->var("resMassDH")->setConstant(true);
+  if (m_DHSignal.EqualTo("Res")) {
+    int mediatorMass = DHAnalysis::getMediatorMass(m_DHSignal);
+    if (mediatorMass > 0) {
+      m_workspace->var("resMassDH")->setVal(mediatorMass);
+      m_workspace->var("resMassDH")->setConstant(true);
+    }
   }
   
   RooDataSet *asimovData = (RooDataSet*)AsymptoticCalculator::GenerateAsimovData(*m_workspace->pdf(Form("combinedPdf_%s", m_anaType.Data())), *m_workspace->set(Form("observables_%s", m_anaType.Data())));
@@ -482,12 +485,14 @@ double DHTestStat::getFitNLL(TString datasetName, double muVal, bool fixMu,
 			     double &profiledMu) { 
   std::cout << "DHTestStat: getFitNLL(" << datasetName << ", " << muVal
 	    << ", " << fixMu << ")" << std::endl;
-    
+  
   RooAbsPdf* combPdf = m_mc->GetPdf();
   RooArgSet* nuisanceParameters = (RooArgSet*)m_mc->GetNuisanceParameters();
   RooArgSet* globalObservables = (RooArgSet*)m_mc->GetGlobalObservables();
-  m_workspace->loadSnapshot("paramsOrigin");
-  RooArgSet* origValNP = (RooArgSet*)m_workspace->getSnapshot("paramsOrigin");
+  m_workspace->loadSnapshot(Form("paramsOrigin_%s", m_anaType.Data()));
+  RooArgSet* origValNP 
+    = (RooArgSet*)m_workspace->getSnapshot(Form("paramsOrigin_%s",
+						m_anaType.Data()));
   RooArgSet* poi = (RooArgSet*)m_mc->GetParametersOfInterest();
   RooRealVar* firstPoI = (RooRealVar*)poi->first();
   RooArgSet* poiAndNuis = new RooArgSet();
@@ -520,15 +525,17 @@ double DHTestStat::getFitNLL(TString datasetName, double muVal, bool fixMu,
   firstPoI->setConstant(fixMu);
   
   // Check if parameters have been specified during fit:
-  for (int i_p = 0; i_p < m_setParamNames.size(); i_p++) {
+  for (int i_p = 0; i_p < (int)m_setParamNames.size(); i_p++) {
+    std::cout << "i_p=" << i_p << ", " << m_setParamNames[i_p] << std::endl;
     m_workspace->var(m_setParamNames[i_p])->setVal(m_setParamVals[i_p]);
     m_workspace->var(m_setParamNames[i_p])->setConstant(m_setParamConsts[i_p]);
   }
   
   // Iterate over SM mu values and fix all to 1:
-  RooArgSet* muConstants = (RooArgSet*)m_workspace->set("muSMConstants");
+  RooArgSet* muConstants = (RooArgSet*)m_workspace->set(Form("muSHConstants_%s",m_anaType.Data()));
   TIterator *iterMuConst = muConstants->createIterator();
   RooRealVar *currMuConst = NULL;
+  
   while ((currMuConst = (RooRealVar*)iterMuConst->Next())) {
     std::cout << "DHTestStat: Setting " << currMuConst->GetName()
 	      << " constant." << std::endl;
@@ -580,7 +587,7 @@ double DHTestStat::getFitNLL(TString datasetName, double muVal, bool fixMu,
     m_namesGlobs.push_back((std::string)currGlob->GetName());
     m_valuesGlobs.push_back(currGlob->getVal());
   }
-  
+    
   // release nuisance parameters after fit and recovery the default values
   statistics::constSet(nuisanceParameters, false, origValNP);
   return nllValue;
@@ -797,13 +804,14 @@ void DHTestStat::loadStatsFromFile() {
    @param fitType - the type of fit.
 */
 void DHTestStat::plotFits(TString fitType, TString datasetName) {
-  std::cout << "DHWorkspace: Plot final fits for " << fitType << std::endl;
- 
+  std::cout << "DHTestStat: Plot final fits for " << fitType << std::endl;
+  std::cout << "DEBUG1" << std::endl;
   TCanvas *can = new TCanvas("can", "can", 800, 800);
   // loop over categories:
   int nCategories = DHAnalysis::getNumCategories(m_cateScheme, m_anaType);
   for (int i_c = 0; i_c < nCategories; i_c++) {
-    
+    can->Clear();
+    std::cout << "DEBUG2" << std::endl;
     TString currCateName
       = DHAnalysis::cateIndexToName(m_cateScheme, m_anaType, i_c);
     TString obsName = m_anaType.EqualTo("NonRes") ? 
@@ -812,12 +820,23 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     RooPlot* frame =  (*m_workspace->var(obsName)).frame(50);
     TString cutName = Form("categories_%s==categories_%s::%s", m_anaType.Data(),
 			   m_anaType.Data(), currCateName.Data());
+    std::cout << "DEBUG3" << std::endl;
     RooDataSet *currData
       =(RooDataSet*)(m_workspace->data(Form("%s", datasetName.Data())));
-    currData->plotOn(frame, RooFit::Cut(cutName));
+    std::cout << "DEBUG3.1" << std::endl;
+    //currData->plotOn(frame, RooFit::Cut(cutName));
+    /*
+    //RooCategory *categories
+    //=(RooCategory*)(m_workspace->var(Form("categories_%s",m_anaType.Data())));
+    m_workspace->Print("v");
+    std::cout << "DEBUG3.2" << std::endl;
+    RooArgSet tempSet = m_workspace->allCats();
+    tempSet.Print("v");
+    std::cout << "DEBUG3.3" << std::endl;
     RooCategory *categories
-      =(RooCategory*)(m_workspace->var(Form("categories_%s",m_anaType.Data())));
-    
+      =(RooCategory*)(m_workspace->cat(Form("categories_%s",m_anaType.Data())));
+
+    std::cout << "DEBUG4" << std::endl;
     (*m_workspace->pdf(Form("model_%s",m_anaType.Data())))
       .plotOn(frame, Components((*m_workspace->pdf("sigPdfDH_"+currCateName))),
 	      LineColor(6));
@@ -830,6 +849,7 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     (*m_workspace->pdf(Form("model_%s",m_anaType.Data())))
       .plotOn(frame, LineColor(2));
     
+    std::cout << "DEBUG5" << std::endl;
     //double chi2 = frame->chiSquare();
     frame->SetYTitle("Events / GeV");
     frame->SetXTitle("M_{#gamma#gamma} [GeV]");
@@ -856,6 +876,7 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     leg.Draw("SAME");
     can->Print(Form("%s/fitPlot_%s_%s_%s.eps", m_plotDir.Data(),
 		    m_DHSignal.Data(), fitType.Data(), currCateName.Data()));
+    */  
   }
   delete can;
 }
@@ -893,6 +914,7 @@ void DHTestStat::saveSnapshots(bool doSaveSnapshot) {
 */
 void DHTestStat::setPlotDirectory(TString directory) {
   m_plotDir = directory;
+  m_doPlot = true;
 }
 
 /**

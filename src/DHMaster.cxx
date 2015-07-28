@@ -325,7 +325,7 @@ int main (int argc, char **argv) {
     }
     std::cout << "Resubmitted " << jobCounterWS << " jobs" << std::endl;
   }
-  
+  /*
   //--------------------------------------//
   // Step 5.1: Create pseudoexperiment ensemble:
   TString currSignal = sigModes[2];
@@ -425,7 +425,7 @@ int main (int argc, char **argv) {
     }
     std::cout << "Resubmitted " << jobCounterTS << " jobs" << std::endl;
   }
-  
+  */
   //--------------------------------------//
   // Step 7.1: Calculate the limits on the dark matter signal strength.
   if (masterOption.Contains("MuLimit") &&

@@ -86,6 +86,9 @@ class DHTestStat {
   bool m_doPlot;        // Sets whether or not to plot fit results.
   //int m_nBins;
   
+  // Pointer to the input file:
+  TFile *inputFile;
+  
   // Check whether all fits successful:
   bool m_allGoodFits;
   
