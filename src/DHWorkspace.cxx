@@ -318,11 +318,6 @@ void DHWorkspace::createNewModel() {
   double nllMuFree = dhts->getFitNLL(currDataName, 1, false, profiledMuDHVal);
   if (!dhts->fitsAllConverged()) m_allGoodFits = false;
   
-  // Calculate profile likelihood ratios:
-  double llrL1L0 = nllMu1 - nllMu0;
-  double llrL1Lfree = profiledMuDHVal > 1.0 ? 0.0 : (nllMu1 - nllMuFree);
-  double llrL0Lfree = profiledMuDHVal < 0.0 ? 0.0 : (nllMu0 - nllMuFree);
-  
   // Print summary of the fits:
   std::cout.precision(10);
   std::cout << "\nDHWorkspace: Printing likelihood results for " << currAna

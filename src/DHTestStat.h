@@ -20,7 +20,7 @@
 #include "statistics.h"
 #include "DHAnalysis.h"
 
-#include "DHWorkspace.h" //REMOVE DEPENDENCY
+#include "DHWorkspace.h"
 
 class DHTestStat {
   

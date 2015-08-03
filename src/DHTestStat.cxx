@@ -64,9 +64,7 @@ DHTestStat::DHTestStat(TString newJobName, TString newDHSignal,
     }
   }
   // Use the workspace passed to the class constructor:
-  else {
-    m_workspace = newWorkspace;
-  }
+  else m_workspace = newWorkspace;
   
   // Based on resonant or nonresonant:
   m_mc
@@ -87,6 +85,7 @@ DHTestStat::DHTestStat(TString newJobName, TString newDHSignal,
     loadStatsFromFile();
   }
   
+  // Finished instantiating the test statistic class. 
   std::cout << "DHTestStat: Initialized Successfully!" << std::endl;
   return;
 }
@@ -263,11 +262,11 @@ RooDataSet* DHTestStat::createAsimovData(int valMuDH, int valMuSH) {
   // Set mu_DH and mu_SH to the specified values:
   RooRealVar *poi = m_workspace->var("mu_DH");
   double initialMuDH = poi->getVal();
-  double initialMuSH = m_workspace->var("mu_DH")->getVal();
+  double initialMuSH = m_workspace->var("mu_SH")->getVal();
   poi->setVal(valMuDH);
   poi->setConstant(true);
-  m_workspace->var("mu_DH")->setVal(valMuSH);
-  m_workspace->var("mu_DH")->setConstant(true);
+  m_workspace->var("mu_SH")->setVal(valMuSH);
+  m_workspace->var("mu_SH")->setConstant(true);
   
   // Also use m_DHSignal to set the resonance mass.
   if (m_DHSignal.EqualTo("Res")) {
@@ -546,9 +545,7 @@ double DHTestStat::getFitNLL(TString datasetName, double muVal, bool fixMu,
   int status = 0; 
   RooNLLVar* varNLL = (RooNLLVar*)combPdf->createNLL(*data, Constrain(*nuisanceParameters), Extended(combPdf->canBeExtended()));
   statistics::minimize(status, varNLL, "", NULL, false);
-  if (status != 0) {
-    m_allGoodFits = false;
-  }
+  if (status != 0) m_allGoodFits = false;
   
   // Save a snapshot if requested:
   if (m_doSaveSnapshot) {
@@ -559,8 +556,8 @@ double DHTestStat::getFitNLL(TString datasetName, double muVal, bool fixMu,
   
   // Plot the fit result if the user has set an output directory for plots:
   if (m_doPlot) {
-    if (fixMu && ((int)muVal) == 1 ) plotFits("Mu1", datasetName);
-    else if (fixMu && ((int)muVal) == 0 ) plotFits("Mu0", datasetName);
+    if (fixMu && ((int)muVal) == 1) plotFits("Mu1", datasetName);
+    else if (fixMu && ((int)muVal) == 0) plotFits("Mu0", datasetName);
     else plotFits("MuFree", datasetName);
   }
   
@@ -782,19 +779,19 @@ void DHTestStat::loadStatsFromFile() {
   textCL.close();
   
   // save CL and CLs for later access:
-  m_calculatedValues[getKey("CL",0,-2)] = inExpCLn2;
-  m_calculatedValues[getKey("CL",0,-1)] = inExpCLn1;
-  m_calculatedValues[getKey("CL",0,0)] = inExpCL;
-  m_calculatedValues[getKey("CL",0,1)] = inExpCLp1;
-  m_calculatedValues[getKey("CL",0,2)] = inExpCLp2;
-  m_calculatedValues[getKey("CL",1,0)] = inObsCL;
+  m_calculatedValues[getKey("CL", 0, -2)] = inExpCLn2;
+  m_calculatedValues[getKey("CL", 0, -1)] = inExpCLn1;
+  m_calculatedValues[getKey("CL", 0, 0)] = inExpCL;
+  m_calculatedValues[getKey("CL", 0, 1)] = inExpCLp1;
+  m_calculatedValues[getKey("CL", 0, 2)] = inExpCLp2;
+  m_calculatedValues[getKey("CL", 1, 0)] = inObsCL;
   
-  m_calculatedValues[getKey("CLs",0,-2)] = getCLsFromCL(inExpCLn2);
-  m_calculatedValues[getKey("CLs",0,-1)] = getCLsFromCL(inExpCLn1);
-  m_calculatedValues[getKey("CLs",0,0)] = getCLsFromCL(inExpCL);
-  m_calculatedValues[getKey("CLs",0,1)] = getCLsFromCL(inExpCLp1);
-  m_calculatedValues[getKey("CLs",0,2)] = getCLsFromCL(inExpCLp2);
-  m_calculatedValues[getKey("CLs",1,0)] = getCLsFromCL(inObsCL);
+  m_calculatedValues[getKey("CLs", 0, -2)] = getCLsFromCL(inExpCLn2);
+  m_calculatedValues[getKey("CLs", 0, -1)] = getCLsFromCL(inExpCLn1);
+  m_calculatedValues[getKey("CLs", 0, 0)] = getCLsFromCL(inExpCL);
+  m_calculatedValues[getKey("CLs", 0, 1)] = getCLsFromCL(inExpCLp1);
+  m_calculatedValues[getKey("CLs", 0, 2)] = getCLsFromCL(inExpCLp2);
+  m_calculatedValues[getKey("CLs", 1, 0)] = getCLsFromCL(inObsCL);
 }
 
 /**
