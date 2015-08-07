@@ -16,20 +16,26 @@
 int main(int argc, char **argv) {
   
   // Check that arguments are provided.
-  if (argc < 5) {
+  if (argc < 4) {
     std::cout << "\nUsage: " << argv[0]
-	      << " <jobName> <DHSignal> <cateScheme> <options>" << std::endl;
+	      << " <configFile> <DHSignal> <options>" << std::endl;
     exit(0);
   }
   
-  TString jobName = argv[1];
+  TString configFile = argv[1];
   TString DHSignal = argv[2];
-  TString cateScheme = argv[3];
-  TString options = argv[4];
+  TString options = argv[3];
+  
+  // Load the analysis configuration file:
+  Config *config = new Config(configFile);
+  TString jobName = config->getStr("jobName");
+  TString anaType = DHAnalysis::getAnalysisType(config, DHSignal);
   
   // Define the input file, then make a local copy (for remote jobs):
-  TString originFile = Form("%s/%s/workspaces/rootfiles/workspaceDH.root",
-			    masterOutput.Data(), jobName.Data());
+  TString originFile = Form("%s/%s/workspaces/rootfiles/workspaceDH_%s.root",
+			    (config->getStr("masterOutput")).Data(), 
+			    jobName.Data(), anaType.Data());
+  
   TString copiedFile = "workspaceDH.root";
   system(Form("cp %s %s", originFile.Data(), copiedFile.Data()));
   
@@ -37,8 +43,7 @@ int main(int argc, char **argv) {
   TFile inputFile(copiedFile, "read");
   RooWorkspace *workspace = (RooWorkspace*)inputFile.Get("combinedWS");
   
-  DHTestStat *ts = new DMTestStat(jobName, DHSignal, cateScheme, "new",
-				  workspace);
+  DHTestStat *ts = new DHTestStat(configFile, DHSignal, "new", workspace);
   ts->calculateNewCL();
   ts->calculateNewP0();
   if (ts->fitsAllConverged()) {

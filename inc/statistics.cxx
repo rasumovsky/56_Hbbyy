@@ -39,7 +39,7 @@ RooNLLVar* statistics::createNLL(RooAbsData* _data, ModelConfig* _mc)
   return nll;
 }
 
-RooFitResult* statistics::minimize( int& savestatus, RooAbsReal* fcn, TString option, RooArgSet *minosVars, bool m_save )
+RooFitResult* statistics::minimize(RooAbsReal* fcn, TString option, RooArgSet *minosVars, bool m_save)
 {
   option.ToLower();
 
@@ -113,7 +113,6 @@ RooFitResult* statistics::minimize( int& savestatus, RooAbsReal* fcn, TString op
 
     ROOT::Math::MinimizerOptions::SetDefaultMinimizer(minType.c_str());
   }
-  savestatus = status;
   if (status != 0 && status != 1)
   {
     cout << "WARNING::Fit failure unresolved with status " << status << endl;
@@ -135,8 +134,7 @@ RooFitResult* statistics::minimize( int& savestatus, RooAbsReal* fcn, TString op
 RooFitResult* statistics::minimize(RooNLLVar* nll, TString option, RooArgSet *minosVars)
 {
   RooAbsReal* fcn = (RooAbsReal*)nll;
-  int dummy = 0;
-  return minimize(dummy,fcn,option,minosVars);
+  return minimize(fcn,option,minosVars);
 }
 
 void statistics::recoverSet(RooArgSet* set, RooArgSet* snapshot){

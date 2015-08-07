@@ -49,7 +49,7 @@ public:
   static void setDefaultPrintLevel(int printlevel){ROOT::Math::MinimizerOptions::SetDefaultPrintLevel(printlevel);}
   static void setDefaultStrategy(int strategy){ROOT::Math::MinimizerOptions::SetDefaultStrategy(strategy);}
   static RooNLLVar* createNLL(RooAbsData* _data, ModelConfig* _mc);
-  static RooFitResult* minimize(int& savestatus, RooAbsReal* fcn, TString option="", RooArgSet *minosVars=NULL, bool m_save=true );
+  static RooFitResult* minimize(RooAbsReal* fcn, TString option="", RooArgSet *minosVars=NULL, bool m_save=true );
   static RooFitResult* minimize(RooNLLVar* nll, TString option="", RooArgSet *minosVars=NULL);
   static void constSet(RooArgSet* set, bool flag=true, RooArgSet* snapshot=NULL);
   static void recoverSet(RooArgSet* set, RooArgSet* snapshot);

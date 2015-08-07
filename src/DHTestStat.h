@@ -4,7 +4,7 @@
 //  Class: DHTestStat.cxx                                                     //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 19/04/2015                                                          //
+//  Date: 06/08/2015                                                          //
 //                                                                            //
 //  This class allows the user to calculate p0 and CLs based on an input      //
 //  workspace.                                                                //
@@ -14,20 +14,20 @@
 #ifndef DHTestStat_h
 #define DHTestStat_h
 
+// Package libraries:
 #include "CommonHead.h"
 #include "CommonFunc.h"
+#include "Config.h"
+#include "DHWorkspace.h"
 #include "RooFitHead.h"
 #include "statistics.h"
-#include "DHAnalysis.h"
-
-#include "DHWorkspace.h"
 
 class DHTestStat {
   
  public:
   
-  DHTestStat(TString newJobName, TString newDHSignal, TString newCateScheme,
-	     TString newOptions, RooWorkspace *newWorkspace);
+  DHTestStat(TString newConfigFile, TString newDHSignal, TString newOptions,
+	     RooWorkspace *newWorkspace);
   virtual ~DHTestStat() {};
   
   double accessValue(TString testStat, bool observed, int N);
@@ -35,9 +35,8 @@ class DHTestStat {
   void calculateNewP0();
   void clearData();
   void clearFitParamSettings();
-  RooDataSet* createAsimovData(int valueMuDH, int valMuSH);
-  RooDataSet* createAsimovData(TString datasetName);
   // RooDataSet createBinnedData(TString unbinnedName, int nBins);
+  RooDataSet* createPseudoData(int seed, int valMuDM, int valMuSM, bool fixMu);//TO ADD AND TEST IN DM FIRST!
   bool fitsAllConverged();
   double functionQMu(double x);
   double functionQMuTilde(double x, double asimovTestStat);
@@ -73,14 +72,16 @@ class DHTestStat {
   
   // From the initialization:
   TString m_anaType;    // The analysis type ("Res", "NonRes").
-  TString m_cateScheme; // The categorization scheme.
   TString m_DHSignal;   // The specific signal under study.
   TString m_jobName;    // The name of the group of jobs (for I/O purposes).
   TString m_options;    // Job options.
   TString m_outputDir;  // The output directory for statistics.
   
-  TString m_dataForObs; // The dataset for observed results.
-  TString m_dataForExp; // The dataset for expected results.
+  TString m_dataForObsQ0;  // The dataset for expected results.
+  TString m_dataForObsQMu; // The dataset for observed results.
+  TString m_dataForExpQ0;  // The dataset for expected results.
+  TString m_dataForExpQMu; // The dataset for observed results.
+  
   TString m_plotDir;    // The output directory for plots (not set by default).
   bool m_doSaveSnapshot;// Option to save snapshots of PoI and nuisance params.
   bool m_doPlot;        // Sets whether or not to plot fit results.
@@ -89,6 +90,9 @@ class DHTestStat {
   // Pointer to the input file:
   TFile *inputFile;
   
+  // The configuration of the analysis:
+  Config *m_config;
+
   // Check whether all fits successful:
   bool m_allGoodFits;
   

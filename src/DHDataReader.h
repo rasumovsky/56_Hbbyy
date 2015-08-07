@@ -26,6 +26,7 @@
 #include "TTree.h"
 
 // Package includes:
+#include "Config.h"
 #include "DHAnalysis.h"
 #include "RooFitHead.h"
 
@@ -34,7 +35,7 @@ class DHDataReader {
  public:
   
   // Constructor and destructor:
-  DHDataReader(RooRealVar *observable);
+  DHDataReader(TString configFile, RooRealVar *observable);
   virtual ~DHDataReader() {};
   
   // Mutators:
@@ -44,6 +45,7 @@ class DHDataReader {
   
  private:
   
+  Config *m_config;
   RooRealVar *m_observable;
   
 };
