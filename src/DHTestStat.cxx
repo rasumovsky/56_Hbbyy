@@ -75,7 +75,7 @@ DHTestStat::DHTestStat(TString newConfigFile, TString newDHSignal,
   m_calculatedValues.clear();
   
   // Create output directories:
-  m_outputDir = Form("%s/%s/TestStat",
+  m_outputDir = Form("%s/%s/DHTestStat",
 		     (m_config->getStr("masterOutput")).Data(),
 		     m_jobName.Data());
   system(Form("mkdir -vp %s", m_outputDir.Data()));
@@ -326,7 +326,7 @@ RooDataSet* DHTestStat::createBinnedData(TString unbinnedName, int nBins) {
 RooDataSet* DHTestStat::createPseudoData(int seed, int valMuDH, int valMuSH,
 					 bool fixMu) {
   std::cout << "DHTestStat: Create pseudodata with seed = " << seed 
-	    << "muDH = " << valMuDH << " muSH = " << valMuSH << std::endl;
+	    << ", muDH = " << valMuDH << ", muSH = " << valMuSH << std::endl;
   
   // Load the original parameters from profiling:
   m_workspace->loadSnapshot("paramsOrigin");
@@ -370,10 +370,19 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valMuDH, int valMuSH,
   // WARNING! This overrides the randomization settings above!
   for (int i_p = 0; i_p < (int)m_setParamNames.size(); i_p++) {
     std::cout << "i_p=" << i_p << ", " << m_setParamNames[i_p] << std::endl;
-    m_workspace->var(m_setParamNames[i_p])->setVal(m_setParamVals[i_p]);
-    m_workspace->var(m_setParamNames[i_p])->setConstant(m_setParamConsts[i_p]);
+    if (m_workspace->var(m_setParamNames[i_p])) {
+      m_workspace->var(m_setParamNames[i_p])->setVal(m_setParamVals[i_p]);
+      m_workspace->var(m_setParamNames[i_p])
+	->setConstant(m_setParamConsts[i_p]);
+    }
+    else {
+      m_workspace->Print("v");
+      std::cout << "DHTestStat: Error! Parameter " << m_setParamNames[i_p]
+		<< " not found in workspace! See printout above for clues..."
+		<< std::endl;
+      exit(0);
+    }
   }
-  
   // Iterate over the categories:
   while ((cateType = (RooCatType*)cateIter->Next())) {
     RooAbsPdf *currPDF = combPdf->getPdf(cateType->GetName());
@@ -558,11 +567,22 @@ double DHTestStat::getFitNLL(TString datasetName, double muVal, bool fixMu,
   
   // Check if parameters have been specified during fit:
   for (int i_p = 0; i_p < (int)m_setParamNames.size(); i_p++) {
-    std::cout << "i_p=" << i_p << ", " << m_setParamNames[i_p] << std::endl;
-    m_workspace->var(m_setParamNames[i_p])->setVal(m_setParamVals[i_p]);
-    m_workspace->var(m_setParamNames[i_p])->setConstant(m_setParamConsts[i_p]);
+    std::cout << "i_p = " << i_p << ", " << m_setParamNames[i_p] << std::endl;
+    if (m_workspace->var(m_setParamNames[i_p])) {
+      m_workspace->var(m_setParamNames[i_p])->setVal(m_setParamVals[i_p]);
+      m_workspace->var(m_setParamNames[i_p])
+	->setConstant(m_setParamConsts[i_p]);
+    }
+    else {
+      m_workspace->Print("v");
+      std::cout << "DHTestStat: Error! Parameter " << m_setParamNames[i_p]
+		<< " not found in workspace! See printout above for clues..."
+		<< std::endl;
+      exit(0);
+    }
   }
-  
+  std::cout << "DHTestStat: Parameters have been set for fit." << std::endl;
+
   // Iterate over SM mu values and fix all to 1:
   RooArgSet* muConstants = (RooArgSet*)m_workspace->set("muSHConstants");
   TIterator *iterMuConst = muConstants->createIterator();
@@ -895,6 +915,11 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     leg.Draw("SAME");
     can->Print(Form("%s/fitPlot_%s_%s_%s.eps", m_plotDir.Data(),
 		    m_DHSignal.Data(), fitType.Data(), cateNames[i_c].Data()));
+    delete histDH;
+    delete histSH;
+    delete histBkg;
+    delete histSig;
+    delete frame;
   }
   delete can;
 }

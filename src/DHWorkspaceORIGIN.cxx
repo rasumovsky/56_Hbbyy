@@ -35,36 +35,28 @@ using namespace CommonFunc;
 /**
    -----------------------------------------------------------------------------
    Instantiate the class.
-   @param newConfigFile - The name of the analysis config file.
-   @param newAnalysisType - The name of the analysis type.
-   @param newOptions - The job options ("New", "FromFile"), etc.
+   @param jobName - The name of the job
+   @param cateScheme - The name of the event categorization
+   @param options - The job options ("New", "FromFile"), etc.
    @returns void
 */
-DHWorkspace::DHWorkspace(TString newConfigFile, TString newAnalysisType,
-			 TString newOptions) {
-  m_configFile = newConfigFile;
-  m_anaType = newAnalysisType;
-  m_options = newOptions;
+DHWorkspace::DHWorkspace(TString jobName, TString cateScheme,
+			 TString options) {
+  m_jobName = jobName;
+  m_cateScheme = cateScheme;
+  m_options = options;
   m_allGoodFits = true;
   
   m_combinedWS = NULL;
-  m_modelConfig = NULL;
+  m_mConfig.clear();
   
-  m_muNominalSH = 1;
-  
-  m_config = new Config(m_configFile);
-  m_dataToPlot = (m_config->getBool("doBlind")) ? "asimovDataMu1" : "obsData";
-  
-  // Print workspace inputs:
-  std::cout << "\nDHWorkspace: Initializing..."
-	    << "\n\tconfigFile = " << m_configFile 
-	    << "\n\tanaType = " << m_anaType
-	    << "\n\toptions = " << m_options << std::endl;
+  std::cout << "\nDHWorkspace: Initializing..." << "\n\tjobName = " << m_jobName
+	    << "\n\tcateScheme = " << m_cateScheme << "\n\toptions = "
+	    << m_options << std::endl;
   
   // Assign output directory, and make sure it exists:
-  m_outputDir = Form("%s/%s/DHWorkspace", 
-		     (m_config->getStr("masterOutput")).Data(),
-		     (m_config->getStr("jobName")).Data());
+  m_outputDir = Form("%s/%s/DHWorkspace", DHAnalysis::masterOutput.Data(),
+		     m_jobName.Data());
   system(Form("mkdir -vp %s", m_outputDir.Data()));
   system(Form("mkdir -vp %s/Plots/", m_outputDir.Data()));
   system(Form("mkdir -vp %s/rootfiles/", m_outputDir.Data()));
@@ -72,7 +64,7 @@ DHWorkspace::DHWorkspace(TString newConfigFile, TString newAnalysisType,
   
   // Set style for plots:
   CommonFunc::SetAtlasStyle();
-    
+  
   // Make new or load old workspace:
   if (m_options.Contains("FromFile")) loadWSFromFile();
   else createNewWS();
@@ -106,9 +98,10 @@ RooWorkspace* DHWorkspace::getCombinedWorkspace() {
 /**
    -----------------------------------------------------------------------------
    Retrieves a pointer to the model config.
+   @param analysisType - The type of analysis (Res, NonRes).
 */
-ModelConfig* DHWorkspace::getModelConfig() {
-  return m_modelConfig;
+ModelConfig* DHWorkspace::getModelConfig(TString analysisType) {
+  return m_mConfig[analysisType];
 }
 
 /**
@@ -117,13 +110,25 @@ ModelConfig* DHWorkspace::getModelConfig() {
 */
 void DHWorkspace::loadWSFromFile() {
   //Check to see if the workspace has actually been made.
-  TFile inputFile(Form("%s/rootfiles/workspaceDH_%s.root", 
-		       m_outputDir.Data(), m_anaType.Data()), "read");
+  TFile inputFile(Form("%s/rootfiles/workspaceDH.root", m_outputDir.Data()),
+		  "read");
   if (inputFile.IsOpen()) {
-    std::cout << "DHWorkspace: Loading workspace from file..." << std::endl;
+    std::cout << "DHWorkspace: Loading workspace from file..."<< std::endl;
     // Load the single workspace file:
     m_combinedWS = (RooWorkspace*)inputFile.Get("combinedWS");
-    m_modelConfig = (ModelConfig*)m_combinedWS->obj("modelConfig");
+    
+    // Load the multiple models contained in the workspace:
+    for (int i_t = 0; i_t < DHAnalysis::nAnalysisTypes; i_t++) {
+      currAna = DHAnalysis::analysisTypes[i_t];
+      if ((m_combinedWS->obj(Form("modelConfig_%s",currAna.Data())))) {
+	m_mConfig[currAna] = (ModelConfig*)m_combinedWS
+	  ->obj(Form("modelConfig_%s",currAna.Data()));
+      }	
+      else {
+	std::cout << "DHWorkspace: could not retrieve model for " << currAna
+		  << std::endl;
+      }
+    }
   }
   else {
     std::cout << "DHWorkspace: WARNING! Cannot locate requested workspace!" 
@@ -138,33 +143,63 @@ void DHWorkspace::loadWSFromFile() {
 */
 void DHWorkspace::createNewWS() {
   
-  std::cout << "DHWorkspace: Create a new workspace from scratch." << std::endl;
-  std::cout << "\n........................................" << std::endl;
-  std::cout << "Luminosity at 13 TeV: "
-	    << m_config->getStr("analysisLuminosity") << " pb-1." << std::endl;
-  
-  // Define and name analysis categories:
-  std::vector<TString> cateNames
-    = m_config->getStrV(Form("cateNames%s", m_anaType.Data()));
-  int nCategories = cateNames.size();
-  std::cout << "  Number of categories = " << nCategories << std::endl;
-  std::cout << "........................................" << std::endl;
-  
-  // Read tables of PES and PER and store values:
-  m_pes = new PESReader(m_config->getStr("fileNamePESValues"), nCategories);
-  m_per = new PERReader(m_config->getStr("fileNamePERValues"), nCategories);
-  
-  //--------------------------------------//
-  // Initialize classes relevant to workspace:
   // The combined workspace:
   m_combinedWS = new RooWorkspace("combinedWS");
   m_combinedWS->importClassCode();
   
+  std::cout << "DHWorkspace: Create a new workspace from scratch." << std::endl;
+  std::cout << "\n........................................" << std::endl;
+  std::cout << "Luminosity at 13 TeV: " << DHAnalysis::analysisLuminosity 
+	    << " pb-1." << std::endl;
+  
+  // Loop over the analysis types and define a statistical model for each:
+  for (int i_t = 0; i_t < DHAnalysis::nAnalysisTypes; i_t++) {
+    
+    // Get the current analysis name:
+    currAna = DHAnalysis::analysisTypes[i_t];
+    currNCategories = DHAnalysis::getNumCategories(m_cateScheme, currAna); 
+    
+    // Check to see if the analysis should be implemented:
+    if ((m_options.Contains("NonResOnly") && currAna.EqualTo("Res")) ||
+	(m_options.Contains("ResonantOnly") && currAna.EqualTo("NonRes"))) {
+      continue;
+    }
+    
+    // Go ahead and built that analysis model!
+    createNewModel();
+  }
+  
+  // Print the workspace before saving:
+  std::cout << "DHWorkspace: Printing the workspace to be saved." << std::endl;
+  m_combinedWS->Print("v");
+  
+  // Write workspace to file:
+  m_combinedWS->writeToFile(Form("%s/rootfiles/workspaceDH.root",
+				 m_outputDir.Data()));
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Create one of the analysis models from scratch. Called from createNewWS().
+*/
+void DHWorkspace::createNewModel() {
+  std::cout << "DHWorkspace: Creating model for " << currAna << " analysis." 
+	    << std::endl;
+  // Define and name analysis categories:
+  std::cout << "  Number of categories = " << currNCategories << std::endl;
+  
+
+  //--------------------------------------//
+  // Initialize classes relevant to workspace:
+  
   // Category workspaces, and RooCategory and Simultaneous PDF:
-  RooWorkspace* cateWS[nCategories];
-  RooCategory *categories = new RooCategory("categories", "categories");
+  RooWorkspace* cateWS[currNCategories];
+  RooCategory *categories
+    = new RooCategory(Form("categories_%s", currAna.Data()),
+		      Form("categories_%s", currAna.Data()));
   RooSimultaneous *combinedPdf
-    = new RooSimultaneous("combinedPdf", "combinedPdf", *categories);
+    = new RooSimultaneous(Form("combinedPdf_%s", currAna.Data()),
+			  Form("combinedPdf_%s", currAna.Data()), *categories);
   
   // Instantiate parameter sets:
   RooArgSet *nuisanceParameters = new RooArgSet();
@@ -175,46 +210,41 @@ void DHWorkspace::createNewWS() {
   
   // Maps for datasets:
   std::map<std::string, RooDataSet*> dm;
-  map<string,RooDataSet*> dmAsimovMu0;
-  map<string,RooDataSet*> dmAsimovMu1;
   
+  // Read tables of PES and PER and store values:
+  pes = new PESReader(DHAnalysis::fileNamePESValues, currNCategories);
+  per = new PERReader(DHAnalysis::fileNamePERValues, currNCategories);
+
   //--------------------------------------//
   // Loop over channels:
-  std::cout << "DHWorkspace: Looping over categories to define workspace."
+  std::cout << "DHWorkspace: Looping over " << currAna << " categories."
 	    << std::endl;
-  for (m_currCateIndex = 0; m_currCateIndex < nCategories; m_currCateIndex++) {
+  for (currCateIndex = 0; currCateIndex < currNCategories; currCateIndex++) {
     
-    m_currCateName = cateNames[m_currCateIndex];
+    currCateName = DHAnalysis::cateIndexToName(m_cateScheme, currAna, 
+					       currCateIndex);
     
     // Create the workspace for a single category:
-    cateWS[m_currCateIndex] = createNewCategoryWS();
-    categories->defineType(m_currCateName);
+    cateWS[currCateIndex] = createNewCategoryWS();
+    categories->defineType(currCateName);
     
     // Add PDFs and parameters: 
-    TString namePdf = Form("model_%s", m_currCateName.Data());
-    TString nameNP = Form("nuisanceParameters_%s", m_currCateName.Data());
-    TString nameGlob = Form("globalObservables_%s", m_currCateName.Data());
-    TString nameMuC = Form("muConstants_%s", m_currCateName.Data());
-    TString nameObs = Form("observables_%s", m_currCateName.Data());
-    combinedPdf->addPdf(*cateWS[m_currCateIndex]->pdf(namePdf), m_currCateName);
-    nuisanceParameters->add(*cateWS[m_currCateIndex]->set(nameNP));
-    globalObservables->add(*cateWS[m_currCateIndex]->set(nameGlob));
-    muSHConstants->add(*cateWS[m_currCateIndex]->set(nameMuC));
-    nuisanceParameters->add(*cateWS[m_currCateIndex]->set(nameMuC));
-    observables->add(*cateWS[m_currCateIndex]->set(nameObs));
-
-    // Add category datasets to combined workspace and combined datasets:
-    TString nameOD = Form("obsData_%s", m_currCateName.Data());
-    //TString nameAD0 = Form("asimovDataMu0_%s", m_currCateName.Data());
-    //TString nameAD1 = Form("asimovDataMu1_%s", m_currCateName.Data());
-    m_combinedWS->import(*(RooDataSet*)cateWS[m_currCateIndex]->data(nameOD));
-    // m_combinedWS->import(*(RooDataSet*)cateWS[m_currCateIndex]->data(nameAD0));
-    //m_combinedWS->import(*(RooDataSet*)cateWS[m_currCateIndex]->data(nameAD1));
-    dm[(string)m_currCateName] = (RooDataSet*)m_combinedWS->data(nameOD);
-    //dmAsimovMu0[(string)m_currCateName] 
-    //  = (RooDataSet*)m_combinedWS->data(nameAD0);
-    //dmAsimovMu1[(string)m_currCateName]
-    //  = (RooDataSet*)m_combinedWS->data(nameAD1);
+    TString namePdf = Form("model_%s", currCateName.Data());
+    TString nameNP = Form("nuisanceParameters_%s", currCateName.Data());
+    TString nameGlob = Form("globalObservables_%s", currCateName.Data());
+    TString nameMuC = Form("muConstants_%s", currCateName.Data());
+    TString nameObs = Form("observables_%s", currCateName.Data());
+    combinedPdf->addPdf(*cateWS[currCateIndex]->pdf(namePdf), currCateName);
+    nuisanceParameters->add(*cateWS[currCateIndex]->set(nameNP));
+    globalObservables->add(*cateWS[currCateIndex]->set(nameGlob));
+    muSHConstants->add(*cateWS[currCateIndex]->set(nameMuC));
+    nuisanceParameters->add(*cateWS[currCateIndex]->set(nameMuC));
+    observables->add(*cateWS[currCateIndex]->set(nameObs));
+    
+    // Add category datasets to combined workspace and combined data maps:
+    TString nameData = Form("obsData_%s", currCateName.Data());
+    m_combinedWS->import(*(RooDataSet*)cateWS[currCateIndex]->data(nameData));
+    dm[(string)currCateName] = (RooDataSet*)m_combinedWS->data(nameData);
   }
   std::cout << "DHWorkspace: Beginning to combine all categories." << std::endl;
   
@@ -223,111 +253,74 @@ void DHWorkspace::createNewWS() {
   RooArgSet *args = new RooArgSet();
   args->add(*observables);
   args->add(wt);
-  RooDataSet* obsData = new RooDataSet("obsData", "obsData", *args,
-				       Index(*categories), Import(dm),
+  RooDataSet* obsData = new RooDataSet(Form("obsData_%s", currAna.Data()),
+				       Form("obsData_%s", currAna.Data()),
+				       *args, Index(*categories), Import(dm),
 				       WeightVar(wt));
-  //  RooDataSet* asimovDataMu0 = new RooDataSet("asimovDataMu0", "asimovDataMu0",
-  //					     *args, Index(*categories), 
-  //					     Import(dmAsimovMu0),WeightVar(wt));
-  //RooDataSet* asimovDataMu1 = new RooDataSet("asimovDataMu1", "asimovDataMu1",
-  //					     *args, Index(*categories), 
-  //					     Import(dmAsimovMu1),WeightVar(wt));
   
   // Import PDFs, parameters, and dataset into workspace:
   m_combinedWS->import(*categories);
   m_combinedWS->import(*combinedPdf);
-  m_combinedWS->defineSet("nuisanceParameters", *nuisanceParameters);
-  m_combinedWS->defineSet("observables", *observables);
-  m_combinedWS->defineSet("globalObservables", *globalObservables);
-  m_combinedWS->defineSet("poi", RooArgSet(*m_combinedWS->var("mu_DH")));   
-  m_combinedWS->defineSet("muSHConstants", *muSHConstants);
+  m_combinedWS->defineSet(Form("nuisanceParameters_%s", currAna.Data()),
+			  *nuisanceParameters);
+  m_combinedWS->defineSet(Form("observables_%s", currAna.Data()),
+			  *observables);
+  m_combinedWS->defineSet(Form("globalObservables_%s", currAna.Data()),
+			  *globalObservables);
+  m_combinedWS->defineSet(Form("poi_%s",currAna.Data()),
+			  RooArgSet(*m_combinedWS->var("mu_DH")));   
+  m_combinedWS->defineSet(Form("muSHConstants_%s", currAna.Data()),
+			  *muSHConstants);
   m_combinedWS->import(*obsData);
-  //m_combinedWS->import(*asimovDataMu0);
-  //m_combinedWS->import(*asimovDataMu1);
   
   // Define the ModelConfig for the analysis and import to the workspace:
-  m_modelConfig = new ModelConfig("modelConfig", m_combinedWS);
-  m_modelConfig->SetPdf((*m_combinedWS->pdf("combinedPdf")));
-  m_modelConfig->SetObservables((*m_combinedWS->set("observables")));
-  m_modelConfig->SetParametersOfInterest((*m_combinedWS->set("poi")));
-  m_modelConfig
-    ->SetNuisanceParameters((*m_combinedWS->set("nuisanceParameters")));
-  m_modelConfig
-    ->SetGlobalObservables((*m_combinedWS->set("globalObservables")));
-  m_combinedWS->import(*m_modelConfig);
+  m_mConfig[currAna] = new ModelConfig(Form("modelConfig_%s",currAna.Data()),
+				       m_combinedWS);
+  m_mConfig[currAna]->SetPdf((*m_combinedWS->pdf(Form("combinedPdf_%s",currAna.Data()))));
+  m_mConfig[currAna]->SetObservables((*m_combinedWS->set(Form("observables_%s",currAna.Data()))));
+  m_mConfig[currAna]->SetParametersOfInterest((*m_combinedWS->set(Form("poi_%s",currAna.Data()))));
+  m_mConfig[currAna]->SetNuisanceParameters((*m_combinedWS->set(Form("nuisanceParameters_%s",currAna.Data()))));
+  m_mConfig[currAna]->SetGlobalObservables((*m_combinedWS->set(Form("globalObservables_%s",currAna.Data()))));
+  m_combinedWS->import(*m_mConfig[currAna]);
   
-  std::cout << "DHWorkspace: Printing the combined workspace." << std::endl;
+  std::cout << "DHWorkspace: Printing the " << currAna << " combined workspace."
+	    << std::endl;
   m_combinedWS->Print("v");
-  
-  
-  //////////////
-  (*m_combinedWS->var("mu_DH")).setVal(0.0);
-  
-  (*m_combinedWS->pdf("combinedPdf")).fitTo(*m_combinedWS->data("obsData"), Minos(RooArgSet(*m_combinedWS->set("nuisanceParameters"))), SumW2Error(kTRUE));
-  
-  //Minos(RooArgSet(*nuisCateWS))
-  
-  
-  // Stupid secondary loop for Asimov data:
-  for (m_currCateIndex = 0; m_currCateIndex < nCategories; m_currCateIndex++) {
-    m_currCateName = cateNames[m_currCateIndex];
-    
-    (*m_combinedWS->var("nBkg_"+m_currCateName)).setVal((*m_combinedWS->data(Form("obsData_%s",m_currCateName.Data()))).sumEntries());
-    dmAsimovMu0[(string)m_currCateName] = createAsimovData(0, m_muNominalSH);
-    dmAsimovMu1[(string)m_currCateName] = createAsimovData(1, m_muNominalSH);
-    
-    //TString nameAD0 = Form("asimovDataMu0_%s", m_currCateName.Data());
-    //TString nameAD1 = Form("asimovDataMu1_%s", m_currCateName.Data());
-    //m_combinedWS->import(*(RooDataSet*)cateWS[m_currCateIndex]->data(nameAD0));
-    //m_combinedWS->import(*(RooDataSet*)cateWS[m_currCateIndex]->data(nameAD1));
-    //dmAsimovMu0[(string)m_currCateName] 
-    //= (RooDataSet*)m_combinedWS->data(nameAD0);
-    //dmAsimovMu1[(string)m_currCateName]
-    //= (RooDataSet*)m_combinedWS->data(nameAD1);
-  }    
-  RooDataSet* asimovDataMu0 = new RooDataSet("asimovDataMu0", "asimovDataMu0",
-  					     *args, Index(*categories), 
-  					     Import(dmAsimovMu0),WeightVar(wt));
-  RooDataSet* asimovDataMu1 = new RooDataSet("asimovDataMu1", "asimovDataMu1",
-  					     *args, Index(*categories), 
-  					     Import(dmAsimovMu1),WeightVar(wt));
-  
-  m_combinedWS->import(*asimovDataMu0);
-  m_combinedWS->import(*asimovDataMu1);
-  //////////
-  
-  // Save snapshot of original parameter values:
-  RooArgSet* poiAndNuis = new RooArgSet();
-  poiAndNuis->add(*m_modelConfig->GetNuisanceParameters());
-  poiAndNuis->add(*m_modelConfig->GetParametersOfInterest());
-  m_combinedWS->saveSnapshot("paramsOrigin", *poiAndNuis);
   
   // Start profiling the data:
   std::cout << "DHWorkspace: Start profiling data" << std::endl;
-    
-  // Choose two models for the default test fits:
-  std::vector<TString> sigDHModes = m_config->getStrV("sigDHModes");
-  TString currDHSignal
-    = m_anaType.Contains("NonRes") ? sigDHModes[0] : sigDHModes[1];
   
-  DHTestStat *dhts 
-    = new DHTestStat(m_configFile, currDHSignal, "FromFile", m_combinedWS);
+  // Save a snapshot of the parameters:
+  m_combinedWS->saveSnapshot(Form("paramsOrigin_%s",currAna.Data()),
+			     *nuisanceParameters);
+  
+  // Choose two models for the default test fits:
+  TString currDHSignal = currAna.Contains("NonRes") ?
+    DHAnalysis::sigDHModes[0] : DHAnalysis::sigDHModes[1];
+  
+  DHTestStat *dhts = new DHTestStat(m_jobName, currDHSignal, m_cateScheme,
+				    "FromFile", m_combinedWS);
   dhts->saveSnapshots(true);
-  dhts->setPlotDirectory(Form("%s/Plots/", m_outputDir.Data()));
+  //dhts->setPlotDirectory(Form("%s/Plots/", m_outputDir.Data()));
+  
+  m_dataToPlot = (DHAnalysis::doBlind) ?
+    Form("asimovDataMu1_%s",currAna.Data()) : Form("obsData_%s",currAna.Data());
+
   double profiledMuDHVal = -999.0;
+  TString currDataName = Form("%s_%s", m_dataToPlot.Data(), currAna.Data());
   // Mu = 0 fits:
-  double nllMu0 = dhts->getFitNLL(m_dataToPlot, 0, true, profiledMuDHVal);
+  double nllMu0 = dhts->getFitNLL(currDataName, 0, true, profiledMuDHVal);
   if (!dhts->fitsAllConverged()) m_allGoodFits = false;
   // Mu = 1 fits:
-  double nllMu1 = dhts->getFitNLL(m_dataToPlot, 1, true, profiledMuDHVal);
+  double nllMu1 = dhts->getFitNLL(currDataName, 1, true, profiledMuDHVal);
   if (!dhts->fitsAllConverged()) m_allGoodFits = false;
   // Mu free fits:
-  double nllMuFree = dhts->getFitNLL(m_dataToPlot, 1, false, profiledMuDHVal);
+  double nllMuFree = dhts->getFitNLL(currDataName, 1, false, profiledMuDHVal);
   if (!dhts->fitsAllConverged()) m_allGoodFits = false;
   
   // Print summary of the fits:
   std::cout.precision(10);
-  std::cout << "\nDHWorkspace: Printing likelihood results for " << m_anaType
+  std::cout << "\nDHWorkspace: Printing likelihood results for " << currAna
 	    << std::endl;
   std::cout << "\tnll(muDH = 1):  " << nllMu1 << std::endl;
   std::cout << "\tnll(muDH = 0):  " << nllMu0 << std::endl;
@@ -342,54 +335,45 @@ void DHWorkspace::createNewWS() {
   
   // Write the profiled mu value to file:
   ofstream fileMuProf;
-  fileMuProf
-    .open(Form("%s/mu/mu_%s.txt", m_outputDir.Data(), currDHSignal.Data()));
+  fileMuProf.open(Form("%s/mu/mu_%s.txt",
+		       m_outputDir.Data(), currDHSignal.Data()));
   fileMuProf << profiledMuDHVal << std::endl;
   fileMuProf.close();
-
-  // Print the workspace before saving:
-  std::cout << "DHWorkspace: Printing the workspace to be saved." << std::endl;
-  m_combinedWS->Print("v");
-  
-  // Write workspace to file:
-  m_combinedWS->writeToFile(Form("%s/rootfiles/workspaceDH_%s.root",
-				 m_outputDir.Data(), m_anaType.Data()));
 }
 
 /**
    -----------------------------------------------------------------------------
-   Create the workspace for a single analysis category. Note: m_anaType, 
-   m_currCateIndex, and m_currCateName are defined with global scope and updated
-   in each call to this method.
+   Create the workspace for a single analysis category. Note: currAna, 
+   currNCategories, currCateIndex, and currCateName are defined with a global 
+   scope and updated in each call to this method.
 */
 RooWorkspace* DHWorkspace::createNewCategoryWS() {
     
   // The bools that control the systematic uncertainties:
-  bool inclusive = (m_currCateName == "inclusive");
-  bool channel_constraints_attached = (m_currCateIndex == 0);
-  bool switch_norm = !m_options.Contains("nonorm");
-  bool switch_pes = !m_options.Contains("nopes");
-  bool switch_per = !m_options.Contains("noper");
-  bool switch_ss  = !m_options.Contains("noss");
-  bool switch_bgm = !m_options.Contains("nobgm");
-  bool switch_mig = !m_options.Contains("nomig");
-  bool switch_nosys = m_options.Contains("nosys");
-  if (switch_nosys) {
+  bool inclusive = (currCateName == "inclusive");
+  bool channel_constraints_attached = (currCateIndex == 0);
+  bool m_norm = !m_options.Contains("nonorm");
+  bool m_pes = !m_options.Contains("nopes");
+  bool m_per = !m_options.Contains("noper");
+  bool m_ss  = !m_options.Contains("noss");
+  bool m_bgm = !m_options.Contains("nobgm");
+  bool m_mig = !m_options.Contains("nomig");
+  bool m_nosys = m_options.Contains("nosys");
+  if (m_nosys) {
     std::cout << "\tDHWorkspace: ALL systematics OFF" << endl;
-    switch_norm = false;   switch_pes = false;   switch_per = false;
-    switch_ss = false;     switch_bgm = false;   switch_mig = false;
+    m_norm = false;   m_pes = false;   m_per = false;
+    m_ss = false;     m_bgm = false;   m_mig = false;
   }
-  std::cout << "\tNormalization systematics = " << switch_norm << std::endl;
-  std::cout << "\tEnergy scale systematics  = " << switch_pes  << std::endl;
-  std::cout << "\tResolution systematics    = " << switch_per  << std::endl;
-  std::cout << "\tShape systematics         = " << switch_ss   << std::endl;
-  std::cout << "\tBackground systematics    = " << switch_bgm  << std::endl;
-  std::cout << "\tMigration systematics     = " << switch_mig  << std::endl;
+  std::cout << "\tNormalization systematics = " << m_norm << std::endl;
+  std::cout << "\tEnergy scale systematics  = " << m_pes  << std::endl;
+  std::cout << "\tResolution systematics    = " << m_per  << std::endl;
+  std::cout << "\tShape systematics         = " << m_ss   << std::endl;
+  std::cout << "\tBackground systematics    = " << m_bgm  << std::endl;
+  std::cout << "\tMigration systematics     = " << m_mig  << std::endl;
   
   //--------------------------------------//
   // Create the individual channel workspace:
-  RooWorkspace *tempWS
-    = new RooWorkspace(Form("tempWS_%s", m_currCateName.Data()));
+  RooWorkspace *tempWS = new RooWorkspace(Form("tmpWS_%s",currCateName.Data()));
   
   // Nuisance parameters:
   RooArgSet *nuisParamsBkg = new RooArgSet();
@@ -414,7 +398,7 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   
   //--------------------------------------//
   // Normalization systematics:
-  if (switch_norm) {
+  if (m_norm) {
     double setupLumi[4] = {0.036, 0, 1, 1};
     makeNP("Luminosity", setupLumi, *&nuisParamsCorr, *&constraints, 
 	   *&globalObs, *&expected);
@@ -434,13 +418,13 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   
   //--------------------------------------//
   // Migration systematics:
-  if (switch_mig) {
+  if (m_mig) {
     // Follow examples in other workspaces...
   }
   
   //--------------------------------------//
   // SYSTEMATICS: Spurious signal
-  if (switch_bgm) {
+  if (m_bgm) {
     double ssEvents = 0.1;//need a spuriousSignal function;
     double setupBias[4] = {ssEvents, -999, 1, 0}; //Gaussian constraint
     makeNP("bias", setupBias, *&nuisParamsUncorr, *&constraintsBias,
@@ -454,15 +438,15 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   // SYSTEMATICS - Resolution:
   TString m_listMRS = "";
   std::vector<TString> perList; perList.clear();
-  if (switch_per) {
+  if (m_per) {
     double setupPER[4] = {0.0, 0, 1, 1};
     // Loop over sources of resolution systematic uncertainty:
-    for (int i_s = 0; i_s < m_per->getNumberOfSources(); i_s++) {
-      TString currPERSource = m_per->getNameOfSource(i_s);
+    for (int i_s = 0; i_s < per->getNumberOfSources(); i_s++) {
+      TString currPERSource = per->getNameOfSource(i_s);
       TString currPERName = Form("EM_%s",currPERSource.Data());
       perList.push_back(currPERName);
-      setupPER[0] = m_per->getValue(currPERSource, m_currCateIndex);
-      setupPER[2] = m_per->getSign(currPERSource, m_currCateIndex);
+      setupPER[0] = per->getValue(currPERSource, currCateIndex);
+      setupPER[2] = per->getSign(currPERSource, currCateIndex);
       // Resolution on the inclusive shape:
       makeShapeNP(currPERName, "DH", setupPER, *&nuisParamsCorr, *&constraints,
 		  *&globalObs, *&expectedShape);
@@ -475,15 +459,15 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   // SYSTEMATICS - Energy-scale:
   TString m_listMSS = "";
   std::vector<TString> pesList; pesList.clear();
-  if (switch_pes) {
+  if (m_pes) {
     double setupPES[4] = {0.0, 0, 1, 1};
     // loop over sources of energy scale systematic uncertainty:
-    for (int i_s = 0; i_s < m_pes->getNumberOfSources(); i_s++) {
-      TString currPESSource = m_pes->getNameOfSource(i_s);
+    for (int i_s = 0; i_s < pes->getNumberOfSources(); i_s++) {
+      TString currPESSource = pes->getNameOfSource(i_s);
       TString currPESName = Form("EM_%s",currPESSource.Data());
       pesList.push_back(currPESName);
-      setupPES[0] = m_pes->getValue(currPESSource, m_currCateIndex);
-      setupPES[2] = m_pes->getSign(currPESSource, m_currCateIndex);
+      setupPES[0] = pes->getValue(currPESSource, currCateIndex);
+      setupPES[2] = pes->getSign(currPESSource, currCateIndex);
       makeNP(currPESName, setupPES, *&nuisParamsCorr, *&constraints, 
 	     *&globalObs, *&expectedShape);
     }
@@ -511,23 +495,21 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   tempWS->import(*expectedBias);
   
   // Declare the observable, and the observables set:
-  TString obsVarName = m_anaType.EqualTo("NonRes") ? "m_yy" : "m_bbyy";
-  double obsMin = m_anaType.EqualTo("NonRes") ?
-    m_config->getNum("DHMyyRangeLo") : m_config->getNum("DHMyybbRangeLo");
-  double obsMax = m_anaType.EqualTo("NonRes") ? 
-    m_config->getNum("DHMyyRangeHi") : m_config->getNum("DHMyybbRangeHi");
-  tempWS->factory(Form("%s[%f,%f]", obsVarName.Data(), obsMin, obsMax));
-  tempWS->defineSet("obsprelim", obsVarName);
+  TString obsName = currAna.EqualTo("NonRes") ? "m_yy" : "m_bbyy";
+  double obsMin = currAna.EqualTo("NonRes") ?
+    DHAnalysis::DHMyyRangeLo : DHAnalysis::DHMyybbRangeLo;
+  double obsMax = currAna.EqualTo("NonRes") ? 
+    DHAnalysis::DHMyyRangeHi : DHAnalysis::DHMyybbRangeHi;
+  tempWS->factory(Form("%s[%f,%f]", obsName.Data(), obsMin, obsMax));
+  tempWS->defineSet("obsprelim", obsName);
   
   //--------------------------------------//
   // Begin PDF construction.
-    
+  
   // Construct the background PDF (present in every category):
   std::cout << "DHWorkspace: Constructing background model" << std::endl;
-  BkgModel *currBkgModel = new BkgModel(tempWS->var(obsVarName));
-  vector<TString> bkgFunctionList
-    = m_config->getStrV(Form("bkgFunctions%s",m_anaType.Data()));
-  TString bkgFuncName = bkgFunctionList[m_currCateIndex];
+  BkgModel *currBkgModel = new BkgModel(tempWS->var(obsName));
+  TString bkgFuncName = DHAnalysis::cateToBkgFunc(currCateName);
   currBkgModel->addBkgToCateWS(tempWS, nuisParamsBkg, bkgFuncName);
     
   std::cout << "DHWorkspace: Printing corr. bkg. nuisance params." << std::endl;
@@ -535,21 +517,21 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   
   // Start to construct the statistical model, add components one by one:
   TString modelForm = "SUM::modelSB(nBkg[100,0,1000000]*bkgPdf";
-  
+    
   // Construct SH and DH signals (depending on categories):
   std::cout << "DHWorkspace: Constructing signal model" << std::endl;
-  if (m_anaType.EqualTo("NonRes")) {
+  if (currAna.EqualTo("NonRes")) {
     
     // SH (Single-Higgs) signal:
-    if (DHAnalysis::cateHasComponent(m_config,m_currCateName,"BkgSingleHiggs")){
+    if (DHAnalysis::cateHasComponent(currCateName, "BkgSingleHiggs")) {
       std::cout << "DHWorkspace: Add single Higgs model component for category "
-		<< m_currCateName << std::endl;
+		<< currCateName << std::endl;
       // jj CR first, bb SR second
       double normSH[2] = {0.00868, 0.186};
-      tempWS->factory(Form("RooCBShape::pdfCB_SH(%s, prod::muCB_SH(muCBNom_SH[124.96]%s), prod::sigmaCB_SH(sigmaCBNom_SH[1.53]%s), alphaCB_SH[1.56], nCB_SH[10.0])", obsVarName.Data(), m_listMSS.Data(), m_listMRS.Data()));
-      tempWS->factory(Form("RooGaussian::pdfGA_SH(%s, prod::muGA_SH(muCBNom_SH%s), prod::sigmaGA_SH(sigmaGANom_SH[23.98]%s))", obsVarName.Data(), m_listMSS.Data(), m_listMRS.Data()));
+      tempWS->factory(Form("RooCBShape::pdfCB_SH(%s, prod::muCB_SH(muCBNom_SH[124.96]%s), prod::sigmaCB_SH(sigmaCBNom_SH[1.53]%s), alphaCB_SH[1.56], nCB_SH[10.0])", obsName.Data(), m_listMSS.Data(), m_listMRS.Data()));
+      tempWS->factory(Form("RooGaussian::pdfGA_SH(%s, prod::muGA_SH(muCBNom_SH%s), prod::sigmaGA_SH(sigmaGANom_SH[23.98]%s))", obsName.Data(), m_listMSS.Data(), m_listMRS.Data()));
       tempWS->factory(Form("SUM::sigPdfSH(fracCB_SH[1.00]*pdfCB_SH,pdfGA_SH)"));
-      tempWS->factory(Form("nSH[%f]", normSH[m_currCateIndex]));
+      tempWS->factory(Form("nSH[%f]", normSH[currCateIndex]));
       
       // Normalization for SH (expectationCommon = mu*isEM*lumi*migr):
       tempWS->factory("prod::nSigSH(nSH,expectationCommon,expectationSH)");
@@ -559,20 +541,15 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
     }
     
     // Now BSM (Di-Higgs) signal:
-    if (DHAnalysis::cateHasComponent(m_config,m_currCateName,"SigDiHiggs")){
+    if (DHAnalysis::cateHasComponent(currCateName, "Signal")) {
       std::cout << "DHWorkspace: Add di-Higgs model component for category "
-		<< m_currCateName << std::endl;
-      tempWS->factory(Form("RooCBShape::pdfCB_DH(%s, prod::muCB_DH(muCBNom_DH[124.95]%s), prod::sigmaCB_DH(sigmaCBNom_DH[1.31]%s), alphaCB_DH[1.56], nCB_DH[10.0])", obsVarName.Data(), m_listMSS.Data(), m_listMRS.Data()));
-      tempWS->factory(Form("RooGaussian::pdfGA_DH(%s, prod::muGA_DH(muCBNom_DH%s), prod::sigmaGA_DH(sigmaGANom_DH[2.84]%s))", obsVarName.Data(), m_listMSS.Data(), m_listMRS.Data()));
+		<< currCateName << std::endl;
+      tempWS->factory(Form("RooCBShape::pdfCB_DH(%s, prod::muCB_DH(muCBNom_DH[124.95]%s), prod::sigmaCB_DH(sigmaCBNom_DH[1.31]%s), alphaCB_DH[1.56], nCB_DH[10.0])", obsName.Data(), m_listMSS.Data(), m_listMRS.Data()));
+      tempWS->factory(Form("RooGaussian::pdfGA_DH(%s, prod::muGA_DH(muCBNom_DH%s), prod::sigmaGA_DH(sigmaGANom_DH[2.84]%s))", obsName.Data(), m_listMSS.Data(), m_listMRS.Data()));
       tempWS->factory(Form("SUM::sigPdfDH(fracCB_DH[0.94]*pdfCB_DH,pdfGA_DH)"));
       //tempWS->factory("nDH[1,0,100]");
+      tempWS->factory("nDH[1.0]");
       
-      double nSignalEvents = (m_config->getNum("analysisLuminosity") * 
-			      m_config->getNum("acceptanceXEfficiency") * 
-			      m_config->getNum("bbyyBranchingRatio") * 
-			      m_config->getNum("exampleSignalXS"));
-      tempWS->factory(Form("nDH[%f]", nSignalEvents));
-		      
       // Normalization for DH (expectationCommon = mu*isEM*lumi*migr):
       tempWS->factory("prod::nSigDH(nDH,expectationCommon,expectationDH)");
       
@@ -580,7 +557,7 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
       modelForm += ",nSigDH*sigPdfDH,sigBias*sigPdfDH";
     }
   }
-  else if (m_anaType.EqualTo("Resonant")) {
+  else if (currAna.EqualTo("Res")) {
     std::cout << "DHWorkspace: Resonant analysis has not been implemented!"
 	      << std::endl;
     exit(0);
@@ -597,7 +574,7 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   
   // Only attach constraint term to first category. If constraint terms were
   // attached to each category, constraints would effectively be multiplied.
-  if (m_currCateIndex == 0) {
+  if (currCateIndex == 0) {
     constraints->add(*constraintsBias);
     RooProdPdf constraint("constraint", "constraint", *constraints);
     tempWS->import(constraint);
@@ -641,18 +618,18 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
     std::cout << "\t" << currBkgNuis->GetName() << std::endl;
     corrNPNames += Form(",%s",currBkgNuis->GetName());
   }
-  std::cout << "For category " << m_currCateName << ", correlate variables: "
+  std::cout << "For category " << currCateName << ", correlate variables: "
 	    << corrNPNames << std::endl;
   
   /*
     Sub-channel labeling
-    Import the workspace tempWS to a new workspace and add m_currCateName as a 
-    suffix to all nodes and variables. The correlated nuisance parameters
+    Import the workspace tempWS to another workspace and add currCateName as a 
+    suffix to all nodes and variables of w. the correlated nuisance parameters
     and their respective global observables will not be renamed.
   */
-  RooWorkspace* categoryWS = new RooWorkspace("workspace_"+m_currCateName);
-  categoryWS->import((*tempWS->pdf("model")), RenameAllNodes(m_currCateName),
-		     RenameAllVariablesExcept(m_currCateName,corrNPNames),
+  RooWorkspace* categoryWS = new RooWorkspace("workspace_"+currCateName);
+  categoryWS->import((*tempWS->pdf("model")), RenameAllNodes(currCateName),
+		     RenameAllVariablesExcept(currCateName,corrNPNames),
 		     Silence());
   
   // Adding correlated nuisance parameters to nuisanceParameters:
@@ -667,21 +644,25 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   RooRealVar* currNuisUncorrelated;
   while ((currNuisUncorrelated = (RooRealVar*)iterNuisUncorrelated->Next())) {
     TString nuisName = (currNuisUncorrelated->GetName() 
-			+ (TString)"_" + m_currCateName);
+			+ (TString)"_" + currCateName);
     nuisCateWS->add(*(RooRealVar*)categoryWS->obj(nuisName));
   }
   
 
+
+
+  /**
+     SHOULD THIS BE nuisCateWS
+   */
 
   // Adding unconstrained NPs from the background pdf:
   RooArgSet* nuisBkgCateWS = new RooArgSet();
   TIterator *iterNuisBkg = nuisParamsBkg->createIterator();
   RooRealVar* currNuisBkg;
   while ((currNuisBkg = (RooRealVar*)iterNuisBkg->Next())) {
-    TString parName = currNuisBkg->GetName()+(TString)"_"+m_currCateName;
-    nuisCateWS->add(*categoryWS->var(parName));
+    //TString parName = currNuisBkg->GetName()+(TString)"_"+currCateName;
     //nuisBkgCateWS->add(*categoryWS->var(parName));
-    //nuisBkgCateWS->add(*categoryWS->var(currNuisBkg->GetName()));
+    nuisBkgCateWS->add(*categoryWS->var(currNuisBkg->GetName()));
   }
   
   /*
@@ -696,38 +677,35 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
   TIterator *iterGlobs = globalObs->createIterator();
   RooRealVar *currGlobs;
   while ((currGlobs = (RooRealVar*)iterGlobs->Next())) {
-    TString globName = currGlobs->GetName()+(TString)"_"+m_currCateName;
-    if (categoryWS->obj(globName)) {
+    TString globName = currGlobs->GetName()+(TString)"_"+currCateName;
+    if ((bool)categoryWS->obj(globName)) {
       globsCateWS->add(*(RooRealVar*)categoryWS->obj(globName));
       categoryWS->var(globName)->setConstant();
     }
-    else if (categoryWS->obj(currGlobs->GetName())) {
+    else if ((bool)categoryWS->obj(currGlobs->GetName())) {
       globsCateWS->add(*(RooRealVar*)categoryWS->obj(currGlobs->GetName()));
       categoryWS->var(currGlobs->GetName())->setConstant();
     }
   }
   
-  /*
-    Observables:
-    Iterate over the observables in this category and add them to the new set.
-  */
   RooArgSet *obsCateWS = new RooArgSet();
   TIterator *iterObs = tempWS->set("obsprelim")->createIterator();
   RooRealVar *currObs;
   while ((currObs = (RooRealVar*)iterObs->Next())) {
-    TString currObsName = currObs->GetName()+(TString)"_"+m_currCateName;
-    if (categoryWS->obj(currObsName)) {
-      obsCateWS->add(*(RooRealVar*)categoryWS->obj(currObsName));
+    TString anObsName = currObs->GetName()+(TString)"_"+currCateName;
+    if ((bool)categoryWS->obj(anObsName)) {
+      obsCateWS->add(*(RooRealVar*)categoryWS->obj(anObsName));
     }
     else {
       obsCateWS->add(*(RooRealVar*)categoryWS->obj(currObs->GetName()));
     }
   }
   
-  // Set the single Higgs mu parameters to 1 and constant:
+  // Set some of the mu values constant:
   std::cout << "DHWorkspace: Setting SH signals constant." << std::endl;
   RooArgSet* muConstCateWS = new RooArgSet();
   muConstCateWS->add(*categoryWS->var("mu_SH"));
+
   TIterator *iterMuConst = muConstCateWS->createIterator();
   RooRealVar *currMuConst;
   while ((currMuConst = (RooRealVar*)iterMuConst->Next())) {
@@ -735,54 +713,44 @@ RooWorkspace* DHWorkspace::createNewCategoryWS() {
     currMuConst->setConstant(true);
   }
   
-  categoryWS->defineSet(Form("muConstants_%s",m_currCateName.Data()),
+  categoryWS->defineSet(Form("muConstants_%s",currCateName.Data()),
 			*muConstCateWS);
-  categoryWS->defineSet(Form("observables_%s",m_currCateName.Data()),
+  categoryWS->defineSet(Form("observables_%s",currCateName.Data()),
 			*obsCateWS);
-  categoryWS->defineSet(Form("nuisanceParameters_%s",m_currCateName.Data()),
+  categoryWS->defineSet(Form("nuisanceParameters_%s",currCateName.Data()),
 			*nuisCateWS);
-  categoryWS->defineSet(Form("globalObservables_%s",m_currCateName.Data()),
+  categoryWS->defineSet(Form("globalObservables_%s",currCateName.Data()),
 			*globsCateWS);
   
   //--------------------------------------//
   // Import the observed data set, and create a binned version:
-  DHDataReader *dhdr = new DHDataReader(m_configFile, categoryWS->var(Form("%s_%s",obsVarName.Data(),m_currCateName.Data())));
+  DHDataReader *dhdr = new DHDataReader(categoryWS->var(Form("%s_%s",obsName.Data(),currCateName.Data())));
   RooDataSet *obsData = NULL;
-  if (m_anaType.EqualTo("NonRes")) {
-    obsData = dhdr->loadNonResData(m_currCateName);
+  if (currAna.EqualTo("NonRes")) {
+    obsData = dhdr->loadNonResData(currCateName);
   }
   else {
     std::cout << "DHWorkspace: Error importing resonant data." << std::endl;
   }
+  
   // Rename the imported dataset for consistency:
-  TString obsDataName = Form("obsData_%s", m_currCateName.Data());
+  TString obsDataName = Form("obsData_%s", currCateName.Data());
   obsData->SetNameTitle(obsDataName, obsDataName);
+  
+  // Set the background normalization parameter:
+  std::cout << "DHWorkspace: Fitting bkg. in " << currCateName << std::endl;
+  (*categoryWS->var("nBkg_"+currCateName)).setVal(obsData->sumEntries());
+  (*categoryWS->pdf("bkgPdf_"+currCateName)).fitTo(*obsData, Minos(RooArgSet(*nuisBkgCateWS)), SumW2Error(kTRUE));//should be false?
+  (*categoryWS->var("nBkg_"+currCateName)).setVal(obsData->sumEntries());
+  
   categoryWS->import(*obsData);
   
-  /////////////
-  // Need to make sure shape of bkg always comes from CR
-  /////////////
-
-  // Fit background shape and set normalization:
-  std::cout << "DHWorkspace: Fitting bkg. in " << m_currCateName << std::endl;
-  (*categoryWS->var("nBkg_"+m_currCateName)).setVal(obsData->sumEntries());
+  plotSingleCateFit(categoryWS, obsDataName, obsName);
   
-  // Only fit if Control Region (CR)
-  if (m_currCateName.Contains("CR")) {
-    (*categoryWS->pdf("bkgPdf_"+m_currCateName)).fitTo(*categoryWS->data(obsDataName), Minos(RooArgSet(*nuisCateWS)), SumW2Error(kTRUE));
-  }
-  (*categoryWS->var("nBkg_"+m_currCateName)).setVal(obsData->sumEntries());
-  
-  //plotSingleCateFit(categoryWS, obsDataName, obsVarName);
-  
-  // Create Asimov data the old-fashioned way:
-  //createAsimovData(categoryWS, 0, m_muNominalSH);
-  //createAsimovData(categoryWS, 1, m_muNominalSH);
-  
-  // Print and return category workspace:
-  std::cout << "DHWorkspace: Printing workspace for category:" << m_currCateName
+  std::cout << "DHWorkspace: Printing workspace for category:" << currCateName
 	    << std::endl;
   categoryWS->Print("v");
+  
   return categoryWS;
 }
 
@@ -950,21 +918,21 @@ void DHWorkspace::makeShapeNP(TString varNameNP, TString process,
   expected->add(*workspace->function(Form("expected_%s",varName.Data())));
 }
 
-/*
+/**
    -----------------------------------------------------------------------------
    Plot the data and fit in a single category
-
+*/
 void DHWorkspace::plotSingleCateFit(RooWorkspace *cateWS, TString dataset, 
 				    TString observableName) {
   std::cout << "DMWorkspace: Plot single category fit for "
-	    << m_currCateName << std::endl;
+	    << currCateName << std::endl;
   TCanvas *can = new TCanvas("can", "can", 800, 800);
-  RooPlot* frame = (*cateWS->var(observableName+"_"+m_currCateName)).frame(50);
+  RooPlot* frame = (*cateWS->var(observableName+"_"+currCateName)).frame(50);
   cateWS->data(dataset)->plotOn(frame);
-  (*cateWS->pdf("model_"+m_currCateName)).plotOn(frame, LineColor(2));
-  (*cateWS->pdf("model_"+m_currCateName)).plotOn(frame, Components((*cateWS->pdf("bkgPdf_"+m_currCateName))), LineColor(4), LineStyle(2));
-  (*cateWS->pdf("model_"+m_currCateName)).plotOn(frame, Components((*cateWS->pdf("sigPdfDH_"+m_currCateName))), LineColor(3), LineStyle(2));
-  (*cateWS->pdf("model_"+m_currCateName)).plotOn(frame, Components((*cateWS->pdf("sigPdfSH_"+m_currCateName))), LineColor(6), LineStyle(2));
+  (*cateWS->pdf("model_"+currCateName)).plotOn(frame, LineColor(2));
+  (*cateWS->pdf("model_"+currCateName)).plotOn(frame, Components((*cateWS->pdf("bkgPdf_"+currCateName))), LineColor(4), LineStyle(2));
+  (*cateWS->pdf("model_"+currCateName)).plotOn(frame, Components((*cateWS->pdf("sigPdfDH_"+currCateName))), LineColor(3), LineStyle(2));
+  (*cateWS->pdf("model_"+currCateName)).plotOn(frame, Components((*cateWS->pdf("sigPdfSH_"+currCateName))), LineColor(6), LineStyle(2));
   
   //double chi2 = frame->chiSquare();
   frame->SetYTitle("Events / GeV");
@@ -972,7 +940,7 @@ void DHWorkspace::plotSingleCateFit(RooWorkspace *cateWS, TString dataset,
   frame->Draw();
   
   TLatex text; text.SetNDC(); text.SetTextColor(1);
-  text.DrawLatex(0.2, 0.81, Form("Category %d", m_currCateIndex));
+  text.DrawLatex(0.2, 0.81, Form("Category %d", currCateIndex));
   TH1F *histSH = new TH1F("histSH", "histSH", 1, 0, 1);
   TH1F *histDH = new TH1F("histDH", "histDH", 1, 0, 1);
   TH1F *histNR = new TH1F("histNR", "histNR", 1, 0, 1);
@@ -992,91 +960,4 @@ void DHWorkspace::plotSingleCateFit(RooWorkspace *cateWS, TString dataset,
   leg.Draw("SAME");
   can->Print(Form("%s/Plots/cateFit_%s.eps",m_outputDir.Data(),dataset.Data()));
   delete can;
-}
-*/
-
-
-/**
-   -----------------------------------------------------------------------------
-   Create Asimov data for the statistical model, using a fit to observed data
-   for the shape and normalizaiton of the background.
-   @param cateWS - the current category workspace.
-   @param valMuDH - the value of the di-Higgs signal strength to use.
-   @param valMuSH - the value of the single-Higgs signal strength to use.
-*/
-void DHWorkspace::createAsimovData(RooWorkspace* cateWS, int valMuDH,
-				   int valMuSH) {
-  std::cout << "DHWorkspace: Creating Asimov data, mu=" << valMuDH << std::endl;
-  
-  // Set mu_DM and mu_SM to the specified values:
-  RooRealVar *poi = NULL;
-  double initialMuDH = 0.0;
-  double initialMuSH = 0.0;
-  if (cateWS->var("mu_DH")) {
-    poi = cateWS->var("mu_DH");
-    initialMuDH = poi->getVal();
-    poi->setVal(valMuDH);
-    poi->setConstant(true);  
-  }
-  if (cateWS->var("mu_SH")) {
-    initialMuSH = cateWS->var("mu_SH")->getVal();
-    cateWS->var("mu_SH")->setVal(valMuSH);
-    cateWS->var("mu_SH")->setConstant(true);  
-  }
-    
-  RooDataSet *asimov = (RooDataSet*)AsymptoticCalculator::GenerateAsimovData(*cateWS->pdf(Form("model_%s", m_currCateName.Data())), *cateWS->set(Form("observables_%s",m_currCateName.Data())));
-  asimov->SetNameTitle(Form("asimovDataMu%d_%s",valMuDH,m_currCateName.Data()),
-		       Form("asimovDataMu%d_%s",valMuDH,m_currCateName.Data()));
-  cateWS->import(*asimov);
-  
-  if (cateWS->var("mu_DH")) {
-    cateWS->var("mu_DH")->setVal(initialMuDH);
-    cateWS->var("mu_DH")->setConstant(false);
-  }
-  if (cateWS->var("mu_SH")) {
-    cateWS->var("mu_SH")->setVal(initialMuSH);
-    cateWS->var("mu_SH")->setConstant(true);
-  }
-  
-  std::cout << "DHWorkspace: Asimov data has " << asimov->sumEntries() 
-	    << " entries" << std::endl;
-}
-
-/**
-   -----------------------------------------------------------------------------
-   Create Asimov data for the statistical model, using a fit to observed data
-   for the shape and normalizaiton of the background.
-   @param cateWS - the current category workspace.
-   @param valMuDH - the value of the di-Higgs signal strength to use.
-   @param valMuSH - the value of the single-Higgs signal strength to use.
-*/
-RooDataSet* DHWorkspace::createAsimovData(int valMuDH, int valMuSH) {
-  std::cout << "DHWorkspace: Creating Asimov data, mu=" << valMuDH << std::endl;
-  
-  // Set mu_DM and mu_SM to the specified values:
-  RooRealVar *poi = NULL;
-  double initialMuDH = 0.0;
-  double initialMuSH = 0.0;
-  poi = m_combinedWS->var("mu_DH");
-  initialMuDH = poi->getVal();
-  poi->setVal(valMuDH);
-  poi->setConstant(true);  
-  initialMuSH = m_combinedWS->var("mu_SH")->getVal();
-  m_combinedWS->var("mu_SH")->setVal(valMuSH);
-  m_combinedWS->var("mu_SH")->setConstant(true);  
-  
-  TString asimovName = Form("asimovDataMu%d_%s",valMuDH,m_currCateName.Data());
-  //RooDataSet *asimov = (RooDataSet*)AsymptoticCalculator::GenerateAsimovData(*m_combinedWS->pdf(Form("model_%s", m_currCateName.Data())), *m_combinedWS->set(Form("observables_%s",m_currCateName.Data())));
-  RooDataSet *asimov = (RooDataSet*)AsymptoticCalculator::GenerateAsimovData(*m_combinedWS->pdf(Form("model_%s",m_currCateName.Data())), *m_combinedWS->set("observables"));
-  asimov->SetNameTitle(asimovName, asimovName);
-  m_combinedWS->import(*asimov);
-  
-  m_combinedWS->var("mu_DH")->setVal(initialMuDH);
-  m_combinedWS->var("mu_DH")->setConstant(false);
-  m_combinedWS->var("mu_SH")->setVal(initialMuSH);
-  m_combinedWS->var("mu_SH")->setConstant(true);
-  
-  std::cout << "DHWorkspace: Asimov data has " << asimov->sumEntries() 
-	    << " entries" << std::endl;
-  return (RooDataSet*)(m_combinedWS->data(asimovName));
 }

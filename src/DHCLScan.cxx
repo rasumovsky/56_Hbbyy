@@ -6,8 +6,8 @@
 //  Email: ahard@cern.ch                                                      //
 //  Date: 07/08/2015                                                          //
 //                                                                            //
-//  Includes a main method for using the DHTestStat.cxx class. This is useful //
-//  for grid jobs.                                                            //
+//  Performs a scan of the 95% CL for the non-resonant Di-Higgs analysis as a //
+//  function of signal cross-section.                                         //
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -16,10 +16,12 @@
 #include "Config.h"
 #include "DHTestStat.h"
 
-double convertToXS(double nEvents) {
-  return (nEvents * 0.252155);
-}
-
+/**
+   The main method scans the 95% CL for various signal cross-sections.
+   @param configFile - The analysis configuration file.
+   @param DHSignal - The signal model to scan.
+   @param options - Job options.
+*/
 int main(int argc, char **argv) {
   
   // Check that arguments are provided.
@@ -55,14 +57,23 @@ int main(int argc, char **argv) {
   // Instantiate the test statistic class for calculations and plots:
   DHTestStat *ts = new DHTestStat(configFile, DHSignal, "new", workspace);
   
+  
   TGraph *gCLExp = new TGraph();
   TGraph *gCLObs = new TGraph();
   
   // Loop over number of accepted events:
-  for (int i_e = 0; i_e < 40; i_e++) {
+  int i_e = 0;
+  double xsMin = 0.0; 
+  double xsMax = 5.5;
+  for (double crossSection = xsMin; crossSection < xsMax; crossSection += 0.1) {
+    
     // Set output directory for plots:
     ts->setPlotDirectory(outputDir.Data());
-    ts->setParams("nDH_NonResSR", ((double)i_e+1.0)/2.0, true);
+    double currSigEvents = (config->getNum("analysisLuminosity") * 
+			    config->getNum("acceptanceXEfficiency") * 
+			    config->getNum("bbyyBranchingRatio") *
+			    crossSection);
+    ts->setParams("nDH_NonResSR", currSigEvents, true);
     
     // Calculate the 95% CL value:
     ts->calculateNewCL();
@@ -72,10 +83,10 @@ int main(int argc, char **argv) {
       double currExpCL = ts->accessValue("CL", false, 0);
       double currObsCL = ts->accessValue("CL", true, 0);
       // fill graphs
-      gCLExp->SetPoint(i_e, convertToXS(i_e), currExpCL);
-      gCLObs->SetPoint(i_e, convertToXS(i_e), currObsCL);
+      gCLExp->SetPoint(i_e, crossSection, currExpCL);
+      gCLObs->SetPoint(i_e, crossSection, currObsCL);
+      i_e++;
     }
-    
     ts->clearData();
   }
   
@@ -86,11 +97,15 @@ int main(int argc, char **argv) {
   gCLExp->GetYaxis()->SetTitle("95% CL");
   gCLObs->GetYaxis()->SetTitle("95% CL");
   gCLExp->SetLineColor(kBlack);
+  gCLExp->SetLineWidth(2);
   gCLExp->SetMarkerColor(kBlack);
   gCLExp->SetMarkerColor(kBlack);
   gCLExp->SetMarkerStyle(2);
+  gCLObs->SetLineColor(kBlue);
+  gCLObs->SetLineWidth(2);
   gCLObs->SetMarkerColor(kBlue);
   gCLObs->SetMarkerStyle(2);
+  gCLObs->GetXaxis()->SetRangeUser(xsMin, xsMax);
   gCLObs->Draw("ALP");
   gCLExp->Draw("LPSAME");
   TLegend leg(0.7,0.2,0.88,0.3);
@@ -104,13 +119,11 @@ int main(int argc, char **argv) {
   line->SetLineStyle(2);
   line->SetLineWidth(1);
   line->SetLineColor(kRed);
-  line->DrawLine(gCLObs->GetXaxis()->GetXmin(), 0.95,
-		 gCLObs->GetXaxis()->GetXmax(), 0.95);
+  line->DrawLine(xsMin, 0.95, xsMax, 0.95);
   can->Print(Form("%s/scan95CL.eps",outputDir.Data()));
   
+  // Delete pointers, close files, return:
   std::cout << "DHCLScan: Finished!" << std::endl;
- 
-  // Instantiate the test statistic class for calculations and plots:
   delete line;
   delete can;
   delete gCLObs;
@@ -118,8 +131,6 @@ int main(int argc, char **argv) {
   delete ts;
   delete workspace;
   delete config;
-  
   inputFile.Close();
-  
   return 0;
 }

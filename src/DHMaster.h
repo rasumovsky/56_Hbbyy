@@ -4,27 +4,27 @@
 //                                                                            //
 //  Created: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 25/07/2015                                                          //
+//  Date: 10/08/2015                                                          //
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "BkgModel.h"
-#include "CheckJobs.h"
+#include "Config.h"
 #include "DHAnalysis.h"
+#include "DHCheckJobs.h"
 #include "DHTestStat.h"
 #include "DHToyAnalysis.h"
-#include "SigParam.h"
+//#include "SigParamInterface.h"
 
-bool isFirstJob;
+bool m_isFirstJob;
 
-void makeExe(TString exeName);
+Config *m_config;
 
-void submitWSViaBsub(TString exeJobName, TString exeOption, TString exeSignal,
-		     TString exeCateScheme);
+void submitTSViaBsub(TString exeConfigFile, TString exeOption,
+		     TString exeSignal);
 
-void submitTSViaBsub(TString exeJobName, TString exeOption, TString exeSignal);
+void submitMLViaBsub(TString exeConfigFile, TString exeOption, 
+		     TString exeSignal);
 
-void submitMLViaBsub(TString exeJobName, TString exeOption, TString exeSignal);
-
-void submitPEViaBsub(TString exeJobName, TString exeOption, TString exeSignal,
-		     int exeSeed, int exeToysPerJob);
+void submitPEViaBsub(TString exeConfigFile, TString exeOption,
+		     TString exeSignal, int exeSeed, int exeToysPerJob);
