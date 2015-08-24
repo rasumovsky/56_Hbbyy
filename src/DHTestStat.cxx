@@ -74,6 +74,9 @@ DHTestStat::DHTestStat(TString newConfigFile, TString newDHSignal,
   // Map storing all calculations:
   m_calculatedValues.clear();
   
+  // Use linear plot y-axis by default:
+  setPlotAxis(false, 0.0, 100.0);
+
   // Create output directories:
   m_outputDir = Form("%s/%s/DHTestStat",
 		     (m_config->getStr("masterOutput")).Data(),
@@ -854,6 +857,68 @@ void DHTestStat::loadStatsFromFile() {
 
 /**
    -----------------------------------------------------------------------------
+   Create a ratio plot:
+   @param dataName - The name of the RooAbsData set in the workspace.
+   @param pdfName - The name of the RooAbsPdf in the workspace.
+   @param xMin - The minimum value of the observable range.
+   @param xMax - The maximum value of the observable range.
+   @param xBins - The number of bins for the observable.
+   @returns - A TGraphErrors to plot.
+*/
+TGraphErrors* DHTestStat::plotDivision(TString dataName, TString pdfName, 
+				       TString obsName, double xMin, 
+				       double xMax, double xBins){
+  RooRealVar *observable = m_workspace->var(obsName);
+  RooAbsData *data = m_workspace->data(dataName);
+  RooAbsPdf *pdf = m_workspace->pdf(pdfName); 
+  
+  double minOrigin = observable->getMin();
+  double maxOrigin = observable->getMax();
+  double nEvents = data->sumEntries();
+  
+  observable->setRange("fullRange", xMin, xMax);
+  TH1F *originHist
+    = (TH1F*)data->createHistogram("dataSub", *observable,
+  				   RooFit::Binning(xBins, xMin, xMax));
+  TGraphErrors *result = new TGraphErrors();
+  double increment = (xMax - xMin) / ((double)xBins);
+  
+  RooAbsReal* intTot
+    = (RooAbsReal*)pdf->createIntegral(RooArgSet(*observable),
+				       RooFit::NormSet(*observable), 
+				       RooFit::Range("fullRange"));
+  double valTot = intTot->getVal();
+  
+  int pointIndex = 0;
+  for (double i_m = xMin; i_m < xMax; i_m += increment) {
+    observable->setRange(Form("range%2.2f",i_m), i_m, (i_m+increment));
+    RooAbsReal* intCurr
+      = (RooAbsReal*)pdf->createIntegral(RooArgSet(*observable), 
+					 RooFit::NormSet(*observable), 
+					 RooFit::Range(Form("range%2.2f",i_m)));
+    double valCurr = intCurr->getVal();
+    
+    double currMass = i_m + (0.5*increment);
+    double currPdfWeight = nEvents * (valCurr / valTot);
+    TString varName = observable->GetName();
+    double currDataWeight = data->sumEntries(Form("%s>%f&&%s<%f",varName.Data(),
+						  i_m,varName.Data(),
+						  (i_m+increment)));
+    double currWeight = currDataWeight / currPdfWeight;
+    if (currDataWeight == 0) currWeight = 1.0;
+    result->SetPoint(pointIndex, currMass, currWeight);
+    
+    double currError = originHist->GetBinError(pointIndex+1) / currPdfWeight;
+    result->SetPointError(pointIndex, 0.0, currError);
+    pointIndex++;
+  }
+  observable->setMin(minOrigin);
+  observable->setMax(maxOrigin);
+  return result;
+}
+
+/**
+   -----------------------------------------------------------------------------
    Plot the fits produced by the specified model.
    @param combWS - the combined workspace.
    @param fitType - the type of fit.
@@ -862,18 +927,49 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
   std::cout << "DHTestStat: Plot fit " << fitType << ", " << datasetName 
 	    << std::endl;
   TCanvas *can = new TCanvas("can", "can", 800, 800);
+  can->cd();
+  TPad *pad1 = new TPad( "pad1", "pad1", 0.00, 0.33, 1.00, 1.00 );
+  TPad *pad2 = new TPad( "pad2", "pad2", 0.00, 0.00, 1.00, 0.33 );
+  pad1->SetBottomMargin(0.00001);
+  pad1->SetBorderMode(0);
+  pad2->SetTopMargin(0.00001);
+  pad2->SetBottomMargin(0.4);
+  pad2->SetBorderMode(0);
   
+  can->cd();
+  pad1->Draw();
+  pad2->Draw();
+    
   // Loop over categories:
   std::vector<TString> cateNames
     = m_config->getStrV(Form("cateNames%s", m_anaType.Data()));
   for (int i_c = 0; i_c < (int)cateNames.size(); i_c++) {
-    can->cd();
-    can->Clear();
+    //can->cd();
+    //can->Clear();
+    pad1->cd();
+    pad1->Clear();
     
     TString obsName = m_anaType.EqualTo("NonRes") ? 
       Form("m_yy_%s", cateNames[i_c].Data()) : 
       Form("m_bbyy_%s", cateNames[i_c].Data());
-    RooPlot* frame = (*m_workspace->var(obsName)).frame(50);
+    
+    // Set the resonant analysis plot binning and axis scale to paper settings:
+    int nGeVPerBin = 50; 
+    if (cateNames[i_c].EqualTo("ResonantSR")) {
+      nGeVPerBin = 5;
+      m_yMin = 0.002;
+      m_yMax = 40;
+    }
+    else if (cateNames[i_c].EqualTo("ResonantCR")) {
+      nGeVPerBin = 20;
+      m_yMin = 0.3;
+      m_yMax = 40;
+    }
+    int nBinsForPlot = (int)(((*m_workspace->var(obsName)).getMax() - 
+			      (*m_workspace->var(obsName)).getMin()) /
+			     nGeVPerBin);
+    
+    RooPlot* frame = (*m_workspace->var(obsName)).frame(nBinsForPlot);
     (*m_workspace->data(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data())))
       .plotOn(frame);
     
@@ -889,13 +985,18 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     (*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, LineColor(2));
     
     TString xTitle = m_anaType.EqualTo("NonRes") ? 
-      "M_{#gamma#gamma} [GeV]" : "M_{jj#gamma#gamma} [GeV]";
+      "M_{#gamma#gamma} [GeV]" : "Constrained M_{#gamma#gammajj} [GeV]";
     frame->SetXTitle(xTitle);
-    frame->SetYTitle("Events / GeV");
+    frame->SetYTitle(Form("Events / %d GeV", nGeVPerBin));
     frame->Draw();
     
+    if (m_useLogScale) {
+      gPad->SetLogy();
+      frame->GetYaxis()->SetRangeUser(m_yMin, m_yMax);
+    }
+    
     TLatex text; text.SetNDC(); text.SetTextColor(1);
-    text.DrawLatex(0.2, 0.81, cateNames[i_c]);
+    text.DrawLatex(0.6, 0.89, cateNames[i_c]);
     TH1F *histDH = new TH1F("histDH", "histDH", 1, 0, 1);
     TH1F *histSH = new TH1F("histSH", "histSH", 1, 0, 1);
     TH1F *histBkg = new TH1F("histBkg", "histBkg", 1, 0, 1);
@@ -904,7 +1005,7 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     histSH->SetLineColor(3);
     histBkg->SetLineColor(4);
     histSig->SetLineColor(2);
-    TLegend leg(0.61, 0.63, 0.89, 0.77);
+    TLegend leg(0.6, 0.71, 0.92, 0.86);
     leg.SetFillColor(0);
     leg.SetTextSize(0.04);
     leg.SetBorderSize(0);
@@ -913,6 +1014,38 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     leg.AddEntry(histBkg, "Non-resonant", "l");
     leg.AddEntry(histSig, "Sum", "l");
     leg.Draw("SAME");
+    
+    pad2->cd();
+    pad2->Clear();
+    
+    double obsMin = (*m_workspace->var(obsName)).getMin();
+    double obsMax = (*m_workspace->var(obsName)).getMax();
+    
+    double ratioMin = 0.0; double ratioMax = 2.0;
+    TGraphErrors* subData = plotDivision(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()), Form("model_%s", cateNames[i_c].Data()), obsName, obsMin, obsMax, nBinsForPlot);
+    subData->GetYaxis()->SetTitle("Data / Fit");
+    subData->GetYaxis()->SetRangeUser(ratioMin, ratioMax);
+    subData->GetXaxis()->SetTitleOffset(0.95);
+    subData->GetYaxis()->SetTitleOffset(0.7);
+    subData->GetXaxis()->SetTitleSize(0.1);
+    subData->GetYaxis()->SetTitleSize(0.1);
+    subData->GetXaxis()->SetLabelSize(0.1);
+    subData->GetYaxis()->SetLabelSize(0.1);
+    subData->GetYaxis()->SetNdivisions(4);
+    subData->GetXaxis()->SetRangeUser(obsMin, obsMax);
+    subData->Draw("AEP");
+    
+    TLine *line = new TLine();
+    line->SetLineStyle(1);
+    line->SetLineWidth(2);
+    line->SetLineColor(kBlack);
+    line->DrawLine(obsMin, 1.0, obsMax, 1.0); 
+    line->SetLineWidth(1);
+    line->SetLineStyle(2);
+    line->DrawLine(obsMin, ((1.0+ratioMin)/2.0), obsMax, ((1.0+ratioMin)/2.0));
+    line->DrawLine(obsMin, ((1.0+ratioMax)/2.0), obsMax, ((1.0+ratioMax)/2.0));
+    subData->Draw("EPSAME");
+        
     can->Print(Form("%s/fitPlot_%s_%s_%s.eps", m_plotDir.Data(),
 		    m_DHSignal.Data(), fitType.Data(), cateNames[i_c].Data()));
     delete histDH;
@@ -948,6 +1081,16 @@ bool DHTestStat::mapValueExists(TString mapKey) {
 */
 void DHTestStat::saveSnapshots(bool doSaveSnapshot) {
   m_doSaveSnapshot = doSaveSnapshot;
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Set axis options for plots:
+*/
+void DHTestStat::setPlotAxis(bool useLogScale, double yMin, double yMax) {
+  m_useLogScale = useLogScale;
+  m_yMin = yMin;
+  m_yMax = yMax;
 }
 
 /**

@@ -61,13 +61,16 @@ class DHTestStat {
 			    double muHat, double muTest);
   void loadStatsFromFile();
   void saveSnapshots(bool doSaveSnapshot);
+  void setPlotAxis(bool useLogScale, double yMin, double yMax);
   void setPlotDirectory(TString directory);
   void setParams(TString paramName, double paramVal, bool doSetConstant);
-
+  
  private:
   
   TString getKey(TString testStat, bool observed, int N);
   bool mapValueExists(TString mapKey);
+  TGraphErrors* plotDivision(TString dataName, TString pdfName, TString obsName,
+			     double xMin, double xMax, double xBins);
   void plotFits(TString fitType, TString datasetName);
   
   // From the initialization:
@@ -113,7 +116,12 @@ class DHTestStat {
   std::vector<bool> m_setParamConsts;
   std::vector<TString> m_setParamNames;
   std::vector<double> m_setParamVals;
-    
+  
+  // Plot settings:
+  bool m_useLogScale;
+  double m_yMin;
+  double m_yMax;
+  
 };
 
 #endif

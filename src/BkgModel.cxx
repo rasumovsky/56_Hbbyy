@@ -57,8 +57,6 @@ void BkgModel::addBkgToCateWS(RooWorkspace *&workspace, RooArgSet *&nuisParams,
   while ((currIter = (RooRealVar*)iterArgs->Next())) {
     TString obsName = m_obs->GetName();
     TString currName = (*currIter).GetName();
-    std::cout << "obs name is " << obsName << " and other is " << currName 
-	      << std::endl;
     if (!currName.Contains(obsName)) {
       nuisParams->add(*currIter);
       std::cout << "Adding NP " << currName << std::endl;

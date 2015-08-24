@@ -26,7 +26,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
-#include <time.h>
 #include <vector>
 
 // ROOT includes:
@@ -34,9 +33,6 @@
 #include "TCanvas.h"
 #include "TF1.h"
 #include "TFile.h"
-#include "TGraphErrors.h"
-#include "TH1.h"
-#include "TH1F.h"
 #include "TLatex.h"
 #include "TLine.h"
 #include "TROOT.h"
@@ -96,10 +92,8 @@ class SigParam {
   double getParameterValue(TString paramName, double resonanceMass, 
 			   int cateIndex);
   double getParameterValue(TString paramName, int cateIndex);
-  TString getParamState(TString paramName);
   RooAbsPdf* getResonance(int cateIndex);
   RooAbsPdf* getSingleResonance(double resonanceMass, int cateIndex);
-  std::vector<TString> getVariableNames(double resonanceMass, int cateIndex);
   RooWorkspace* getWorkspace();
   double getYieldInCategory(double resonanceMass, int cateIndex);
   double getYieldTotal(double resonanceMass);
@@ -115,7 +109,6 @@ class SigParam {
 		   TString massBranchName, TString weightBranchName);
   void addMassPoint(double resonanceMass, int cateIndex, double diphotonMass,
 		    double eventWeight);
-  void doBinnedFit(bool doBinned, double nBinsPerGeV = 1.0);
   bool loadParameterization(TString directory, TString signalType);
   bool makeAllParameterizations(TString function);
   bool makeCategoryParameterization(int cateIndex, TString function);
@@ -124,22 +117,15 @@ class SigParam {
   void makeYieldParameterization(int cateIndex);
   void plotCategoryResonances(int cateIndex);
   void plotSingleResonance(double resonanceMass, int cateIndex);
-  TGraphErrors* plotSubtraction(RooAbsData *data, RooAbsPdf *pdf, double xMin,
-				double xMax, double xBins);
-  TGraphErrors* plotDivision(RooAbsData *data, RooAbsPdf *pdf, double xMin,
-			     double xMax, double xBins);
+  RooDataSet* plotDivision(RooAbsData *data, RooAbsPdf *pdf, double xMin,
+			   double xMax, double xBins, double& chi2);
   void plotYields(int cateIndex);
   void saveAll();
   void saveParameterization();
   void saveParameterList();
   void saveYieldList();
   void setDirectory(TString directory);
-  void setLogYAxis(bool useLogYAxis);
-  void setParamState(TString paramName, TString valueAndRange);
-  void setPlotFormat(TString fileFormat);
-  void setRatioPlot(bool doRatioPlot, double ratioMin, double ratioMax);
   void setSignalType(TString signalType);
-  void useCommonCBGAMean(bool sameCBGAMean);
   
  private:
   
@@ -152,9 +138,6 @@ class SigParam {
   std::vector<double> massPointsForCategory(int cateIndex);
 
   //----------Private Mutators----------//
-  void addFitParameter(TString paramName, int cateIndex);
-  void binTheData(TString unbinnedDataName, int cateIndex);
-  void binSingleDataSet(TString unbinnedDataName, TString binnedDataName);
   RooFitResult* fitResult(int cateIndex);
   RooFitResult* fitResult(double resonanceMass, int cateIndex);
   int getNCategories();
@@ -166,8 +149,7 @@ class SigParam {
   int m_nCategories;
   TString m_signalType;
   TString m_directory;
-  TString m_fileFormat;
-
+  
   // Objects for fitting:
   RooRealVar *m_yy;
   RooRealVar *m_wt;
@@ -175,33 +157,17 @@ class SigParam {
   RooWorkspace *m_ws;
   RooCategory *m_cat;
   
-  // Store fit initial values and ranges:
-  std::map<TString,TString> m_paramState;
-  
   // Systematic: 
   TString m_listMRS;
   TString m_listMSS;
   
   // Yield data for plotting:
-  std::map<int,TF1*> m_yieldFunc;
-  std::map<int,TGraph*> m_yieldGraph;
+  std::map<int,TF1*> yieldFunc;
+  std::map<int,TGraph*> yieldGraph;
   
   // List to track imported datasets:
   std::vector<std::pair<double,int> > m_massCatePairs;
   
-  // True iff fits should be binned.
-  bool m_binned;
-  int m_nBinsPerGeV;
-  
-  // Fit parameter options:
-  bool m_sameCBGAMean;
-
-  // Plot options:
-  bool m_useLogYAxis;
-  bool m_doRatioPlot;
-  double m_ratioMin;
-  double m_ratioMax;
-  TString m_currFunction;
 };
 
 #endif

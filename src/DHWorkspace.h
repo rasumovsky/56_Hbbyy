@@ -50,7 +50,11 @@ class DHWorkspace {
   void createAsimovData(RooWorkspace *cateWS, int valMuDH, int valMuSH);
   RooDataSet* createAsimovData(int valMuDH, int valMuSH);
   
-// Member variables:
+  void getTemporarySingleHiggs(RooWorkspace* workspace);
+  void plotSingleCateFit(RooWorkspace *cateWS, TString dataset, 
+			 TString observableName);
+  
+  // Member variables:
   TString m_configFile;
   TString m_anaType;
   TString m_options;

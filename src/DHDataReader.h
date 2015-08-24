@@ -40,7 +40,8 @@ class DHDataReader {
   
   // Mutators:
   RooDataSet* loadNonResData(TString cateName);
-  RooDataSet* loadResData(TString cateName);
+  RooDataSet* loadResData(TString cateName); 
+  RooDataSet* loadSingleHiggs(TString cateName);
   void setMassObservable(RooRealVar *observable);
   
  private:

@@ -17,7 +17,7 @@
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "HGamTools/SigParam.h"
+#include "SigParam.h"
 
 /**
    -----------------------------------------------------------------------------
@@ -52,39 +52,6 @@ SigParam::SigParam(TString signalType, TString directory) {
   m_listMRS = "";
   m_listMSS = "";
     
-  // Set the default initial values and ranges for fit parameters:
-  setParamState("a_muCBNom", "[-0.0,-2.0,2.0]");
-  setParamState("b_muCBNom", "[-0.1,-0.5,0.5]");
-  setParamState("c_muCBNom", "[-0.02,-0.5,0.5]");
-  setParamState("a_sigmaCBNom", "[0.0,-10.0,10.0]");
-  setParamState("b_sigmaCBNom", "[3.90,0.01,10.0]");
-  setParamState("a_alphaCB", "[2.2,0.0,4.0]");
-  setParamState("b_alphaCB", "[0.0,-0.1,0.1]");
-  setParamState("nCB", "[5.0,0.1,10.0]");
-  setParamState("a_muGANom", "[-0.0,-2.0,2.0]");
-  setParamState("b_muGANom", "[-0.1,-0.5,0.5]");
-  setParamState("c_muGANom", "[-0.02,-0.5,0.5]");
-  setParamState("a_sigmaGANom", "[5.0,-1.0,20.0]");
-  setParamState("b_sigmaGANom", "[1.8,0.1,4.0]");
-  setParamState("fracCB", "[0.9,0.0,1.0]");
-  setParamState("a_alphaCBLo", "[2.42,1.0,4.0]");
-  setParamState("b_alphaCBLo", "[-483,-1000,0]");
-  setParamState("c_alphaCBLo", "[380,100,500]");
-  setParamState("nCBLo", "[9.0,0.1,20.0]");
-  setParamState("a_alphaCBHi", "[2.2,0.0,4.0]");
-  setParamState("b_alphaCBHi", "[0.0,-0.5,0.5]");
-  setParamState("nCBHi", "[5.0,0.1,10.0]");
-  
-  // Some basic fit options:
-  useCommonCBGAMean(false);
-  
-  // Set the plot format:
-  doBinnedFit(false, 1);
-  setLogYAxis(false);
-  setPlotFormat(".eps");
-  setRatioPlot(true, 0.0, 2.0);
-  m_currFunction = "DoubleCB";
-  
   std::cout << "SigParam: Successfully initialized!" << std::endl;
 }
 
@@ -152,18 +119,6 @@ void SigParam::addDataTree(double resonanceMass, int cateIndex,
     // Add current event values to the dataset used for parameterization.
     addMassPoint(resonanceMass, cateIndex, massValue, weightValue);
   }
-}
-
-/**
-   -----------------------------------------------------------------------------
-   Adds a parameter to the workspace for the fit.
-   @param paramName - The name of the shape parameter of interest.
-   @param cateIndex - The event category index (starting at 0).
-*/
-void SigParam::addFitParameter(TString paramName, int cateIndex) {
-  TString valAndRange = getParamState(paramName);
-  m_ws->factory(Form("%s_%sc%d%s", paramName.Data(), m_signalType.Data(),
-		     cateIndex, valAndRange.Data()));
 }
 
 /**
@@ -397,77 +352,6 @@ bool SigParam::addSigToWS(RooWorkspace *&workspace, double resonanceMass,
 }
 
 /**
-   Creates a single or combined binned dataset. 
-   @param unbinnedDataName - The name of the unbinned data in the workspace.
-   @param cateIndex - The index of the category of the desired PDF.
-*/
-void SigParam::binTheData(TString unbinnedDataName, int cateIndex) {
-  if (!unbinnedDataName.Contains(Form("data_c%d",cateIndex))) {
-    TString currBinnedName = unbinnedDataName; 
-    currBinnedName.ReplaceAll("data","dataBinned");
-    binSingleDataSet(unbinnedDataName, currBinnedName);
-  }
-  else {
-    // Create a dataset map to store the RooDataSet objects:
-    std::map<std::string,RooDataSet*> currDataMap; currDataMap.clear();
-    
-    // Create a list of the corresponding unbinned datasets, and loop over it:
-    std::vector<double> currMassPoints = massPointsForCategory(cateIndex); 
-    for (int i_m = 0; i_m < (int)currMassPoints.size(); i_m++) {
-      TString currKey = getKey(currMassPoints[i_m], cateIndex);
-
-      // bin each one, add to map
-      TString currUnbinnedName = Form("data_%s", currKey.Data());
-      TString currBinnedName = Form("dataBinned_%s", currKey.Data());
-      binSingleDataSet(currUnbinnedName, currBinnedName);
-      currDataMap[((std::string)currKey)]
-	= (RooDataSet*)m_ws->data(currBinnedName);
-    }
-    
-    // Create the combined binned dataset:
-    RooArgSet *args = new RooArgSet();
-    args->add(*(m_ws->var("m_yy")));
-    args->add(*(m_ws->var("wt")));
-    RooDataSet *dataBinned = new RooDataSet(Form("dataBinned_c%d", cateIndex),
-					    Form("dataBinned_c%d", cateIndex),
-					    *args, RooFit::Index(*m_cat),
-					    RooFit::Import(currDataMap),
-					    RooFit::WeightVar(*m_wt));
-    m_ws->import(*dataBinned);
-  }
-}
-
-/**
-   Create a binned dataset from an unbinned dataset.
-   @param unbinnedName - The name of the unbinned data in the workspace.
-   @param unbinnedName - The name of the binned data to create.
-*/
-void SigParam::binSingleDataSet(TString unbinnedName, TString binnedName) {
-  std::cout << "SigParam: Rebin sample " << unbinnedName << std::endl;
-  
-  RooDataSet *unbinnedData = (RooDataSet*)m_ws->data(unbinnedName);
-  
-  // Create a histogram to automatically bin the points:
-  int nBins = (int)(m_nBinsPerGeV*(m_yy->getMax() - m_yy->getMin()));
-  TH1 *hist = unbinnedData
-    ->createHistogram(Form("hist_%s",unbinnedName.Data()), *m_yy, 
-		      RooFit::Binning(nBins, m_yy->getMin(), m_yy->getMax()));
-  
-  // Create a dataset to fill with binned entries:
-  RooDataSet* binnedData = new RooDataSet(binnedName, binnedName,
-					  RooArgSet(*m_yy,*m_wt), 
-					  RooFit::WeightVar(*m_wt));
-  for (int i_b = 1; i_b <= hist->GetNbinsX(); i_b++) {
-    m_yy->setVal(hist->GetXaxis()->GetBinCenter(i_b));
-    m_wt->setVal(hist->GetBinContent(i_b));
-    binnedData->add(RooArgSet(*m_yy,*m_wt), hist->GetBinContent(i_b));
-  }
-  
-  // Import binned dataset to the workspace:
-  m_ws->import(*binnedData);
-}
-
-/**
    -----------------------------------------------------------------------------
    Get a list of categories corresponding to a single mass point.
    @param resonanceMass - The mass value.
@@ -484,7 +368,7 @@ std::vector<int> SigParam::categoriesForMass(double resonanceMass) {
   std::sort(currCategories.begin(), currCategories.end());
   return currCategories;
 }
-
+	
 /**
    -----------------------------------------------------------------------------
    Check if the dataset being requested has been instantiated (exists in map).
@@ -500,17 +384,6 @@ bool SigParam::dataExists(double resonanceMass, int cateIndex) {
     }
   }
   return false;
-}
-
-/**
-   Option to do a binned fit. Sets the private variable m_binned.
-   @param binned - True iff the fit should be binned.
-   @param nBinsPerGeV - The number of bins per GeV for the binned data.
-*/
-void SigParam::doBinnedFit(bool binned, double nBinsPerGeV) {
-  m_binned = binned;
-  m_nBinsPerGeV = nBinsPerGeV;
-  std::cout << "SigParam: Binned bool = " << m_binned << std::endl;
 }
 
 /**
@@ -534,11 +407,6 @@ bool SigParam::equalMasses(double massValue1, double massValue2) {
 RooFitResult* SigParam::fitResult(double resonanceMass, int cateIndex) {
   std::cout << "SigParam: Preparing to fit resonance" << std::endl;
   
-  // Clock the fit:
-  clock_t time;
-  time = clock();
-  
-  // Define the PDF and dataset names:
   TString sigName = (resonanceMass < 0.0) ?
     Form("sigPdfTmp_%sc%d", m_signalType.Data(), cateIndex) :
     Form("sigPdf_%s%s", m_signalType.Data(), 
@@ -546,19 +414,6 @@ RooFitResult* SigParam::fitResult(double resonanceMass, int cateIndex) {
   TString dataName = (resonanceMass < 0.0) ? Form("data_c%d",cateIndex) :
     Form("data_%s",(getKey(resonanceMass,cateIndex)).Data());
   
-  // Change the dataset name if the fit is binned:
-  if (m_binned) {
-    TString binnedDataName = dataName;
-    binnedDataName.ReplaceAll("data", "dataBinned");
-    
-    // Also check that binned data have been created, otherwise create:
-    if (m_ws->data(dataName) && !m_ws->data(binnedDataName)) {
-      binTheData(dataName, cateIndex);
-    }
-    
-    dataName = binnedDataName;
-  }
-
   RooAbsPdf *currSignal = m_ws->pdf(sigName);
   RooAbsData *currData = m_ws->data(dataName);
   
@@ -567,18 +422,8 @@ RooFitResult* SigParam::fitResult(double resonanceMass, int cateIndex) {
   RooFitResult *result = currSignal->fitTo(*currData, RooFit::PrintLevel(0),
 					   RooFit::SumW2Error(kTRUE),
 					   RooFit::Save(true));
-  /*
-  RooFitResult *result = currSignal->fitTo(*currData, RooFit::PrintLevel(0),
-					   RooFit::SumW2Error(kFALSE),
-					   RooFit::Save(true));
-  */
   SigParam::setParamsConstant(currSignal, true);
   std::cout << "SigParam: Fit procedure concluded." << std::endl;
-  
-  // Clock the fit:
-  time = clock() - time;
-  printf("\tFit required %d clock cycles (%f seconds).\n\n",
-	 (int)time, ((float)time/CLOCKS_PER_SEC));
   return result;
 }
 
@@ -721,16 +566,6 @@ double SigParam::getParameterValue(TString paramName, int cateIndex) {
 
 /**
    -----------------------------------------------------------------------------
-   Get the initial value [a] and range [b,c] of a parameter: "[a,b,c]"
-   @param paramName - The name of the parameter of interest.
-   @returns - The initial value and range of the parameter. 
-*/
-TString SigParam::getParamState(TString paramName) {
-  return m_paramState[paramName];
-}
-
-/**
-   -----------------------------------------------------------------------------
    Retrieves the resonance parameterized as a function of mResonance.
    @param cateIndex - The index of the category for the PDF.
    @returns - A pointer to the signal PDF.
@@ -759,42 +594,6 @@ RooAbsPdf* SigParam::getSingleResonance(double resonanceMass, int cateIndex) {
   RooAbsPdf* pdf = m_ws->pdf(pdfName);
   std::cout << "SigParam: Returning parameterized pdf " << pdfName << std::endl;
   return pdf;
-}
-
-/**
-   -----------------------------------------------------------------------------
-   Get a list of parameters associated with the PDF in the given category.
-   @param resonanceMass - The truth mass of the resonance
-   @param cateIndex - The index of the category for which we want the PDF.
-   @returns - A vector of parameter names.
-*/
-std::vector<TString> SigParam::getVariableNames(double resonanceMass, 
-						int cateIndex) {
-  std::cout << "SigParam: Get PDF variables in category = " << cateIndex
-	    << " and mass = " << resonanceMass << std::endl;
-  std::vector<TString> result; result.clear();
-  TString pdfName = Form("sigPdf_%s%s",m_signalType.Data(),
-			 (getKey(resonanceMass,cateIndex)).Data());
-  RooArgSet* currSet = (*m_ws->pdf(pdfName)).getVariables();
-  TIterator *iterArg = currSet->createIterator();
-  RooRealVar *currArg = NULL;
-  while ((currArg = (RooRealVar*)iterArg->Next())) {
-    TString currArgName = currArg->GetName();
-    currArgName = currArgName.ReplaceAll(getKey(resonanceMass,cateIndex), "");
-    currArgName = currArgName.ReplaceAll(Form("_%s",m_signalType.Data()), "");
-    currArgName = currArgName.ReplaceAll(Form("c%d",cateIndex), "");
-    if (!currArgName.EqualTo(m_yy->GetName())) result.push_back(currArgName);
-  }
-  return result;
-}
-
-/**
-   -----------------------------------------------------------------------------
-   Get the workspace that stores the SigParam class data.
-   @returns - A pointer to the workspace storing all datasets and PDFs.
-*/
-RooWorkspace* SigParam::getWorkspace() {
-  return m_ws;
 }
 
 /**
@@ -883,11 +682,7 @@ bool SigParam::loadParameterization(TString directory, TString signalType){
 */
 bool SigParam::makeAllParameterizations(TString function) {
   std::cout << "SigParam: Engage full signal parameterization!" << std::endl;
-  if (!function.EqualTo("DoubleCB") && !function.EqualTo("CBGA")) {
-    std::cout << "SigParam: Error! Improper function " << function << std::endl;
-    return false;
-  }
-    
+  
   bool result = true;
   // Define models in each category independently:
   for (int i_c = 0; i_c < getNCategories(); i_c++) {
@@ -907,10 +702,6 @@ bool SigParam::makeAllParameterizations(TString function) {
 */
 bool SigParam::makeCategoryParameterization(int cateIndex, TString function) {
   std::cout << "SigParam: parameterizing category " << cateIndex << std::endl;
-  if (!function.EqualTo("DoubleCB") && !function.EqualTo("CBGA")) {
-    std::cout << "SigParam: Error! Improper function " << function << std::endl;
-    return false;
-  }
   
   // Create a list of mass points in this category.
   std::vector<double> currMassPoints = massPointsForCategory(cateIndex);
@@ -933,32 +724,46 @@ bool SigParam::makeCategoryParameterization(int cateIndex, TString function) {
   }
   // If more than 1 mass points, parameterize variables:
   else {
-    addFitParameter("a_muCBNom", cateIndex);
-    addFitParameter("b_muCBNom", cateIndex);
-    addFitParameter("c_muCBNom", cateIndex);
-    addFitParameter("a_sigmaCBNom", cateIndex);
-    addFitParameter("b_sigmaCBNom", cateIndex);
+    m_ws->factory(Form("a_muCBNom_%sc%d[-0.0,-2.0,2.0]",
+		       m_signalType.Data(), cateIndex));
+    m_ws->factory(Form("b_muCBNom_%sc%d[-0.1,-0.5,0.5]", 
+		       m_signalType.Data(), cateIndex));
+    m_ws->factory(Form("c_muCBNom_%sc%d[-0.02,-0.5,0.5]",
+		       m_signalType.Data(), cateIndex));
+    m_ws->factory(Form("a_sigmaCBNom_%sc%d[0.0,-10.0,10.0]",
+		       m_signalType.Data(), cateIndex));
+    m_ws->factory(Form("b_sigmaCBNom_%sc%d[3.90,0.01,10.0]",
+		       m_signalType.Data(), cateIndex));
+
     if (function.EqualTo("CBGA")) {
-      addFitParameter("a_alphaCB", cateIndex);
-      addFitParameter("b_alphaCB", cateIndex);
-      addFitParameter("nCB", cateIndex);
-      if (!m_sameCBGAMean) {
-	addFitParameter("a_muGANom", cateIndex);
-	addFitParameter("b_muGANom", cateIndex);
-	addFitParameter("c_muGANom", cateIndex);
-      }
-      addFitParameter("a_sigmaGANom", cateIndex);
-      addFitParameter("b_sigmaGANom", cateIndex);
-      addFitParameter("fracCB", cateIndex);
+      m_ws->factory(Form("a_alphaCB_%sc%d[2.2,0.0,4.0]",
+			 m_signalType.Data(), cateIndex));
+      m_ws->factory(Form("b_alphaCB_%sc%d[0.0,-0.1,0.1]", 
+			 m_signalType.Data(), cateIndex));
+      m_ws->factory(Form("nCB_%sc%d[5.0,0.1,10.0]",
+			 m_signalType.Data(), cateIndex));
+      m_ws->factory(Form("a_sigmaGANom_%sc%d[5.0,-1.0,20.0]",
+			 m_signalType.Data(), cateIndex));
+      m_ws->factory(Form("b_sigmaGANom_%sc%d[1.8,0.1,4.0]", 
+			 m_signalType.Data(), cateIndex));
+      m_ws->factory(Form("fracCB_%sc%d[0.9,0.0,1.0]", 
+			 m_signalType.Data(), cateIndex));
     }
     else if (function.EqualTo("DoubleCB")) {
-      addFitParameter("a_alphaCBLo", cateIndex);
-      addFitParameter("b_alphaCBLo", cateIndex);
-      addFitParameter("c_alphaCBLo", cateIndex);
-      addFitParameter("nCBLo", cateIndex);
-      addFitParameter("a_alphaCBHi", cateIndex);
-      addFitParameter("b_alphaCBHi", cateIndex);
-      addFitParameter("nCBHi", cateIndex);
+      m_ws->factory(Form("a_alphaCBLo_%sc%d[2.42,1.0,4.0]", 
+			 m_signalType.Data(), cateIndex));
+      m_ws->factory(Form("b_alphaCBLo_%sc%d[-483,-1000,0]", 
+			 m_signalType.Data(), cateIndex));
+      m_ws->factory(Form("c_alphaCBLo_%sc%d[380,100,500]",
+			 m_signalType.Data(), cateIndex));
+      m_ws->factory(Form("nCBLo_%sc%d[9.0,0.1,20.0]",
+			 m_signalType.Data(), cateIndex));
+      m_ws->factory(Form("a_alphaCBHi_%sc%d[2.2,0.0,4.0]",
+			 m_signalType.Data(), cateIndex));
+      m_ws->factory(Form("b_alphaCBHi_%sc%d[0.0,-0.5,0.5]",
+			 m_signalType.Data(), cateIndex));
+      m_ws->factory(Form("nCBHi_%sc%d[5.0,0.1,10.0]",
+			 m_signalType.Data(), cateIndex));
     }
     
     // Loop over mass points, define resonance model in each:
@@ -972,9 +777,6 @@ bool SigParam::makeCategoryParameterization(int cateIndex, TString function) {
       // Crystal Ball + Gaussian-specific parameters:
       if (function.EqualTo("CBGA")) {
 	m_ws->factory(Form("expr::alphaCB_%s%s('@0+@1*%f',{a_alphaCB_%sc%d,b_alphaCB_%sc%d})", m_signalType.Data(), currKey.Data(), mRegVal, m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex));
-	if (!m_sameCBGAMean) {
-	  m_ws->factory(Form("expr::muGANom_%s%s('@0+@1*%f+@2*%f*%f+%f',{a_muGANom_%sc%d,b_muGANom_%sc%d,c_muGANom_%sc%d})", m_signalType.Data(), currKey.Data(), mRegVal, mRegVal, mRegVal, mResVal, m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex));
-	}
 	m_ws->factory(Form("expr::sigmaGANom_%s%s('@0+@1*%f',{a_sigmaGANom_%sc%d,b_sigmaGANom_%sc%d})", m_signalType.Data(), currKey.Data(), mRegVal, m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex));
       }
       // Double Crystal Ball-specific parameters:
@@ -982,7 +784,7 @@ bool SigParam::makeCategoryParameterization(int cateIndex, TString function) {
 	m_ws->factory(Form("expr::alphaCBLo_%s%s('@0+@1/(%f+@2)',{a_alphaCBLo_%sc%d,b_alphaCBLo_%sc%d,c_alphaCBLo_%sc%d})", m_signalType.Data(), currKey.Data(), mRegVal, m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex));
 	m_ws->factory(Form("expr::alphaCBHi_%s%s('@0+@1*%f',{a_alphaCBHi_%sc%d,b_alphaCBHi_%sc%d})", m_signalType.Data(), currKey.Data(), mRegVal, m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex));
       }
-      
+            
       // Create, individual resonance shapes, add to simultaneous PDF:
       resonanceCreator(currMassPoints[i_m], cateIndex, function);
       currSim->addPdf(*m_ws->pdf(Form("sigPdf_%s%s",m_signalType.Data(),
@@ -1020,9 +822,6 @@ bool SigParam::makeCategoryParameterization(int cateIndex, TString function) {
     // Crystal Ball + Gaussian-specific parameters:
     if (function.EqualTo("CBGA")) {
       m_ws->factory(Form("expr::alphaCB_%sc%d('@0+@1*@2',{a_alphaCB_%sc%d,b_alphaCB_%sc%d,mRegularized})", m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex));
-      if (!m_sameCBGAMean) {
-	m_ws->factory(Form("expr::muGANom_%sc%d('@0+@1*@3+@2*@3*@3+@4',{a_muGANom_%sc%d,b_muGANom_%sc%d,c_muGANom_%sc%d,mRegularized,mResonance})", m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex));
-      }
       m_ws->factory(Form("expr::sigmaGANom_%sc%d('@0+@1*@2',{a_sigmaGANom_%sc%d,b_sigmaGANom_%sc%d,mRegularized})", m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex));
     }
     // Double Crystal Ball-specific parameters:
@@ -1051,58 +850,45 @@ bool SigParam::makeCategoryParameterization(int cateIndex, TString function) {
 */
 bool SigParam::makeSingleResonance(double resonanceMass, int cateIndex,
 				   TString function) {
-  std::cout << "SigParam: parameterizing single point in category " << cateIndex
-	    << " and at mass " << resonanceMass << std::endl;
-  if (!function.EqualTo("DoubleCB") && !function.EqualTo("CBGA")) {
-    std::cout << "SigParam: Error! Improper function " << function << std::endl;
-    return false;
-  }
-  
   // Before calling resonanceCreator, need to define dependent variables.
   TString currKey = getKey(resonanceMass, cateIndex);
-  m_ws->factory(Form("muCBNom_%s%s[%f,%f,%f]", m_signalType.Data(), 
-		     currKey.Data(), resonanceMass, 0.9*resonanceMass, 
-		     1.1*resonanceMass));
-  m_ws->factory(Form("sigmaCBNom_%s%s[2.0,0.01,200.0]", m_signalType.Data(), 
-		     currKey.Data()));
-  
   if (function.EqualTo("CBGA")) {
-    m_ws->factory(Form("alphaCB_%s%s[1.5,1.0,2.5]", m_signalType.Data(), 
-		       currKey.Data()));
+    m_ws->factory(Form("muCBNom_%s%s[%f,%f,%f]", m_signalType.Data(), 
+		       currKey.Data(), resonanceMass, 0.9*resonanceMass, 
+		       1.1*resonanceMass));
+    m_ws->factory(Form("sigmaCBNom_%s%s[%f,%f,%f]", m_signalType.Data(), 
+		       currKey.Data(), 2.0, 0.01, 40.0));
+    m_ws->factory(Form("alphaCB_%s%s[%f,%f,%f]", m_signalType.Data(), 
+		       currKey.Data(), 1.5, 1.0, 2.5));
     if (!m_ws->var(Form("nCB_%sc%d",m_signalType.Data(), cateIndex))) {
-      //m_ws->factory(Form("nCB_%sc%d[9.0,0.01,20.0]", m_signalType.Data(), 
-      //		 cateIndex));
-      m_ws->factory(Form("nCB_%sc%d[9.0]", m_signalType.Data(), cateIndex));
+      m_ws->factory(Form("nCB_%sc%d[%f,%f,%f]", m_signalType.Data(), 
+			 cateIndex, 9.0, 0.01, 20.0));
     }
-    //m_ws->factory(Form("sigmaGANom_%s%s[2.0,0.01,40.0]", m_signalType.Data(),
-    //		       currKey.Data()));
-    if (!m_sameCBGAMean) {
-      m_ws->factory(Form("muGANom_%s%s[%f,%f,%f]", m_signalType.Data(), 
-			 currKey.Data(), resonanceMass, 0.8*resonanceMass, 
-			 1.2*resonanceMass));
-    }
-    m_ws->factory(Form("sigmaGANom_%s%s[10.0,0.01,80.0]", m_signalType.Data(),
-		       currKey.Data()));
-    //m_ws->factory(Form("fracCB_%sc%d[0.9,0.001,0.999]", m_signalType.Data(), 
-    //		       cateIndex));
-    m_ws->factory(Form("fracCB_%sc%d[0.5,0.001,0.999]", m_signalType.Data(), 
-		       cateIndex));
+    m_ws->factory(Form("sigmaGANom_%s%s[%f,%f,%f]", m_signalType.Data(),
+		       currKey.Data(), 2.0, 0.01, 40.0));
+    m_ws->factory(Form("fracCB_%sc%d[%f,%f,%f]", m_signalType.Data(), 
+		       cateIndex, 0.9, 0.01, 1.0));
   }
   else if (function.EqualTo("DoubleCB")) {
-    m_ws->factory(Form("alphaCBLo_%s%s[1.5,1.0,2.5]", m_signalType.Data(),
-		       currKey.Data()));
+    m_ws->factory(Form("muCBNom_%s%s[%f,%f,%f]", m_signalType.Data(), 
+		       currKey.Data(), resonanceMass, 0.9*resonanceMass,
+		       1.1*resonanceMass));
+    m_ws->factory(Form("sigmaCBNom_%s%s[%f,%f,%f]", m_signalType.Data(), 
+		       currKey.Data(), 2.0, 0.01, 200.0));
+    m_ws->factory(Form("alphaCBLo_%s%s[%f,%f,%f]", m_signalType.Data(), 
+		       currKey.Data(), 1.5, 1.0, 2.5));
     if (!m_ws->var(Form("nCBLo_%sc%d", m_signalType.Data(), cateIndex))) {
-      m_ws->factory(Form("nCBLo_%sc%d[17.0,0.01,30.0]", m_signalType.Data(),
-			 cateIndex));
+      m_ws->factory(Form("nCBLo_%sc%d[%f,%f,%f]", m_signalType.Data(), 
+			 cateIndex, 17.0, 0.01, 30.0));
     }
-    m_ws->factory(Form("alphaCBHi_%s%s[2.2,1.0,3.0]", m_signalType.Data(),
-		       currKey.Data()));
+    m_ws->factory(Form("alphaCBHi_%s%s[%f,%f,%f]", m_signalType.Data(),
+		       currKey.Data(), 2.2, 1.00, 3.0));
     if (!m_ws->var(Form("nCBHi_%sc%d", m_signalType.Data(), cateIndex))) {
-      m_ws->factory(Form("nCBHi_%sc%d[5.2,0.01,10.0]", m_signalType.Data(), 
-			 cateIndex));
+      m_ws->factory(Form("nCBHi_%sc%d[%f,%f,%f]", m_signalType.Data(), 
+			 cateIndex, 5.2, 0.01, 10.0));
     }
   }
-  
+
   // Create the single resonance PDF:
   resonanceCreator(resonanceMass, cateIndex, function);
   
@@ -1138,19 +924,19 @@ void SigParam::makeYieldParameterization(int cateIndex) {
   }
   
   // Use TF1 and TGraph to fit the yield:
-  m_yieldFunc[cateIndex] = new TF1("yieldFunc", "pol3", 0.0, 0.5);
-  m_yieldGraph[cateIndex] = new TGraph(nResPoints, mResValues, yieldValues);
-  m_yieldGraph[cateIndex]->Fit(m_yieldFunc[cateIndex]);
+  yieldFunc[cateIndex] = new TF1("yieldFunc", "pol3", 0.0, 0.5);
+  yieldGraph[cateIndex] = new TGraph(nResPoints, mResValues, yieldValues);
+  yieldGraph[cateIndex]->Fit(yieldFunc[cateIndex]);
   
   // Create the yield parameters:
   m_ws->factory(Form("yieldVar_a_%sc%d[%f]", m_signalType.Data(), cateIndex,
-		     m_yieldFunc[cateIndex]->GetParameter(0)));
+		     yieldFunc[cateIndex]->GetParameter(0)));
   m_ws->factory(Form("yieldVar_b_%sc%d[%f]", m_signalType.Data(), cateIndex,
-		     m_yieldFunc[cateIndex]->GetParameter(1)));
+		     yieldFunc[cateIndex]->GetParameter(1)));
   m_ws->factory(Form("yieldVar_c_%sc%d[%f]", m_signalType.Data(), cateIndex, 
-		     m_yieldFunc[cateIndex]->GetParameter(2)));
+		     yieldFunc[cateIndex]->GetParameter(2)));
   m_ws->factory(Form("yieldVar_d_%sc%d[%f]", m_signalType.Data(), cateIndex,
-		     m_yieldFunc[cateIndex]->GetParameter(3)));
+		     yieldFunc[cateIndex]->GetParameter(3)));
   
   // Then create a yield RooFormulaVar.
   m_ws->factory(Form("expr::sigYield_%sc%d('@0+@1*@4+@2*@4*@4+@3*@4*@4*@4',{yieldVar_a_%sc%d,yieldVar_b_%sc%d,yieldVar_c_%sc%d,yieldVar_d_%sc%d,mRegularized})", m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex, m_signalType.Data(), cateIndex));
@@ -1196,34 +982,28 @@ std::vector<double> SigParam::massPointsForCategory(int cateIndex) {
 
 /**
    -----------------------------------------------------------------------------
-   Create a ratio plot (or subtraction plot, for the moment...)
-   @param data - The RooAbsData set for comparison.
-   @param pdf - The PDF for comparison.
-   @param xMin - The minimum value of the observable range.
-   @param xMax - The maximum value of the observable range.
-   @param xBins - The number of bins for the observable.
-   @returns - A TGraphErrors to plot.
 */
-TGraphErrors* SigParam::plotSubtraction(RooAbsData *data, RooAbsPdf *pdf, 
-					double xMin, double xMax, double xBins){
+RooDataSet* SigParam::plotDivision(RooAbsData *data, RooAbsPdf *pdf,
+				   double xMin, double xMax, double xBins,
+				   double &chi2) {
   double minOrigin = m_yy->getMin();
   double maxOrigin = m_yy->getMax();
   double nEvents = data->sumEntries();
   
-  m_yy->setRange("fullRange", xMin, xMax);
-  TH1F *originHist
-    = (TH1F*)data->createHistogram("dataSub", *m_yy, 				
-  				   RooFit::Binning(xBins, xMin, xMax));
-  TGraphErrors *result = new TGraphErrors();
-  double increment = (xMax - xMin) / ((double)xBins);
+  chi2 = 0.0;
   
+  RooDataSet *result = new RooDataSet("dataSub", "dataSub",
+				      RooArgSet(*m_yy,*m_wt), 
+				      RooFit::WeightVar(*m_wt));
+  double increment = (xMax - xMin ) / ((double)xBins);
+  
+  m_yy->setRange("fullRange", xMin, xMax);
   RooAbsReal* intTot
     = (RooAbsReal*)pdf->createIntegral(RooArgSet(*m_yy),
 				       RooFit::NormSet(*m_yy), 
 				       RooFit::Range("fullRange"));
   double valTot = intTot->getVal();
   
-  int pointIndex = 0;
   for (double i_m = xMin; i_m < xMax; i_m += increment) {
     m_yy->setRange(Form("range%2.2f",i_m), i_m, (i_m+increment));
     RooAbsReal* intCurr
@@ -1235,74 +1015,20 @@ TGraphErrors* SigParam::plotSubtraction(RooAbsData *data, RooAbsPdf *pdf,
     double currMass = i_m + (0.5*increment);
     double currPdfWeight = nEvents * (valCurr / valTot);
     TString varName = m_yy->GetName();
-    double currDataWeight = data->sumEntries(Form("%s>%f&&%s<%f",varName.Data(),
-						  i_m,varName.Data(),
-						  (i_m+increment)));
+    double currDataWeight
+      = data->sumEntries(Form("%s>%f&&%s<%f",varName.Data(),i_m,varName.Data(),(i_m+increment)));
+    
     double currWeight = currDataWeight - currPdfWeight;
-    result->SetPoint(pointIndex, currMass, currWeight);
-  
-    double currError = originHist->GetBinError(pointIndex+1);
-    result->SetPointError(pointIndex, 0.0, currError);
-    pointIndex++;
-  }
-  m_yy->setMin(minOrigin);
-  m_yy->setMax(maxOrigin);
-  return result;
-}
-
-/**
-   -----------------------------------------------------------------------------
-   Create a ratio plot (or subtraction plot, for the moment...)
-   @param data - The RooAbsData set for comparison.
-   @param pdf - The PDF for comparison.
-   @param xMin - The minimum value of the observable range.
-   @param xMax - The maximum value of the observable range.
-   @param xBins - The number of bins for the observable.
-   @returns - A TGraphErrors to plot.
-*/
-TGraphErrors* SigParam::plotDivision(RooAbsData *data, RooAbsPdf *pdf, 
-				     double xMin, double xMax, double xBins){
-  double minOrigin = m_yy->getMin();
-  double maxOrigin = m_yy->getMax();
-  double nEvents = data->sumEntries();
-  
-  m_yy->setRange("fullRange", xMin, xMax);
-  TH1F *originHist
-    = (TH1F*)data->createHistogram("dataSub", *m_yy, 				
-  				   RooFit::Binning(xBins, xMin, xMax));
-  TGraphErrors *result = new TGraphErrors();
-  double increment = (xMax - xMin) / ((double)xBins);
-  
-  RooAbsReal* intTot
-    = (RooAbsReal*)pdf->createIntegral(RooArgSet(*m_yy),
-				       RooFit::NormSet(*m_yy), 
-				       RooFit::Range("fullRange"));
-  double valTot = intTot->getVal();
-  
-  int pointIndex = 0;
-  for (double i_m = xMin; i_m < xMax; i_m += increment) {
-    m_yy->setRange(Form("range%2.2f",i_m), i_m, (i_m+increment));
-    RooAbsReal* intCurr
-      = (RooAbsReal*)pdf->createIntegral(RooArgSet(*m_yy), 
-					 RooFit::NormSet(*m_yy), 
-					 RooFit::Range(Form("range%2.2f",i_m)));
-    double valCurr = intCurr->getVal();
+    m_yy->setVal(currMass);
+    m_wt->setVal(currWeight);
+    result->add(RooArgSet(*m_yy,*m_wt), currWeight);
     
-    double currMass = i_m + (0.5*increment);
-    double currPdfWeight = nEvents * (valCurr / valTot);
-    TString varName = m_yy->GetName();
-    double currDataWeight = data->sumEntries(Form("%s>%f&&%s<%f",varName.Data(),
-						  i_m,varName.Data(),
-						  (i_m+increment)));
-    double currWeight = currDataWeight / currPdfWeight;
-    result->SetPoint(pointIndex, currMass, currWeight);
-  
-    double currError = originHist->GetBinError(pointIndex+1) / currPdfWeight;
-    result->SetPointError(pointIndex, 0.0, currError);
-    pointIndex++;
+    chi2 += ((currDataWeight-currPdfWeight) * (currDataWeight-currPdfWeight));
   }
+  chi2 = chi2 / (xBins-1.0);
   m_yy->setMin(minOrigin);
   m_yy->setMax(maxOrigin);
+  
   return result;
 }
 
@@ -1327,26 +1053,30 @@ void SigParam::plotCategoryResonances(int cateIndex) {
   can->cd();
   pad1->Draw();
   pad2->Draw();
+
     
   // Get a list of the resonance masses:
   std::vector<double> currMassPoints = massPointsForCategory(cateIndex);
   int xMin = currMassPoints[0] - 10;
   int xMax = currMassPoints[currMassPoints.size()-1] + 10;
-  int xBins = (int)(m_nBinsPerGeV) * (xMax - xMin);
-    
+  //int xBins = 20 + xMax - xMin;
+  int xBins = 50;
+  
   RooPlot* frame = m_yy->frame(RooFit::Bins(xBins), RooFit::Range(xMin, xMax));
   frame->SetYTitle("Events/0.5 GeV");
   frame->SetXTitle("Mass [GeV]");
-    
+  
+  double totChi2 = 0.0;
+  double totDOF = 0.0;
+  
   // Loop over mass points, drawing data and PDF for each.
   for (int i_m = 0; i_m < (int)currMassPoints.size(); i_m++) {
-    
     pad1->cd();
-    
     RooAbsData *currData = NULL;
     RooAbsPdf *currPdf = NULL;
     
     TString currKey = getKey(currMassPoints[i_m], cateIndex);
+    double currN = (*m_ws->data(Form("data_%s",currKey.Data()))).sumEntries();
     if ((m_ws->data(Form("data_%s",currKey.Data())))) {
       currData = (m_ws->data(Form("data_%s",currKey.Data())));
       currData->plotOn(frame);
@@ -1375,51 +1105,48 @@ void SigParam::plotCategoryResonances(int cateIndex) {
     if (i_m == 0) frame->Draw();
     else frame->Draw("SAME");
     
-    TLatex text; text.SetNDC(); text.SetTextColor(1);
-    text.DrawLatex(0.72, 0.88, Form("category %d", cateIndex));
-    
-    // Switch to sub-plot:
     pad2->cd();
-    TGraphErrors* subData = (m_doRatioPlot) ? 
-      plotDivision(currData,currPdf,xMin,xMax,xBins) :
-      plotSubtraction(currData,currPdf,xMin,xMax,xBins);
+    double currChi2 = 0.0;
+    RooDataSet* subData = plotDivision(currData, currPdf, xMin, xMax, xBins,
+				       currChi2);
+    RooPlot* frame2 = m_yy->frame(RooFit::Bins(xBins),RooFit::Range(xMin,xMax));
+    subData->plotOn(frame2);
+    totChi2 += (currChi2 * xBins);
+    totDOF += xBins;
     
     if (i_m == 0) {
-      subData->GetXaxis()->SetTitle("Mass [GeV]");
-      if (m_doRatioPlot) {
-	subData->GetYaxis()->SetTitle("Data / Fit");
-	subData->GetYaxis()->SetRangeUser(m_ratioMin, m_ratioMax);
-      }
-      else subData->GetYaxis()->SetTitle("Data - Fit");
-      subData->GetXaxis()->SetTitleOffset(0.95);
-      subData->GetYaxis()->SetTitleOffset(0.7);
-      subData->GetXaxis()->SetTitleSize(0.1);
-      subData->GetYaxis()->SetTitleSize(0.1);
-      subData->GetXaxis()->SetLabelSize(0.1);
-      subData->GetYaxis()->SetLabelSize(0.1);
-      subData->GetYaxis()->SetNdivisions(4);
-      subData->SetMarkerColor(1);
-      subData->GetXaxis()->SetRangeUser(xMin, xMax);
-      subData->Draw("AEP");
       
+      frame2->SetLineWidth(2);
+      frame2->GetXaxis()->SetTitle("Mass [GeV]");
+      frame2->GetXaxis()->SetTitleOffset(0.95);
+      frame2->GetYaxis()->SetTitleOffset(0.7);
+      frame2->GetXaxis()->SetTitleSize(0.1);
+      frame2->GetYaxis()->SetTitleSize(0.1);
+      frame2->GetXaxis()->SetLabelSize(0.1);
+      frame2->GetYaxis()->SetLabelSize(0.1);
+      frame2->GetYaxis()->SetNdivisions(4);
+      frame2->GetYaxis()->SetTitle("Data - Fit");
+      
+      frame2->Draw();
       TLine *line = new TLine();
       line->SetLineStyle(1);
-      line->SetLineWidth(2);
+      line->SetLineWidth(1);
       line->SetLineColor(kRed);
-      if (m_doRatioPlot) {
-	line->DrawLine(xMin, 1.0, xMax, 1.0);
-	line->SetLineWidth(1);
-	line->SetLineStyle(2);
-	line->DrawLine(xMin,((1.0+m_ratioMin)/2.0),xMax,((1.0+m_ratioMin)/2.0));
-	line->DrawLine(xMin,((1.0+m_ratioMax)/2.0),xMax,((1.0+m_ratioMax)/2.0));
-      }
-      else line->DrawLine(xMin, 0.0, xMax, 0.0);
-      subData->Draw("EPSAME");
+      line->DrawLine(xMin, 0, xMax, 0);
     }
-    subData->Draw("EPSAME");
+    frame2->Draw("SAME");
+    
   }
-  can->Print(Form("%s/plot_paramResonance_c%d%s", 
-		  m_directory.Data(), cateIndex, m_fileFormat.Data()));
+  
+  pad1->cd();
+  TLatex text; text.SetNDC(); text.SetTextColor(1);
+  text.DrawLatex(0.72, 0.88, Form("category %d", cateIndex));
+  
+  double chi2OverNDOF = totChi2 / totDOF;
+  //text.DrawLatex(0.72, 0.82, Form("#chi^{2}/D.O.F = %2.2f", chi2OverNDOF));
+  
+  can->Print(Form("%s/plot_paramResonance_c%d.eps", 
+		  m_directory.Data(), cateIndex));
 }
 
 /**
@@ -1446,10 +1173,9 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex) {
   pad2->Draw();
   pad1->cd();
   
-  double rMin = 0.75*resonanceMass;
-  double rMax = 1.25*resonanceMass;
-  int rBins = (int)(m_nBinsPerGeV*(rMax - rMin));
-  
+  double rMin = 0.5*resonanceMass;
+  double rMax = 1.5*resonanceMass;
+  int rBins = 40;
   RooPlot* frame = m_yy->frame(RooFit::Bins(rBins), RooFit::Range(rMin,rMax));
   frame->SetYTitle("Events/0.5 GeV");
   frame->SetXTitle("Mass [GeV]");
@@ -1469,21 +1195,17 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex) {
   
   // First check to see if parameterized shape exists:
   if ((m_ws->pdf(Form("sigPdf_%sc%d",m_signalType.Data(),cateIndex)))) {
-    (*m_ws->var("mResonance")).setVal(resonanceMass);    
+    (*m_ws->var("mResonance")).setVal(resonanceMass);
     currPdf = (m_ws->pdf(Form("sigPdf_%sc%d",m_signalType.Data(),cateIndex)));
-    if (m_currFunction.EqualTo("CBGA")) {
-      currPdf->plotOn(frame, RooFit::Components((*m_ws->pdf(Form("pdfGA_%sc%d",m_signalType.Data(), cateIndex)))), RooFit::LineColor(3), RooFit::LineStyle(2));
-      currPdf->plotOn(frame, RooFit::Components((*m_ws->pdf(Form("pdfCB_%sc%d",m_signalType.Data(), cateIndex)))), RooFit::LineColor(4), RooFit::LineStyle(2));
-    }
+    //(*m_ws->pdf(Form("sigPdf_%sc%d",m_signalType.Data(),cateIndex)))
+    //.plotOn(frame, RooFit::LineColor(2));
     currPdf->plotOn(frame, RooFit::LineColor(2));
   }
   else if((m_ws->pdf(Form("sigPdf_%s%s",m_signalType.Data(),currKey.Data())))){
     currPdf
       = (m_ws->pdf(Form("sigPdf_%s%s",m_signalType.Data(),currKey.Data())));
-    if (m_currFunction.EqualTo("CBGA")) {
-      currPdf->plotOn(frame, RooFit::Components((*m_ws->pdf(Form("pdfGA_%s%s",m_signalType.Data(), currKey.Data())))), RooFit::LineColor(3), RooFit::LineStyle(2));
-      currPdf->plotOn(frame, RooFit::Components((*m_ws->pdf(Form("pdfCB_%s%s",m_signalType.Data(), currKey.Data())))), RooFit::LineColor(4), RooFit::LineStyle(2));
-    }
+    //(*m_ws->pdf(Form("sigPdf_%s%s", m_signalType.Data(), currKey.Data())))
+    //.plotOn(frame, RooFit::LineColor(2));
     currPdf->plotOn(frame, RooFit::LineColor(2));
   }
   else {
@@ -1491,49 +1213,42 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex) {
     return;
   }
   frame->Draw();
-  if (m_useLogYAxis) {
-    gPad->SetLogy();
-    frame->GetYaxis()->SetRangeUser(0.00001 *(*m_ws->data(Form("data_%s",currKey.Data()))).sumEntries(), (*m_ws->data(Form("data_%s",currKey.Data()))).sumEntries());
-  }
+
   TLatex text; text.SetNDC(); text.SetTextColor(1);
   text.DrawLatex(0.2, 0.88, Form("category %d", cateIndex));
+  
   pad2->cd();
   
-  TGraphErrors* subData = (m_doRatioPlot) ?
-    plotDivision(currData, currPdf, rMin, rMax, rBins) : 
-    plotSubtraction(currData, currPdf, rMin, rMax, rBins);
+  double currChi2 = 0.0;
+  RooDataSet* subData = plotDivision(currData, currPdf, rMin, rMax, rBins,
+				     currChi2);
+  RooPlot* frame2 = m_yy->frame(RooFit::Bins(rBins),RooFit::Range(rMin,rMax));
+  frame2->SetLineWidth(2);
+  frame2->GetXaxis()->SetTitle("Mass [GeV]");
+  frame2->GetXaxis()->SetTitleOffset(0.95);
+  frame2->GetYaxis()->SetTitleOffset(0.7);
+  frame2->GetXaxis()->SetTitleSize(0.1);
+  frame2->GetYaxis()->SetTitleSize(0.1);
+  frame2->GetXaxis()->SetLabelSize(0.1);
+  frame2->GetYaxis()->SetLabelSize(0.1);
+  frame2->GetYaxis()->SetNdivisions(4);
+  frame2->GetYaxis()->SetTitle("Data - Fit");
   
-  subData->GetXaxis()->SetTitle("Mass [GeV]");
-  if (m_doRatioPlot) {
-    subData->GetYaxis()->SetTitle("Data / Fit");
-    subData->GetYaxis()->SetRangeUser(m_ratioMin, m_ratioMax);
-  }
-  else subData->GetYaxis()->SetTitle("Data - Fit");
-  subData->GetXaxis()->SetTitleOffset(0.95);
-  subData->GetYaxis()->SetTitleOffset(0.7);
-  subData->GetXaxis()->SetTitleSize(0.1);
-  subData->GetYaxis()->SetTitleSize(0.1);
-  subData->GetXaxis()->SetLabelSize(0.1);
-  subData->GetYaxis()->SetLabelSize(0.1);
-  subData->GetYaxis()->SetNdivisions(4);
-  subData->GetXaxis()->SetRangeUser(rMin, rMax);
-  subData->Draw("AEP");
   
+  subData->plotOn(frame2);
+  frame2->Draw();
   TLine *line = new TLine();
   line->SetLineStyle(1);
-  line->SetLineWidth(2);
+  line->SetLineWidth(1);
   line->SetLineColor(kRed);
-  if (m_doRatioPlot) {
-    line->DrawLine(rMin, 1.0, rMax, 1.0); 
-    line->SetLineWidth(1);
-    line->SetLineStyle(2);
-    line->DrawLine(rMin,((1.0+m_ratioMin)/2.0),rMax,((1.0+m_ratioMin)/2.0));
-    line->DrawLine(rMin,((1.0+m_ratioMax)/2.0),rMax,((1.0+m_ratioMax)/2.0));
-  }
-  else line->DrawLine(rMin, 0.0, rMax, 0.0);
-  subData->Draw("EPSAME");
-  can->Print(Form("%s/plot_singleRes_m%2.2f_c%d%s", m_directory.Data(),
-		  resonanceMass, cateIndex, m_fileFormat.Data()));
+  line->DrawLine(rMin, 0, rMax, 0);
+ 
+  pad1->cd();
+  
+  //text.DrawLatex(0.2, 0.82, Form("#chi^{2}/D.O.F = %2.2f", currChi2));
+  
+  can->Print(Form("%s/plot_singleRes_m%2.2f_c%d.eps", 
+		  m_directory.Data(), resonanceMass, cateIndex));
 }
 
 /**
@@ -1546,62 +1261,16 @@ void SigParam::plotYields(int cateIndex) {
 	    << std::endl;
   
   // Get a list of the mass points in the category:
-  //TCanvas *canY = new TCanvas("can", "can", 800, 600);
-  //canY->cd();
-  
-  TCanvas *can = new TCanvas("can","can",800,800);
-  can->cd();
-  TPad *pad1 = new TPad( "pad1", "pad1", 0.00, 0.33, 1.00, 1.00 );
-  TPad *pad2 = new TPad( "pad2", "pad2", 0.00, 0.00, 1.00, 0.33 );
-  pad1->SetBottomMargin(0.00001);
-  pad1->SetBorderMode(0);
-  pad2->SetTopMargin(0.00001);
-  pad2->SetBottomMargin(0.4);
-  pad2->SetBorderMode(0);
-  can->cd();
-  pad1->Draw();
-  pad2->Draw();
-  pad1->cd();
-  
-  m_yieldFunc[cateIndex]->SetLineColor(kBlue);
-  m_yieldGraph[cateIndex]->Draw("AP");
-  m_yieldFunc[cateIndex]->Draw("LSAME");
+  TCanvas *canY = new TCanvas("can", "can", 800, 600);
+  canY->cd();
+  yieldFunc[cateIndex]->SetLineColor(kBlue);
+  yieldGraph[cateIndex]->Draw("AP");
+  yieldFunc[cateIndex]->Draw("LSAME");
   TLatex text; text.SetNDC(); text.SetTextColor(1);
   text.DrawLatex(0.4, 0.88, Form("%s signal, category %d",
 				 m_signalType.Data(), cateIndex));
-  pad2->cd();
-  
-  TGraphErrors *gRatio = new TGraphErrors(Form("ratio_c%d",cateIndex),
-					  Form("ratio_c%d",cateIndex));
-  for (int i_p = 0; i_p < m_yieldGraph[cateIndex]->GetN(); i_p++) {
-    double currX = 0.0; double currY = 0.0;
-    m_yieldGraph[cateIndex]->GetPoint(i_p, currX, currY);
-    gRatio->SetPoint(i_p, currX, (currY/m_yieldFunc[cateIndex]->Eval(currX)));
-  }
-  gRatio->GetXaxis()->SetTitle("Mass [GeV]");
-  gRatio->GetYaxis()->SetTitle("Data - Fit");
-  gRatio->GetXaxis()->SetTitleOffset(0.95);
-  gRatio->GetYaxis()->SetTitleOffset(0.7);
-  gRatio->GetXaxis()->SetTitleSize(0.1);
-  gRatio->GetYaxis()->SetTitleSize(0.1);
-  gRatio->GetXaxis()->SetLabelSize(0.1);
-  gRatio->GetYaxis()->SetLabelSize(0.1);
-  gRatio->GetYaxis()->SetNdivisions(4);
-  gRatio->GetXaxis()
-    ->SetRangeUser(m_yieldGraph[cateIndex]->GetXaxis()->GetXmin(),
-		   m_yieldGraph[cateIndex]->GetXaxis()->GetXmin());
-  gRatio->Draw("AEP");
-  gRatio->Draw("AP");
-  
-  TLine *line = new TLine();
-  line->SetLineStyle(1);
-  line->SetLineWidth(1);
-  line->SetLineColor(kBlue);
-  line->DrawLine(gRatio->GetXaxis()->GetXmin(), 1,
-		 gRatio->GetXaxis()->GetXmax(), 1);
-  
-  can->Print(Form("%s/plot_paramYield_%sc%d%s", m_directory.Data(),
-		  m_signalType.Data(), cateIndex, m_fileFormat.Data()));
+  canY->Print(Form("%s/plot_paramYield_%sc%d.eps", m_directory.Data(),
+		   m_signalType.Data(), cateIndex));
 }
 
 /**
@@ -1626,7 +1295,6 @@ void SigParam::resonanceCreator(double resonanceMass, int cateIndex,
 				TString function) {
   std::cout << "SigParam: Adding resonance to workspace" << "\tresonanceMass: "
 	    << resonanceMass << "\tcategory: " << cateIndex << std::endl;
-  m_currFunction = function;
   
   // Check that the dataset has been defined and is not empty.
   if (!dataExists(resonanceMass, cateIndex) &&
@@ -1646,13 +1314,7 @@ void SigParam::resonanceCreator(double resonanceMass, int cateIndex,
     // Cystal Ball component:
     m_ws->factory(Form("RooCBShape::pdfCB_%s(m_yy, prod::muCB_%s(muCBNom_%s%s), prod::sigmaCB_%s(sigmaCBNom_%s%s), alphaCB_%s, nCB_%sc%d)", suffix.Data(), suffix.Data(), suffix.Data(), m_listMSS.Data(), suffix.Data(), suffix.Data(), m_listMRS.Data(), suffix.Data(), m_signalType.Data(), cateIndex));
     // Gaussian component:
-    if (m_sameCBGAMean) {
-      m_ws->factory(Form("RooGaussian::pdfGA_%s(m_yy, prod::muGA_%s(muCBNom_%s%s), prod::sigmaGA_%s(sigmaGANom_%s%s))", suffix.Data(), suffix.Data(), suffix.Data(), m_listMSS.Data(), suffix.Data(), suffix.Data(), m_listMRS.Data()));
-    }
-    else {
-      m_ws->factory(Form("RooGaussian::pdfGA_%s(m_yy, prod::muGA_%s(muGANom_%s%s), prod::sigmaGA_%s(sigmaGANom_%s%s))", suffix.Data(), suffix.Data(), suffix.Data(), m_listMSS.Data(), suffix.Data(), suffix.Data(), m_listMRS.Data()));
-    }
-    
+    m_ws->factory(Form("RooGaussian::pdfGA_%s(m_yy, prod::muGA_%s(muCBNom_%s%s), prod::sigmaGA_%s(sigmaGANom_%s%s))", suffix.Data(), suffix.Data(), suffix.Data(), m_listMSS.Data(), suffix.Data(), suffix.Data(), m_listMRS.Data()));
     // Crystal Ball + Gaussian:
     m_ws->factory(Form("SUM::sigPdf_%s(fracCB_%sc%d*pdfCB_%s,pdfGA_%s)", suffix.Data(), m_signalType.Data(), cateIndex, suffix.Data(), suffix.Data()));
   }
@@ -1663,14 +1325,13 @@ void SigParam::resonanceCreator(double resonanceMass, int cateIndex,
   }
   
   // Define the yield:
-  
   if (!function.Contains("Parameterized")) {
     double yieldValue
       = (*m_ws->data(Form("data_%s",currKey.Data()))).sumEntries();
     m_ws->factory(Form("sigYield_%s%s[%f]",m_signalType.Data(),currKey.Data(),yieldValue));
   }
   
-  std::cout << "SigParam: Resonance successfully added." << std::endl;
+  std::cout << "SigParam: Resonance succesfully added." << std::endl;
 }
 
 /**
@@ -1697,7 +1358,7 @@ void SigParam::saveParameterization() {
    Save a list of parameter names and values.
 */
 void SigParam::saveParameterList() {
-  std::ofstream outFile(Form("%s/resonance paramList.txt",
+  ofstream outFile(Form("%s/resonance paramList.txt", 
 			m_directory.Data()));
   RooArgSet args = m_ws->allVars();
   TIterator *iterArgs = args.createIterator();
@@ -1713,7 +1374,7 @@ void SigParam::saveParameterList() {
    Save a list of signal yields in all categories and at all mass points. 
 */
 void SigParam::saveYieldList() {
-  std::ofstream outFile(Form("%s/resonance_yieldList.txt", m_directory.Data()));
+  ofstream outFile(Form("%s/resonance_yieldList.txt", m_directory.Data()));
   // Loop over datasets:
   for (int i_d = 0; i_d < (int)m_massCatePairs.size(); i_d++) {
     double currMass = (m_massCatePairs[i_d]).first;
@@ -1747,45 +1408,6 @@ void SigParam::setDirectory(TString directory) {
 }
 
 /**
-   Use a logarithmic Y axis for the plots.
-   @param useLogYAxis - True iff plots should have log axis.
-*/
-void SigParam::setLogYAxis(bool useLogYAxis) {
-  m_useLogYAxis = useLogYAxis;
-}
-
-/**
-   -----------------------------------------------------------------------------
-   Set the initial value and range for a fit parameter.
-   @param paramName - The name of the shape parameter of interest.
-   @param valueAndRange - A string with the initial value and range: "[a,b,c]".
-*/
-void SigParam::setParamState(TString paramName, TString valueAndRange) {
-  m_paramState[paramName] = valueAndRange;
-}
-
-/**
-   -----------------------------------------------------------------------------
-   Set the format for plots. Examples are ".eps", ".pdf", ".png", etc. Standard
-   ROOT file extensions.
-*/
-void SigParam::setPlotFormat(TString fileFormat) {
-  m_fileFormat = fileFormat;
-}
-
-/**
-   Set the sub-plot option to a ratio plot instead of a subtraction plot.
-   @param doRatioPlot - True iff you want to do a ratio plot.
-   @param ratioMin - The minimum ratio plot y-axis range.
-   @param ratioMax - The maximum ratio plot y-axis range.
-*/
-void SigParam::setRatioPlot(bool doRatioPlot, double ratioMin, double ratioMax){
-  m_doRatioPlot = doRatioPlot;
-  m_ratioMin = ratioMin;
-  m_ratioMax = ratioMax;
-}
-
-/**
    -----------------------------------------------------------------------------
    Make the parameters of a PDF free or fixed.
    @param pdf - The PDF containing the parameters to be freed/fixed.
@@ -1813,14 +1435,4 @@ void SigParam::setSignalType(TString signalType) {
     m_signalType = Form("%s_", signalType.Data());
   }
   std::cout << "SigParam: Signal type set to " << signalType << std::endl;
-}
-
-/**
-   -----------------------------------------------------------------------------
-   Tell the program whether or not to use the same value for the Crystal Ball
-   and Gaussian means.
-   @param sameCBGAMean - True iff the same mean value should be used. 
-*/
-void SigParam::useCommonCBGAMean(bool sameCBGAMean) {
-  m_sameCBGAMean = sameCBGAMean;
 }

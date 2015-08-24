@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
   TString anaType = DHAnalysis::getAnalysisType(config, DHSignal);
   
   // Define the input file, then make a local copy (for remote jobs):
-  TString originFile = Form("%s/%s/workspaces/rootfiles/workspaceDH_%s.root",
+  TString originFile = Form("%s/%s/DHWorkspace/rootfiles/workspaceDH_%s.root",
 			    (config->getStr("masterOutput")).Data(), 
 			    jobName.Data(), anaType.Data());
   
