@@ -53,28 +53,40 @@ class DHWorkspace {
   void getTemporarySingleHiggs(RooWorkspace* workspace);
   void plotSingleCateFit(RooWorkspace *cateWS, TString dataset, 
 			 TString observableName);
-  
+  TString varToName(TString varForm);
+  TString funcToName(TString funcForm);
+
   // Member variables:
   TString m_configFile;
   TString m_anaType;
   TString m_options;
   TString m_outputDir;
-  
+  int m_nCategories;
   int m_muNominalSH;
   TString m_dataToPlot;
   
   // Helper classes:
   Config *m_config;
-  PESReader *m_pes;
-  PERReader *m_per;
   
   // Updated for each call to createNewCategoryWS():
   int m_currCateIndex;
   TString m_currCateName;
   
   // The Final RooWorkspace and ModelConfig:
-  RooWorkspace *m_combinedWS;
+  RooWorkspace *m_ws;
   ModelConfig *m_modelConfig;
+  
+  RooArgSet *m_nuisanceParameters;
+  RooArgSet *m_globalObservables;
+  RooArgSet *m_observables;
+  RooArgSet *m_poi;
+  
+  RooCategory *m_categories;
+  RooSimultaneous *m_combinedPdf;
+  
+  std::map<std::string, RooDataSet*> m_combData;
+  map<string,RooDataSet*> m_combDataAsimov0;
+  map<string,RooDataSet*> m_combDataAsimov1;
   
   // Track whether fits converge:
   bool m_allGoodFits;
