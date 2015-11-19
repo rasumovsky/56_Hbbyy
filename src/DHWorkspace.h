@@ -37,18 +37,17 @@ class DHWorkspace {
   ModelConfig* getModelConfig();
   
  private:
-  
+  void addSystematic(TString systematicForm);
   void loadWSFromFile();
   void createNewWS();
-  RooWorkspace* createNewCategoryWS();
+  void createNewCategoryWS();
   void makeNP(TString varName, double setup[4], RooArgSet *&nuisParams,
 	      RooArgSet *&constraints, RooArgSet *&globalObs,
 	      RooArgSet *&expected);
   void makeShapeNP(TString varnameNP, TString process, double setup[4],
 		   RooArgSet *&nuisParams, RooArgSet *&constraints,
 		   RooArgSet *&globalObs, RooArgSet *&expected);
-  void createAsimovData(RooWorkspace *cateWS, int valMuDH, int valMuSH);
-  RooDataSet* createAsimovData(int valMuDH, int valMuSH);
+  void createAsimovData(int valMuDH);
   
   void getTemporarySingleHiggs(RooWorkspace* workspace);
   void plotSingleCateFit(RooWorkspace *cateWS, TString dataset, 
@@ -71,22 +70,23 @@ class DHWorkspace {
   // Updated for each call to createNewCategoryWS():
   int m_currCateIndex;
   TString m_currCateName;
+  RooArgSet *m_constraints;
   
-  // The Final RooWorkspace and ModelConfig:
+  // The Final RooWorkspace and ModelConfig and arg sets:
   RooWorkspace *m_ws;
-  ModelConfig *m_modelConfig;
-  
+  ModelConfig *m_modelConfig;  
   RooArgSet *m_nuisanceParameters;
   RooArgSet *m_globalObservables;
   RooArgSet *m_observables;
   RooArgSet *m_poi;
-  
+
+  // Objects for combined PDFs and datasets:
   RooCategory *m_categories;
   RooSimultaneous *m_combinedPdf;
-  
   std::map<std::string, RooDataSet*> m_combData;
-  map<string,RooDataSet*> m_combDataAsimov0;
-  map<string,RooDataSet*> m_combDataAsimov1;
+  std::map<string,RooDataSet*> m_combDataAsimov0;
+  std::map<string,RooDataSet*> m_combDataAsimov1;
+  std::map<TString,RooArgSet*> m_expectedList;
   
   // Track whether fits converge:
   bool m_allGoodFits;
