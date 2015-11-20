@@ -29,7 +29,7 @@ class DHWorkspace {
 
  public:
   
-  DHWorkspace(TString newConfigFile, TString newAnalysisType, TString options);
+  DHWorkspace(TString newConfigFile, TString options);
   virtual ~DHWorkspace() {};
   
   bool fitsAllConverged();
@@ -37,23 +37,14 @@ class DHWorkspace {
   ModelConfig* getModelConfig();
   
  private:
+  void addCategory();
   void addSystematic(TString systematicForm);
-  void loadWSFromFile();
+  void createAsimovData(int valMuDH);  
   void createNewWS();
-  void createNewCategoryWS();
-  void makeNP(TString varName, double setup[4], RooArgSet *&nuisParams,
-	      RooArgSet *&constraints, RooArgSet *&globalObs,
-	      RooArgSet *&expected);
-  void makeShapeNP(TString varnameNP, TString process, double setup[4],
-		   RooArgSet *&nuisParams, RooArgSet *&constraints,
-		   RooArgSet *&globalObs, RooArgSet *&expected);
-  void createAsimovData(int valMuDH);
-  
-  void getTemporarySingleHiggs(RooWorkspace* workspace);
-  void plotSingleCateFit(RooWorkspace *cateWS, TString dataset, 
-			 TString observableName);
-  TString varToName(TString varForm);
-  TString funcToName(TString funcForm);
+  void loadWSFromFile();
+  TString nameOfVar(TString varForm);
+  TString nameOfFunc(TString funcForm);
+  void plotCatePdfAndData(int nBins);
 
   // Member variables:
   TString m_configFile;
@@ -67,7 +58,7 @@ class DHWorkspace {
   // Helper classes:
   Config *m_config;
   
-  // Updated for each call to createNewCategoryWS():
+  // Updated for each call to addCategory():
   int m_currCateIndex;
   TString m_currCateName;
   RooArgSet *m_constraints;
