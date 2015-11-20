@@ -38,7 +38,7 @@ DHWorkspace::DHWorkspace(TString newConfigFile, TString newOptions) {
   m_modelConfig = NULL;
     
   m_config = new Config(m_configFile);
-  m_dataToPlot = (m_config->getBool("doBlind")) ? "asimovDataMu1" : "obsData";
+  m_dataToPlot = (m_config->getBool("DoBlind")) ? "asimovDataMu1" : "obsData";
   
   m_anaType = m_config->getStr("AnalysisType");
   
@@ -49,8 +49,8 @@ DHWorkspace::DHWorkspace(TString newConfigFile, TString newOptions) {
   
   // Assign output directory, and make sure it exists:
   m_outputDir = Form("%s/%s/DHWorkspace", 
-		     (m_config->getStr("masterOutput")).Data(),
-		     (m_config->getStr("jobName")).Data());
+		     (m_config->getStr("MasterOutput")).Data(),
+		     (m_config->getStr("JobName")).Data());
   system(Form("mkdir -vp %s", m_outputDir.Data()));
   system(Form("mkdir -vp %s/Plots/", m_outputDir.Data()));
   system(Form("mkdir -vp %s/rootfiles/", m_outputDir.Data()));

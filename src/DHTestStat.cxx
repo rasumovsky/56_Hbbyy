@@ -4,7 +4,7 @@
 //                                                                            //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 06/08/2015                                                          //
+//  Date: 20/11/2015                                                          //
 //                                                                            //
 //  This class allows the user to calculate p0, CL, and CLs based on an input //
 //  workspace.                                                                //
@@ -17,17 +17,15 @@
    -----------------------------------------------------------------------------
    Constructor for the DHTestStat class. 
    @param newConfigFile - The analysis config file.
-   @param newDHSignal - The Di-Higgs signal to incorporate in the model.
    @param newOptions - The job options ("New", "FromFile"), etc.
    @param newWorkspace - The workspace with the model for the test stats. 
 */
-DHTestStat::DHTestStat(TString newConfigFile, TString newDHSignal,
-		       TString newOptions, RooWorkspace *newWorkspace) {
+DHTestStat::DHTestStat(TString newConfigFile, TString newOptions,
+		       RooWorkspace *newWorkspace) {
   std::cout << "DHTestStat: Initializing...\n\t" << newConfigFile << "\n\t"
-	    << newDHSignal << "\n\t" << newOptions << "\n\t" << std::endl;
+	    << "\n\t" << newOptions << "\n\t" << std::endl;
   
-  // Assign input variables: 
-  m_DHSignal = newDHSignal;
+  // Assign input variables:
   m_options = newOptions;
   
   // Start with a clean class:
@@ -35,17 +33,14 @@ DHTestStat::DHTestStat(TString newConfigFile, TString newDHSignal,
   
   // Set the analysis configuration:
   m_config = new Config(newConfigFile);
-  m_jobName = m_config->getStr("jobName");
-  
-  m_anaType = DHAnalysis::getAnalysisType(m_config, m_DHSignal);
-    
+  m_jobName = m_config->getStr("JobName");
+  m_anaType = m_config->getStr("AnalysisType");
+      
   // Use Asimov data if the analysis is blind.
   m_dataForExpQ0 = "asimovDataMu1";
   m_dataForExpQMu = "asimovDataMu0";
-  m_dataForObsQ0
-    = (m_config->getBool("doBlind")) ? "asimovDataMu1" : "obsData";
-  m_dataForObsQMu
-    = (m_config->getBool("doBlind")) ? "asimovDataMu0" : "obsData";
+  m_dataForObsQ0 = (m_config->getBool("doBlind")) ? "asimovDataMu1" : "obsData";
+  m_dataForObsQMu= (m_config->getBool("doBlind")) ? "asimovDataMu0" : "obsData";
   
   // Load from file if the pointer passed is NULL:
   if (newWorkspace == NULL) {
@@ -68,7 +63,7 @@ DHTestStat::DHTestStat(TString newConfigFile, TString newDHSignal,
   // Use the workspace passed to the class constructor:
   else m_workspace = newWorkspace;
   
-  // Based on resonant or nonresonant:
+  // Then get the model configuration:
   m_mc = (ModelConfig*)m_workspace->obj("modelConfig");
   
   // Map storing all calculations:
@@ -78,13 +73,13 @@ DHTestStat::DHTestStat(TString newConfigFile, TString newDHSignal,
   setPlotAxis(false, 0.0, 100.0);
 
   // Create output directories:
-  m_outputDir = Form("%s/%s/DHTestStat",
+  m_outputDir = Form("%s/%s/DHTestStat", 
 		     (m_config->getStr("masterOutput")).Data(),
 		     m_jobName.Data());
   system(Form("mkdir -vp %s", m_outputDir.Data()));
   system(Form("mkdir -vp %s/CL/", m_outputDir.Data()));
   system(Form("mkdir -vp %s/p0/", m_outputDir.Data()));
-
+  
   // Make new or load old values:
   if (m_options.Contains("FromFile")) loadStatsFromFile();
   
@@ -96,10 +91,10 @@ DHTestStat::DHTestStat(TString newConfigFile, TString newDHSignal,
 /**
    -----------------------------------------------------------------------------
    Get the value of one of the test statistics.
-   @param testStat - the test stat. name (p0, CL, CLs).
-   @param observed - true iff observed, false if expected. 
-   @param N - the standard deviation (-2, -1, 0, +1, +2). 
-   @returns - the test statistic value.
+   @param testStat - The test stat. name (p0, CL, CLs).
+   @param observed - True iff observed, false if expected. 
+   @param N - The standard deviation (-2, -1, 0, +1, +2). 
+   @return - The test statistic value.
 */
 double DHTestStat::accessValue(TString testStat, bool observed, int N) {
   TString currMapKey = getKey(testStat, observed, N);
@@ -138,8 +133,8 @@ void DHTestStat::calculateNewCL() {
   // Write CL values to file:
   ofstream textCL;
   textCL.open(Form("%s/CL/CL_values_%s.txt",
-		   m_outputDir.Data(), m_DHSignal.Data()));
-  textCL << m_DHSignal << " " << obsCL << " " << expCLn2 << " " << expCLn1
+		   m_outputDir.Data(), m_anaType.Data()));
+  textCL << m_anaType << " " << obsCL << " " << expCLn2 << " " << expCLn1
 	 << " " << expCL << " " << expCLp1 << " " << expCLp2 << std::endl;
   textCL.close();
   
@@ -157,7 +152,7 @@ void DHTestStat::calculateNewCL() {
   if (obsQMu < 0) std::cout << "WARNING! obsQMu < 0 : " << obsQMu << std::endl;
   if (expQMu < 0) std::cout << "WARNING! expQMu < 0 : " << expQMu << std::endl;
   
-  // save CL and CLs for later access:
+  // Save CL and CLs for later access:
   m_calculatedValues[getKey("CL",0,-2)] = expCLn2;
   m_calculatedValues[getKey("CL",0,-1)] = expCLn1;
   m_calculatedValues[getKey("CL",0,0)] = expCL;
@@ -199,19 +194,15 @@ void DHTestStat::calculateNewP0() {
   // Write p0 values to file:
   ofstream textP0;
   textP0.open(Form("%s/p0/p0_values_%s.txt", 
-		   m_outputDir.Data(), m_DHSignal.Data()));
-  textP0 << m_DHSignal << " " << expP0 << " " << obsP0 << std::endl;
+		   m_outputDir.Data(), m_anaType.Data()));
+  textP0 << m_anaType << " " << expP0 << " " << obsP0 << std::endl;
   textP0.close();
   
   // Print summary:
   std::cout << "\n  Expected p0 = " << expP0 << std::endl;
-  std::cout << "  Observed p0 = " << obsP0 << std::endl;
-  if (fitsAllConverged()) {
-    std::cout << "All good fits? True\n" << std::endl;
-  }
-  else {
-    std::cout << "All good fits? False\n" << std::endl;
-  }
+  std::cout << "\n  Observed p0 = " << obsP0 << std::endl;
+  if (fitsAllConverged()) std::cout << "All good fits? True\n" << std::endl;
+  else std::cout << "All good fits? False\n" << std::endl;
   
   // Save p0 for later access:
   m_calculatedValues[getKey("p0", 1, 0)] = obsP0;
@@ -225,17 +216,12 @@ void DHTestStat::calculateNewP0() {
 void DHTestStat::clearData() {
   m_allGoodFits = true;
   m_calculatedValues.clear();
-  m_namesGlobs.clear();
-  m_namesNP.clear();
-  m_valuesGlobs.clear();
-  m_valuesNP.clear();
-  
-  //m_nBins = 240;
-
+  m_mapGlobs.clear();
+  m_mapNP.clear();
   m_doSaveSnapshot = false;
   m_doPlot = false;
   m_plotDir = "";
-
+  
   clearFitParamSettings();
 }
 
@@ -244,92 +230,21 @@ void DHTestStat::clearData() {
    Clears all specifications for parameter values during fits.
 */
 void DHTestStat::clearFitParamSettings() {
-  m_setParamConsts.clear();
-  m_setParamNames.clear();
-  m_setParamVals.clear();
+  m_paramValToSet.clear();
+  m_paramConstToSet.clear();
 }
-
-/*
-   -----------------------------------------------------------------------------
-   Creates a binned dataset from a specified unbinned dataset.
-   @param unbinnedName - The name of the dataset to be binned.
-   @param nBins - The number of bins for the binning procedure. 
-   @returns - A binned dataset.
-
-RooDataSet* DHTestStat::createBinnedData(TString unbinnedName, int nBins) {
-  
-  RooDataSet* dataUnbinned = NULL;
-  if (m_workspace->data(datasetName)) {
-    dataUnbinned = m_workspace->data(unbinnedName);
-  }
-  // Create Asimov data if it is missing:
-  else if (datasetName.Contains("asimovData")) {
-    dataUnbinned = createAsimovData(datasetName);
-  }
-  else {
-    std::cout << "DHTestStat: Error! Requested data unavailable for binning: " 
-	      << datasetName << std::endl;
-    exit(0);
-  }
-  
-  // Load the RooCategory object from the workspace:
-  RooCategory *categories
-    = m_workspace->var(Form("categories_%s", currAna.Data()));
-  for (int currCateIndex = 0; currCateIndex < categories->numTypes();
-       currCateIndex++){
-    
-    // Create a binned observed data set:
-    RooArgSet* obsPlusWt = new RooArgSet();
-    RooRealVar wt("wt","wt",1);
-    obsPlusWt->add(wt);
-    TString obsName = m_anaType.EqualTo("NonRes") ? 
-      Form("m_yy_%s",currCateName.Data()) : 
-      Form("m_bbyy_%s",currCateName.Data());
-    obsPlusWt->add(*m_observable);
-    
-    // Create a histogram to store binned data:
-    TH1F* dataHist = new TH1F("dataHist", "dataHist", nBins, 
-			      m_observable->getMin(), m_observable->getMax());
-    for (int i_e = 0; i_e < dataUnbinned->numEntries(); i_e++) {
-      dataUnbinned->get(i_e);
-      dataHist->Fill(m_observable->getVal());
-    }
-    
-    // Fill obsdatabinned dataset with binned data:
-    TString unbinnedName = dataUnbinned->GetName();
-    TString binnedName = Form("%s_binned", unbinnedName.Data());
-    RooDataSet *obsDataBinned = new RooDataSet(binnedName,binnedName,*obsPlusWt,
-					       RooFit::WeightVar(wt));
-    for (int i_b = 1; i_b <= dataHist->GetNbinsX(); i_b++) {
-      double massVal = dataHist->GetBinCenter(i_b);
-      double weightVal = dataHist->GetBinContent(i_b);
-      m_observable->setVal(massVal);
-      wt.setVal(weightVal);
-      obsDataBinned->add(RooArgSet(*m_observable, wt), weightVal);
-    }
-  }
-  
-  RooDataSet* binnedData = new RooDataSet(Form("%s_binned",unbinnedName.Data()),
-					  Form("%s_binned",unbinnedName.Data()),
-					  *args, Index(*categories), 
-					  Import(dataMap),
-					  WeightVar(wt));
-  return binnedData
-}
-*/
 
 /**
    -----------------------------------------------------------------------------
    Create a pseudo-dataset with a given value of DM and SM signal strength.
-   @param seed - the random seed for dataset generation.
-   @param valMuDH - the value of the Di-Higgs signal strength.
-   @param valMuSH - the value of the Single-Higgs signal strength.
-   @returns - a pseudo-dataset.
+   @param seed - The random seed for dataset generation.
+   @param valPoI - The value of the parameter of interest.
+   @param fixPoI - True iff. the parameter of interest should be fixed. 
+   @return - A pseudo-dataset.
 */
-RooDataSet* DHTestStat::createPseudoData(int seed, int valMuDH, int valMuSH,
-					 bool fixMu) {
+RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   std::cout << "DHTestStat: Create pseudodata with seed = " << seed 
-	    << ", muDH = " << valMuDH << ", muSH = " << valMuSH << std::endl;
+	    << ", PoI = " << valPoI << std::endl;
   
   // Load the original parameters from profiling:
   m_workspace->loadSnapshot("paramsOrigin");
@@ -340,7 +255,7 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valMuDH, int valMuSH,
   RooArgSet* observables = (RooArgSet*)m_mc->GetObservables();
   RooArgSet* originValsNP
     = (RooArgSet*)m_mc->GetNuisanceParameters()->snapshot();
-  RooRealVar* firstPOI = (RooRealVar*)m_mc->GetParametersOfInterest()->first();
+  RooRealVar* firstPoI = (RooRealVar*)m_mc->GetParametersOfInterest()->first();
   
   RooRandom::randomGenerator()->SetSeed(seed);
   statistics::constSet(nuisanceParameters, true);
@@ -359,33 +274,30 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valMuDH, int valMuSH,
   statistics::constSet(globalObservables, true);
   
   //numEventsPerCate.clear();
-    
-  // Set mu_DH and mu_SH to the specified values:
-  RooRealVar *poi = m_workspace->var("mu_DH");
-  double initialMuDH = poi->getVal();
-  double initialMuSH = m_workspace->var("mu_SH")->getVal();
-  poi->setVal(valMuDH);
-  poi->setConstant(fixMu);
-  m_workspace->var("mu_SH")->setVal(valMuSH);
-  m_workspace->var("mu_SH")->setConstant(true);
+  
+  // Set the parameter of interest value and status:
+  firstPoI->setVal(valPoI);
+  firstPoI->setConstant(fixPoI);
   
   // Check if other parameter settings have been specified for toys:
   // WARNING! This overrides the randomization settings above!
-  for (int i_p = 0; i_p < (int)m_setParamNames.size(); i_p++) {
-    std::cout << "i_p=" << i_p << ", " << m_setParamNames[i_p] << std::endl;
-    if (m_workspace->var(m_setParamNames[i_p])) {
-      m_workspace->var(m_setParamNames[i_p])->setVal(m_setParamVals[i_p]);
-      m_workspace->var(m_setParamNames[i_p])
-	->setConstant(m_setParamConsts[i_p]);
+  for (std::map<TString,double>::iterator iterParam = m_paramValToSet.begin();
+       iterParam != m_paramValToSet.end(); iterParam++) {
+    // CHeck that workspace contains parameter:
+    if (m_workspace->var(iterParam->first)) {
+      m_workspace->var(iterParam->first)->setVal(iterParam->second);
+      m_workspace->var(iterParam->first)
+	->setConstant(m_paramConstToSet[iterParam->first]);
     }
     else {
       m_workspace->Print("v");
-      std::cout << "DHTestStat: Error! Parameter " << m_setParamNames[i_p]
+      std::cout << "DHTestStat: Error! Parameter " << iterParam->first
 		<< " not found in workspace! See printout above for clues..."
 		<< std::endl;
       exit(0);
     }
   }
+  
   // Iterate over the categories:
   while ((cateType = (RooCatType*)cateIter->Next())) {
     RooAbsPdf *currPDF = combPdf->getPdf(cateType->GetName());
@@ -437,7 +349,7 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valMuDH, int valMuSH,
 /**
    -----------------------------------------------------------------------------
    Check if all of the fits done by this class have converged.
-   @returns - true iff. all of the fits have been successfully convergent.
+   @return - True iff. all of the fits have been successfully convergent.
 */
 bool DHTestStat::fitsAllConverged() { 
   return m_allGoodFits;
@@ -446,8 +358,8 @@ bool DHTestStat::fitsAllConverged() {
 /**
    -----------------------------------------------------------------------------
    Implements the functional form of qMu.
-   @param x - the value of the test statistic.
-   @returns - the value of the asymptotic test statistic distribution.
+   @param x - The value of the test statistic.
+   @return - The value of the asymptotic test statistic distribution.
 */
 double DHTestStat::functionQMu(double x) {
   // This corresponds to the "special case" of mu=mu'
@@ -458,10 +370,10 @@ double DHTestStat::functionQMu(double x) {
 /**
    -----------------------------------------------------------------------------
    Implements the functional form of qMuTilde.
-   @param x - the value of the test statistic.
-   @param asimovTestStat - the test stat value on Asimov data with mu=0 but
-                           fitting under mu=1 hypothesis.
-   @returns - the value of the asymptotic test statistic distribution.
+   @param x - The value of the test statistic.
+   @param asimovTestStat - The test stat value on Asimov data with mu=0 but
+   fitting under mu=1 hypothesis.
+   @return - The value of the asymptotic test statistic distribution.
 */
 double DHTestStat::functionQMuTilde(double x, double asimovTestStat) {
   // This corresponds to the "special case" of mu=mu'
@@ -481,8 +393,8 @@ double DHTestStat::functionQMuTilde(double x, double asimovTestStat) {
 /**
    -----------------------------------------------------------------------------
    Get the CL value from CLs.
-   @param CLs - the CLs value to convert to CL.
-   @returns - the corresponding CL value.
+   @param CLs - The CLs value to convert to CL.
+   @return - The corresponding CL value.
 */
 double DHTestStat::getCLFromCLs(double CLs) {
   return (1.0 - CLs);
@@ -491,8 +403,8 @@ double DHTestStat::getCLFromCLs(double CLs) {
 /**
    -----------------------------------------------------------------------------
    Get the CLs value from CL.
-   @param CL - the CL value to convert to CLs.
-   @returns - the corresponding CLs value.
+   @param CL - The CL value to convert to CLs.
+   @return - The corresponding CLs value.
 */
 double DHTestStat::getCLsFromCL(double CL) {
   return (1.0 - CL);
@@ -501,10 +413,10 @@ double DHTestStat::getCLsFromCL(double CL) {
 /**
    -----------------------------------------------------------------------------
    Get the CL value using qMu and the type.
-   @param qMu - the value of the test statistic.
-   @param observed - true of observed stat., false if expected result.
-   @param N - the sigma value (-2,-1,0,1,2). Use 0 for median.
-   @returns - the CLs value.
+   @param qMu - The value of the test statistic.
+   @param observed - True of observed stat., false if expected result.
+   @param N - The sigma value (-2,-1,0,1,2). Use 0 for median.
+   @return - The CLs value.
 */
 double DHTestStat::getCLFromQMu(double qMu, bool observed, double N) {
   double CL = getCLFromCLs(getCLsFromQMu(qMu, observed, N));
@@ -514,10 +426,10 @@ double DHTestStat::getCLFromQMu(double qMu, bool observed, double N) {
 /**
    -----------------------------------------------------------------------------
    Get the CLs value using qMu and the type.
-   @param qMu - the value of the test statistic.
-   @param observed - true of observed stat., false if expected result.
-   @param N - the sigma value (-2,-1,0,1,2). Use 0 for median.
-   @returns - the CLs value.
+   @param qMu - The value of the test statistic.
+   @param observed - True of observed stat., false if expected result.
+   @param N - The sigma value (-2,-1,0,1,2). Use 0 for median.
+   @return - The CLs value.
 */
 double DHTestStat::getCLsFromQMu(double qMu, bool observed, double N) {
   // N = 0 for exp and obs
@@ -531,16 +443,16 @@ double DHTestStat::getCLsFromQMu(double qMu, bool observed, double N) {
    -----------------------------------------------------------------------------
    Get the negative-log-likelihood for a fit of a specified type to a specified
    dataset.
-   @param datasetName - the name of the dataset in the workspace.
-   @param muVal - the mu value to fix.
-   @param fixMu - true if mu should be fixed to the specified value.
-   @param &profiledMu - the profiled value of mu (passed by reference)
-   @returns - the nll value.
+   @param datasetName - The name of the dataset in the workspace.
+   @param valPoI - The parameter of interest value to fix.
+   @param fixPoI - True if PoI should be fixed to the specified value.
+   @param &profiledValPoI - The profiled value of mu (passed by reference)
+   @return - The NLL value.
 */
-double DHTestStat::getFitNLL(TString datasetName, double muVal, bool fixMu,
-			     double &profiledMu) { 
-  std::cout << "DHTestStat: getFitNLL(" << datasetName << ", " << muVal
-	    << ", " << fixMu << ")" << std::endl;
+double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
+			     double &profiledValPoI) { 
+  std::cout << "DHTestStat: getFitNLL(" << datasetName << ", " << valPoI
+	    << ", " << fixPoI << ")" << std::endl;
   
   RooAbsPdf* combPdf = m_mc->GetPdf();
   RooArgSet* nuisanceParameters = (RooArgSet*)m_mc->GetNuisanceParameters();
@@ -565,38 +477,28 @@ double DHTestStat::getFitNLL(TString datasetName, double muVal, bool fixMu,
   // the global observables should be fixed to the nominal values...
   statistics::constSet(globalObservables, true);
   
-  firstPoI->setVal(muVal);
-  firstPoI->setConstant(fixMu);
+  firstPoI->setVal(valPoI);
+  firstPoI->setConstant(fixPoI);
   
-  // Check if parameters have been specified during fit:
-  for (int i_p = 0; i_p < (int)m_setParamNames.size(); i_p++) {
-    std::cout << "i_p = " << i_p << ", " << m_setParamNames[i_p] << std::endl;
-    if (m_workspace->var(m_setParamNames[i_p])) {
-      m_workspace->var(m_setParamNames[i_p])->setVal(m_setParamVals[i_p]);
-      m_workspace->var(m_setParamNames[i_p])
-	->setConstant(m_setParamConsts[i_p]);
+  // Check if other parameter settings have been specified for fit:
+  for (std::map<TString,double>::iterator iterParam = m_paramValToSet.begin();
+       iterParam != m_paramValToSet.end(); iterParam++) {
+    // Check that workspace contains parameter:
+    if (m_workspace->var(iterParam->first)) {
+      m_workspace->var(iterParam->first)->setVal(iterParam->second);
+      m_workspace->var(iterParam->first)
+	->setConstant(m_paramConstToSet[iterParam->first]);
     }
     else {
       m_workspace->Print("v");
-      std::cout << "DHTestStat: Error! Parameter " << m_setParamNames[i_p]
+      std::cout << "DHTestStat: Error! Parameter " << iterParam->first
 		<< " not found in workspace! See printout above for clues..."
 		<< std::endl;
       exit(0);
     }
   }
   std::cout << "DHTestStat: Parameters have been set for fit." << std::endl;
-
-  // Iterate over SM mu values and fix all to 1:
-  RooArgSet* muConstants = (RooArgSet*)m_workspace->set("muSHConstants");
-  TIterator *iterMuConst = muConstants->createIterator();
-  RooRealVar *currMuConst = NULL;
-  while ((currMuConst = (RooRealVar*)iterMuConst->Next())) {
-    std::cout << "DHTestStat: Setting " << currMuConst->GetName()
-	      << " constant." << std::endl;
-    currMuConst->setVal(1.0);
-    currMuConst->setConstant(true);
-  }
-     
+  
   // The actual fit command:
   int status = 0; 
   RooNLLVar* varNLL = (RooNLLVar*)combPdf
@@ -607,40 +509,36 @@ double DHTestStat::getFitNLL(TString datasetName, double muVal, bool fixMu,
   
   // Save a snapshot if requested:
   if (m_doSaveSnapshot) {
-    TString muDHValue = fixMu ? (Form("%d",(int)muVal)) : "Free";
+    TString muDHValue = fixPoI ? (Form("%d",(int)valPoI)) : "Free";
     m_workspace->saveSnapshot(Form("paramsProfileMu%s", muDHValue.Data()),
 			      *poiAndNuis);
   }
   
   // Plot the fit result if the user has set an output directory for plots:
   if (m_doPlot) {
-    if (fixMu && ((int)muVal) == 1) plotFits("Mu1", datasetName);
-    else if (fixMu && ((int)muVal) == 0) plotFits("Mu0", datasetName);
+    if (fixPoI && ((int)valPoI) == 1) plotFits("Mu1", datasetName);
+    else if (fixPoI && ((int)valPoI) == 0) plotFits("Mu0", datasetName);
     else plotFits("MuFree", datasetName);
   }
   
-  profiledMu = firstPoI->getVal();
+  profiledValPoI = firstPoI->getVal();
   double nllValue = varNLL->getVal();
   delete varNLL;
   
   // Save names and values of nuisance parameters:
-  m_namesNP.clear();
-  m_valuesNP.clear();
+  m_mapNP.clear();
   TIterator *iterNuis = nuisanceParameters->createIterator();
   RooRealVar *currNuis = NULL;
   while ((currNuis = (RooRealVar*)iterNuis->Next())) {
-    m_namesNP.push_back((std::string)currNuis->GetName());
-    m_valuesNP.push_back(currNuis->getVal());
+    m_mapNP[(std::string)currNuis->GetName()] = currNuis->getVal();
   }
   
   // Save names and values of global observables:
-  m_namesGlobs.clear();
-  m_valuesGlobs.clear();
+  m_mapGlobs.clear();
   TIterator *iterGlobs = globalObservables->createIterator();
   RooRealVar *currGlob = NULL;
   while ((currGlob = (RooRealVar*)iterGlobs->Next())) {
-    m_namesGlobs.push_back((std::string)currGlob->GetName());
-    m_valuesGlobs.push_back(currGlob->getVal());
+    m_mapGlobs[(std::string)currGlob->GetName()] = currGlob->getVal();
   }
   
   // release nuisance parameters after fit and recovery the default values
@@ -653,26 +551,19 @@ double DHTestStat::getFitNLL(TString datasetName, double muVal, bool fixMu,
 
 /**
    -----------------------------------------------------------------------------
-   Get a vector of global observable names from the most recent fit.
+   Get a map of global observable names to values from the most recent fit.
+   @return - A map of global observable names and most recent fit values.
 */
-std::vector<std::string> DHTestStat::getGlobsNames() {
-  return m_namesGlobs;
-}
-
-/**
-   -----------------------------------------------------------------------------
-   Get a vector of global observable values from the most recent fit.
-*/
-std::vector<double> DHTestStat::getGlobsValues() {
-  return m_valuesGlobs;
+std::map<std::string,double> DHTestStat::getGlobalObservables() {
+  return m_mapGlobs;
 }
 
 /**
    -----------------------------------------------------------------------------
    Get the key for the value map.
-   @param testStat - the test statistic.
-   @param observed - true iff. observed.
-   @param N - the sigma value (-2,-1,0,1,2).
+   @param testStat - The test statistic.
+   @param observed - True iff. observed.
+   @param N - The sigma value (-2,-1,0,1,2).
 */
 TString DHTestStat::getKey(TString testStat, bool observed, int N) {
   TString currKey = testStat;
@@ -688,73 +579,62 @@ TString DHTestStat::getKey(TString testStat, bool observed, int N) {
 
 /**
    -----------------------------------------------------------------------------
-   Get a vector of nuisance parameter names from the most recent fit.
+   Get a map of nuisance parameter names to values from the most recent fit.
+   @return - A map of nuisance parameter names and most recent fit values.
 */
-std::vector<std::string> DHTestStat::getNPNames() {
-  return m_namesNP;
-}
-
-/**
-   -----------------------------------------------------------------------------
-   Get a vector of nuisance parameter values from the most recent fit.
-*/
-std::vector<double> DHTestStat::getNPValues() {
-  return m_valuesNP;
+std::map<std::string,double> DHTestStat::getNuisanceParameters() {
+  return m_mapNP;
 }
 
 /**
    -----------------------------------------------------------------------------
    Calculate the value of p0 based on the test statistic q0.
-   @param q0 - the test statistic q0.
-   @returns - the value of p0.
+   @param q0 - The test statistic q0.
+   @return - The value of p0.
 */
 double DHTestStat::getP0FromQ0(double q0) {
-  double p0 = 1 - ROOT::Math::gaussian_cdf(sqrt(fabs(q0)));
-  return p0;
+  return (1 - ROOT::Math::gaussian_cdf(sqrt(fabs(q0))));
 }
 
 /**
    -----------------------------------------------------------------------------
    Calculate pB based on the standard deviation.
-   @param N - the standard deviation.
-   @returns - the value of pB.
+   @param N - The standard deviation.
+   @return - The value of pB.
 */
 double DHTestStat::getPbFromN(double N) {
-  double pB = 1 - ROOT::Math::gaussian_cdf(N);
-  return pB;
+  return (1 - ROOT::Math::gaussian_cdf(N));
 }
 
 /**
    -----------------------------------------------------------------------------
    Calculate the pB value based on qMu.
-   @param qMu - the test statistic qMu.
-   @param sigma - the sigma value...
-   @param mu - the mu value... 
-   @returns - the value of pB.
+   @param qMu - The test statistic qMu.
+   @param sigma - The sigma value...
+   @param mu - The mu value... 
+   @return - The value of pB.
 */
 double DHTestStat::getPbFromQMu(double qMu, double sigma, double mu) {
-  double pB = 1 - ROOT::Math::gaussian_cdf(fabs(mu/sigma) - sqrt(qMu));
-  return pB;
+  return (1 - ROOT::Math::gaussian_cdf(fabs(mu/sigma) - sqrt(qMu)));
 }
 
 /**
    -----------------------------------------------------------------------------
    Calculate the value of pMu.
-   @param qMu - the test statistic qMu.
-   @returns - the value of pMu.
+   @param qMu - The test statistic qMu.
+   @return - The value of pMu.
 */
 double DHTestStat::getPMuFromQMu(double qMu) {
-  double pMu = 1 - ROOT::Math::gaussian_cdf(sqrt(fabs(qMu)));
-  return pMu;
+  return (1 - ROOT::Math::gaussian_cdf(sqrt(fabs(qMu))));
 }
 
 /**
    -----------------------------------------------------------------------------
    Calculate the test statistic q0 based on the nll.
-   @param nllMu0 - nll of a fit with signal strength 0;
-   @param nllMuHat - nll of a fit with profiled signal strength.
-   @param muHat - profiled signal strength.
-   @returns - the value of q0.
+   @param nllMu0 - NLL of a fit with signal strength 0;
+   @param nllMuHat - NLL of a fit with profiled signal strength.
+   @param muHat - Profiled signal strength.
+   @return - The value of q0.
 */
 double DHTestStat::getQ0FromNLL(double nllMu0, double nllMuHat, double muHat) {
   double q0 = (muHat < 0) ? 0 : (2 * (nllMu0 - nllMuHat));
@@ -764,29 +644,28 @@ double DHTestStat::getQ0FromNLL(double nllMu0, double nllMuHat, double muHat) {
 /**
    -----------------------------------------------------------------------------
    Calculate the test statistic qMu based on the nll.
-   @param nllMu - nll of a fit with signal strength mu.
-   @param nllMuHat - nll of a fit with profiled signal strength.
-   @param muHat - profiled signal strength.
-   @param muTest - tested value of signal strength.
-   @returns - the value of qMu.
+   @param nllMu - NLL of a fit with signal strength mu.
+   @param nllMuHat - NLL of a fit with profiled signal strength.
+   @param muHat - Profiled signal strength.
+   @param muTest - Tested value of signal strength.
+   @return - The value of qMu.
 */
 double DHTestStat::getQMuFromNLL(double nllMu, double nllMuHat, double muHat,
 				 double muTest) {
-  double qMu = 0;
+  double qMu = 0.0;
   if (muHat < muTest) qMu = 2 * (nllMu - nllMuHat);
-  else qMu = 0.0;
   return qMu;
 }
 
 /**
    -----------------------------------------------------------------------------
    Calculate the test statistic qMuTilde based on the nll.
-   @param nllMu - nll of a fit with signal strength mu.
-   @param nllMu0 - nll of a fit with signal strength 0.
-   @param nllMuHat - nll of a fit with profiled signal strength.
-   @param muHat - profiled signal strength.
-   @param muTest - tested value of signal strength.
-   @returns - the value of qMuTilde.
+   @param nllMu - NLL of a fit with signal strength mu.
+   @param nllMu0 - NLL of a fit with signal strength 0.
+   @param nllMuHat - NLL of a fit with profiled signal strength.
+   @param muHat - Profiled signal strength.
+   @param muTest - Tested value of signal strength.
+   @return - The value of qMuTilde.
 */
 double DHTestStat::getQMuTildeFromNLL(double nllMu, double nllMu0,
 				      double nllMuHat, double muHat,
@@ -808,12 +687,12 @@ void DHTestStat::loadStatsFromFile() {
   // Load input p0 file:
   ifstream textP0;
   textP0.open(Form("%s/p0/p0_values_%s.txt", 
-		   m_outputDir.Data(), m_DHSignal.Data()));
+		   m_outputDir.Data(), m_anaType.Data()));
   
   // Load input CL file:
   ifstream textCL;
   textCL.open(Form("%s/CL/CL_values_%s.txt", 
-		   m_outputDir.Data(), m_DHSignal.Data()));
+		   m_outputDir.Data(), m_anaType.Data()));
   
   // If the input files don't exist, create from scratch:
   if (!textCL || !textP0) {
@@ -863,7 +742,7 @@ void DHTestStat::loadStatsFromFile() {
    @param xMin - The minimum value of the observable range.
    @param xMax - The maximum value of the observable range.
    @param xBins - The number of bins for the observable.
-   @returns - A TGraphErrors to plot.
+   @return - A TGraphErrors to plot.
 */
 TGraphErrors* DHTestStat::plotDivision(TString dataName, TString pdfName, 
 				       TString obsName, double xMin, 
@@ -920,8 +799,8 @@ TGraphErrors* DHTestStat::plotDivision(TString dataName, TString pdfName,
 /**
    -----------------------------------------------------------------------------
    Plot the fits produced by the specified model.
-   @param combWS - the combined workspace.
-   @param fitType - the type of fit.
+   @param combWS - The combined workspace.
+   @param fitType - The type of fit.
 */
 void DHTestStat::plotFits(TString fitType, TString datasetName) {
   std::cout << "DHTestStat: Plot fit " << fitType << ", " << datasetName 
@@ -1022,7 +901,10 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     double obsMax = (*m_workspace->var(obsName)).getMax();
     
     double ratioMin = 0.0; double ratioMax = 2.0;
-    TGraphErrors* subData = plotDivision(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()), Form("model_%s", cateNames[i_c].Data()), obsName, obsMin, obsMax, nBinsForPlot);
+    TGraphErrors* subData
+      = plotDivision(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()),
+		     Form("model_%s", cateNames[i_c].Data()), obsName, obsMin,
+		     obsMax, nBinsForPlot);
     subData->GetYaxis()->SetTitle("Data / Fit");
     subData->GetYaxis()->SetRangeUser(ratioMin, ratioMax);
     subData->GetXaxis()->SetTitleOffset(0.95);
@@ -1047,7 +929,7 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     subData->Draw("EPSAME");
         
     can->Print(Form("%s/fitPlot_%s_%s_%s.eps", m_plotDir.Data(),
-		    m_DHSignal.Data(), fitType.Data(), cateNames[i_c].Data()));
+		    m_anaType.Data(), fitType.Data(), cateNames[i_c].Data()));
     delete histDH;
     delete histSH;
     delete histBkg;
@@ -1060,8 +942,8 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
 /**
    -----------------------------------------------------------------------------
    Check whether the specified map entry exists.
-    @param mapKey - the key for which we are finding a value:
-    @returns - true iff the categorization has been defined. 
+    @param mapKey - The key for which we are finding a value:
+    @return - True iff the categorization has been defined. 
 */
 bool DHTestStat::mapValueExists(TString mapKey) {
 
@@ -1077,7 +959,7 @@ bool DHTestStat::mapValueExists(TString mapKey) {
 /**
    -----------------------------------------------------------------------------
    Choose whether or not to save snapshots from profiling data.
-   @param doSaveSnapshot - true iff you want to save snapshots in future fits.
+   @param doSaveSnapshot - True iff you want to save snapshots in future fits.
 */
 void DHTestStat::saveSnapshots(bool doSaveSnapshot) {
   m_doSaveSnapshot = doSaveSnapshot;
@@ -1096,7 +978,7 @@ void DHTestStat::setPlotAxis(bool useLogScale, double yMin, double yMax) {
 /**
    -----------------------------------------------------------------------------
    Set an output directory and enable plotting.
-   @param directory - the output directory path.
+   @param directory - The output directory path.
 */
 void DHTestStat::setPlotDirectory(TString directory) {
   m_plotDir = directory;
@@ -1110,9 +992,8 @@ void DHTestStat::setPlotDirectory(TString directory) {
    @param paramVal - The new value of the fit parameter.
    @param doSetConstant - True iff the parameter should be set constant. 
 */
-void DHTestStat::setParams(TString paramName, double paramVal,
-			   bool doSetConstant) {
-  m_setParamConsts.push_back(doSetConstant);
-  m_setParamNames.push_back(paramName);
-  m_setParamVals.push_back(paramVal);
+void DHTestStat::setParam(TString paramName, double paramVal,
+			  bool doSetConstant) {
+  m_paramValToSet[paramName] = paramVal;
+  m_paramConstToSet[paramName] = doSetConstant;
 }

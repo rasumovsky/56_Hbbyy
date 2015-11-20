@@ -4,7 +4,7 @@
 //  Class: DHTestStat.cxx                                                     //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 06/08/2015                                                          //
+//  Date: 20/11/2015                                                          //
 //                                                                            //
 //  This class allows the user to calculate p0 and CLs based on an input      //
 //  workspace.                                                                //
@@ -26,7 +26,7 @@ class DHTestStat {
   
  public:
   
-  DHTestStat(TString newConfigFile, TString newDHSignal, TString newOptions,
+  DHTestStat(TString newConfigFile, TString newOptions,
 	     RooWorkspace *newWorkspace);
   virtual ~DHTestStat() {};
   
@@ -35,8 +35,7 @@ class DHTestStat {
   void calculateNewP0();
   void clearData();
   void clearFitParamSettings();
-  // RooDataSet createBinnedData(TString unbinnedName, int nBins);
-  RooDataSet* createPseudoData(int seed, int valMuDM, int valMuSM, bool fixMu);//TO ADD AND TEST IN DM FIRST!
+  RooDataSet* createPseudoData(int seed, int valPoI, bool fixPoI);
   bool fitsAllConverged();
   double functionQMu(double x);
   double functionQMuTilde(double x, double asimovTestStat);
@@ -46,10 +45,8 @@ class DHTestStat {
   double getCLsFromQMu(double qMu, bool observed, double N);
   double getFitNLL(TString datasetName, double muVal, bool fixMu,
 		   double &profiledMu);
-  std::vector<std::string> getGlobsNames();
-  std::vector<double> getGlobsValues();
-  std::vector<std::string> getNPNames();
-  std::vector<double> getNPValues();
+  std::map<std::string,double> getGlobalObservables();
+  std::map<std::string,double> getNuisanceParameters();
   double getP0FromQ0(double q0);
   double getPbFromN(double N);
   double getPbFromQMu(double qMu, double sigma, double mu);
@@ -63,7 +60,7 @@ class DHTestStat {
   void saveSnapshots(bool doSaveSnapshot);
   void setPlotAxis(bool useLogScale, double yMin, double yMax);
   void setPlotDirectory(TString directory);
-  void setParams(TString paramName, double paramVal, bool doSetConstant);
+  void setParam(TString paramName, double paramVal, bool doSetConstant);
   
  private:
   
@@ -88,7 +85,6 @@ class DHTestStat {
   TString m_plotDir;    // The output directory for plots (not set by default).
   bool m_doSaveSnapshot;// Option to save snapshots of PoI and nuisance params.
   bool m_doPlot;        // Sets whether or not to plot fit results.
-  //int m_nBins;
   
   // Pointer to the input file:
   TFile *inputFile;
@@ -107,15 +103,12 @@ class DHTestStat {
   std::map<TString,double> m_calculatedValues;
   
   // Store fit parameters from NLL calculation:
-  std::vector<std::string> m_namesGlobs;
-  std::vector<std::string> m_namesNP;
-  std::vector<double> m_valuesGlobs;
-  std::vector<double> m_valuesNP;
-  
+  std::map<std::string,double> m_mapGlobs;
+  std::map<std::string,double> m_mapNP;
+
   // In case special parameter settings are used for a fit:
-  std::vector<bool> m_setParamConsts;
-  std::vector<TString> m_setParamNames;
-  std::vector<double> m_setParamVals;
+  std::map<TString,double> m_paramValToSet;
+  std::map<TString,bool> m_paramConstToSet;
   
   // Plot settings:
   bool m_useLogScale;

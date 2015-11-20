@@ -15,9 +15,9 @@
 int main(int argc, char **argv) {
 
   // Check that arguments are provided.
-  if (argc < 4) { 
+  if (argc < 3) { 
     std::cout << "\nUsage: " << argv[0] 
-	      << " <configFile> <analysisType> <options>" << std::endl;
+	      << " <config> <analysisType> <options>" << std::endl;
     exit(0);
   }
   
