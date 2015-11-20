@@ -61,7 +61,7 @@ DHTestStat::DHTestStat(TString newConfigFile, TString newDHSignal,
       std::cout << "DHTestStat: Error loading file, accessing with WS tool."
 		<< std::endl;
       // Load the workspace from the nominal location.
-      DHWorkspace *m_dhws = new DHWorkspace(newConfigFile,m_anaType,"FromFile");
+      DHWorkspace *m_dhws = new DHWorkspace(newConfigFile, "FromFile");
       m_workspace = m_dhws->getCombinedWorkspace();
     }
   }

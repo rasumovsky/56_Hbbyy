@@ -4,7 +4,7 @@
 //                                                                            //
 //  Creator: Andrew Hard,                                                     //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 21/07/2015                                                          //
+//  Date: 20/11/2015                                                          //
 //                                                                            //
 //  This class builds the workspace for the di-Higgs analysis fits.           //
 //                                                                            //
@@ -21,11 +21,12 @@ int main(int argc, char **argv) {
     exit(0);
   }
   
+  // Load job configuration and options:
   TString configFile = argv[1];
-  TString analysisType = argv[2];
-  TString options = argv[3];
+  TString options = argv[2];
   
-  DHWorkspace *dmw = new DHWorkspace(configFile, analysisType, options);
+  // Instantiate the workspace class:
+  DHWorkspace *dmw = new DHWorkspace(configFile, options);
   if (dmw->fitsAllConverged()) {
     std::cout << "DMWorkspaceWrapper: All OK!" << std::endl;
   }

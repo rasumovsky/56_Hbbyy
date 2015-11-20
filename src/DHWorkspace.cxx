@@ -7,7 +7,9 @@
 //  Date: 20/11/2015                                                          //
 //                                                                            //
 //  This class builds the workspace for the resonant and non-resonant di-     //
-//  Higgs search at 13 TeV.                                                   //
+//  Higgs search at 13 TeV. Most of the model configuration is done in the    //
+//  config file, so that the code does not have to be recompiled each time a  //
+//  change needs to be made to the fit model.                                 //
 //                                                                            //
 //  Job options: "New", "FromFile" determine whether to create a new workspace//
 //  or load a previously generated one.                                       //
@@ -52,7 +54,7 @@ DHWorkspace::DHWorkspace(TString newConfigFile, TString newOptions) {
   system(Form("mkdir -vp %s", m_outputDir.Data()));
   system(Form("mkdir -vp %s/Plots/", m_outputDir.Data()));
   system(Form("mkdir -vp %s/rootfiles/", m_outputDir.Data()));
-  system(Form("mkdir -vp %s/mu/", m_outputDir.Data()));
+  system(Form("mkdir -vp %s/PoI/", m_outputDir.Data()));
   
   // Set style for plots:
   CommonFunc::SetAtlasStyle();
@@ -113,7 +115,7 @@ void DHWorkspace::addCategory() {
   TString observable = m_config->getStr(Form("OBS_%s", m_currCateName.Data()));
   TString observableName = nameOfVar(observable);
   m_ws->factory(observable);
-  m_observables->add(m_ws->var(observableName));
+  m_observables->add(*m_ws->var(observableName));
   
   //--------------------------------------//
   // Add variables unrelated to systematics:
@@ -153,22 +155,22 @@ void DHWorkspace::addCategory() {
   //--------------------------------------//
   // Build the complete model:
   TString modelForm = m_config->getStr(Form("MODEL_%s", m_currCateName.Data()));
-  m_ws->factory(modelForm);
-  
-  // Add model to combined PDF:
   TString modelName = nameOfFunc(modelForm);
-  m_combinedPdf->addPdf(*cateWS[m_currCateIndex]->pdf(namePdf), m_currCateName);
+  m_ws->factory(modelForm);
   
   // Attach constraint term to the first category:
   if (m_currCateIndex == 0) {
-    tempWS->factory(Form("PROD::model_%s(%s,constraint)",
-			 m_currCateName.Data(), modelName.Data()));
+    m_ws->factory(Form("PROD::model_%s(%s,constraint)",
+		       m_currCateName.Data(), modelName.Data()));
   }
   else {
-    tempWS->factory(Form("PROD::model_%s(%s)", 
-			 m_currCateName.Data(), modelName.Data()));
+    m_ws->factory(Form("PROD::model_%s(%s)", 
+		       m_currCateName.Data(), modelName.Data()));
   }
   
+  // Add model including constraint to combined PDF:
+  m_combinedPdf->addPdf(*m_ws->pdf(Form("model_%s",m_currCateName.Data())), 
+			m_currCateName);
   
   //--------------------------------------//
   // Import the observed data set:
@@ -211,7 +213,7 @@ void DHWorkspace::addCategory() {
 void DHWorkspace::addSystematic(TString systematicForm) {
   // Get the systematic name:
   TString systematicName = nameOfVar(systematicForm);
-  systematicForm.ReplaceAll(name,"");
+  systematicForm.ReplaceAll(systematicName,"");
   systematicForm.ReplaceAll("[","");
   systematicForm.ReplaceAll("]","");
   
@@ -228,7 +230,7 @@ void DHWorkspace::addSystematic(TString systematicForm) {
   // First split up the item into components:
   TObjArray *array = systematicForm.Tokenize(",");
   for (int i_t = 0; i_t < array->GetEntries(); i_t++) {
-    TString currElement = ((TObjString*)array->At(i_e))->GetString();
+    TString currElement = ((TObjString*)array->At(i_t))->GetString();
     if (currElement.Contains("constr=")) {
       constraint = currElement;
       constraint.ReplaceAll("constr=","");
@@ -245,18 +247,18 @@ void DHWorkspace::addSystematic(TString systematicForm) {
       TString currComponentInfo = currElement;
       currComponentInfo.ReplaceAll("compLo=","");
       TString currComponentName = currComponentInfo;
-      currComponentName.Remove(First("~"));
+      currComponentName.Remove(currComponentName.First("~"));
       TString currComponentVal = currComponentInfo;
-      currComponentVal.Remove(0,name.First("~")+1);
+      currComponentVal.Remove(0,currComponentVal.First("~")+1);
       componentsLo[currComponentName] = currComponentVal.Atof();
     }
     else if (currElement.Contains("comp=")) {
       TString currComponentInfo = currElement;
       currComponentInfo.ReplaceAll("comp=","");
       TString currComponentName = currComponentInfo;
-      currComponentName.Remove(First("~"));
+      currComponentName.Remove(currComponentName.First("~"));
       TString currComponentVal = currComponentInfo;
-      currComponentVal.Remove(0,name.First("~")+1);
+      currComponentVal.Remove(0,currComponentVal.First("~")+1);
       components[currComponentName] = currComponentVal.Atof();
     }
   }
@@ -278,23 +280,27 @@ void DHWorkspace::addSystematic(TString systematicForm) {
       m_ws->factory(Form("%s[0,-5,5]", systematicName.Data()));
       m_ws->factory(Form("RNDM_%s[0,-5,5]", systematicName.Data()));
       std::map<TString,double>::iterator iterComponent = components.begin();
-      TString componentName = iterComponent->firt;
+      TString componentName = iterComponent->first;
       double magnitude = iterComponent->second;
       double magnitudeLo = (componentsLo.count(componentName) > 0) ?
 	componentsLo[componentName] : 0.0;
-      TString magnitudeRatio = (magnitude / magnitudeLo);
+      double magnitudeRatio = (magnitude / magnitudeLo);
       m_ws->factory(Form("RooBifurGauss::constr_%s(RNDM_%s,%s,1,%f)",
 			 systematicName.Data(), systematicName.Data(),
 			 systematicName.Data(), magnitudeRatio));
     }
     // Simple Gaussian constraint is straightforward:
-    else m_ws->factory(Form("RooGaussian::constr_%s(RNDM_%s,%s,1)"));
+    else m_ws->factory(Form("RooGaussian::constr_%s(RNDM_%s,%s,1)", 
+			    systematicName.Data(), systematicName.Data(), 
+			    systematicName.Data()));
     
     // For now, only allow gaussian constraint term:
-    m_ws->factory(Form("RooGaussian::constr_%s(RNDM_%s,%s,1)"));
+    m_ws->factory(Form("RooGaussian::constr_%s(RNDM_%s,%s,1)",
+		       systematicName.Data(), systematicName.Data(), 
+		       systematicName.Data()));
     
     // Add the new objects to the relevant sets:
-    m_nuisanceParameters->add(*m_ws_>var(systematicName));
+    m_nuisanceParameters->add(*m_ws->var(systematicName));
     m_globalObservables->add(*m_ws->var(Form("RNDM_%s",systematicName.Data())));
     m_constraints->add(*m_ws->pdf(Form("constr_%s",systematicName.Data())));
   }
@@ -305,7 +311,7 @@ void DHWorkspace::addSystematic(TString systematicForm) {
        iterComponent != components.end(); iterComponent++) {
     
     // Get the component name and magnitude:
-    TString componentName = iterComponent->firt;
+    TString componentName = iterComponent->first;
     double magnitude = iterComponent->second;
     double magnitudeLo = (componentsLo.count(componentName) > 0) ?
       componentsLo[componentName] : 0.0;
@@ -318,15 +324,15 @@ void DHWorkspace::addSystematic(TString systematicForm) {
     if (constraint.EqualTo("asym")) {
       std::cout << "DHWorkspace: " << systematicName << " has asym. uncertainty"
 		<< std::endl;
-      m_ws->factory(Form("prod::%_times_beta(%s,beta_%s[1]",
-			 systematicName.Data(), varName.Data()));
+      m_ws->factory(Form("prod::%s_times_beta(%s,beta_%s[1]",
+			 varName.Data(),systematicName.Data(),varName.Data()));
       vector<double> magHi; magHi.clear(); magHi.push_back(1+magnitude);
       vector<double> magLo; magLo.clear(); magLo.push_back(1-magnitudeLo);
-      RooArgList nuisList(*m_ws->factory(Form("%_times_beta",
+      RooArgList nuisList(*m_ws->factory(Form("%s_times_beta",
 					      systematicName.Data())));
       RooStats::HistFactory::FlexibleInterpVar
 	expVar(expName, expName, nuisList, centralValue.Atof(), magLo, magHi);
-      workspace->import(expVar);
+      m_ws->import(expVar);
     }
     
     // Gaussian constraint:
@@ -428,8 +434,9 @@ void DHWorkspace::createNewWS() {
   m_ws = new RooWorkspace("combinedWS");
   
   // Category workspaces, and RooCategory and Simultaneous PDF:
-  m_categories = new RooCategory("categories","categories");
-  m_combinedPdf = new RooSimultaneous("combinedPdf","combinedPdf", *categories);
+  m_categories = new RooCategory("categories", "categories");
+  m_combinedPdf = new RooSimultaneous("combinedPdf", "combinedPdf",
+				      *m_categories);
   
   // Instantiate parameter sets:
   m_nuisanceParameters = new RooArgSet();
@@ -467,9 +474,9 @@ void DHWorkspace::createNewWS() {
   std::cout << "DHWorkspace: Beginning to combine all categories." << std::endl;
   
   // Import variable sets:  
-  m_ws->defineSet("nuisanceParameters", *nuisanceParameters);
-  m_ws->defineSet("globalObservables", *globalObservables);
-  m_ws->defineSet("observables", *observables);
+  m_ws->defineSet("nuisanceParameters", *m_nuisanceParameters);
+  m_ws->defineSet("globalObservables", *m_globalObservables);
+  m_ws->defineSet("observables", *m_observables);
   m_ws->defineSet("poi", *m_poi);
   
   /*
@@ -477,8 +484,8 @@ void DHWorkspace::createNewWS() {
   */
   
   // Import the RooCategory and RooAbsPDF:
-  m_ws->import(*categories);
-  m_ws->import(*combinedPdf);
+  m_ws->import(*m_categories);
+  m_ws->import(*m_combinedPdf);
   
   // Define the combined dataset:
   RooRealVar wt("wt", "wt", 1);
@@ -517,20 +524,18 @@ void DHWorkspace::createNewWS() {
   // Loop over categories for Asimov data following background-only fit:
   for (m_currCateIndex = 0; m_currCateIndex < m_nCategories; m_currCateIndex++){
     m_currCateName = cateNames[m_currCateIndex];
-    
     //(*m_ws->var("nBkg_"+m_currCateName)).setVal((*m_ws->data(Form("obsData_%s",m_currCateName.Data()))).sumEntries());
-  
     // Create background-only Asimov data:
     createAsimovData(0);
     // Create signal + background Asimov data:
     createAsimovData(1);
   }
   RooDataSet* asimovDataMu0 = new RooDataSet("asimovDataMu0", "asimovDataMu0",
-  					     *dataArgs, Index(*categories), 
+  					     *dataArgs, Index(*m_categories), 
   					     Import(m_combDataAsimov0),
 					     WeightVar(wt));
   RooDataSet* asimovDataMu1 = new RooDataSet("asimovDataMu1", "asimovDataMu1",
-  					     *dataArgs, Index(*categories), 
+  					     *dataArgs, Index(*m_categories), 
   					     Import(m_combDataAsimov1),
 					     WeightVar(wt));
   m_ws->import(*asimovDataMu0);
@@ -552,38 +557,31 @@ void DHWorkspace::createNewWS() {
   // Write workspace to file:
   m_ws->importClassCode();
   m_ws->writeToFile(Form("%s/rootfiles/workspaceDH_%s.root",
-				 m_outputDir.Data(), m_anaType.Data()));
+			 m_outputDir.Data(), m_anaType.Data()));
   
   //----------------------------------------//
   // Start profiling the data:
   std::cout << "DHWorkspace: Start profiling data" << std::endl;
-    
-  // Choose two models for the default test fits:
-  std::vector<TString> sigDHModes = m_config->getStrV("sigDHModes");
-  TString currDHSignal
-    = m_anaType.Contains("NonRes") ? sigDHModes[0] : sigDHModes[1];
   
-  DHTestStat *dhts 
-    = new DHTestStat(m_configFile, currDHSignal, "FromFile", m_ws);
+  DHTestStat *dhts = new DHTestStat(m_configFile, "FromFile", m_ws);
   dhts->saveSnapshots(true);
   dhts->setPlotDirectory(Form("%s/Plots/", m_outputDir.Data()));
   dhts->setPlotAxis(true, 0.005, 50);
   
-  double profiledMuDHVal = -999.0;
+  double profiledPOIVal = -999.0;
   // Mu = 0 fits:
-  double nllMu0 = dhts->getFitNLL(m_dataToPlot, 0, true, profiledMuDHVal);
+  double nllMu0 = dhts->getFitNLL(m_dataToPlot, 0, true, profiledPOIVal);
   if (!dhts->fitsAllConverged()) m_allGoodFits = false;
   // Mu = 1 fits:
-  double nllMu1 = dhts->getFitNLL(m_dataToPlot, 1, true, profiledMuDHVal);
+  double nllMu1 = dhts->getFitNLL(m_dataToPlot, 1, true, profiledPOIVal);
   if (!dhts->fitsAllConverged()) m_allGoodFits = false;
   // Mu free fits:
-  double nllMuFree = dhts->getFitNLL(m_dataToPlot, 1, false, profiledMuDHVal);
+  double nllMuFree = dhts->getFitNLL(m_dataToPlot, 1, false, profiledPOIVal);
   if (!dhts->fitsAllConverged()) m_allGoodFits = false;
   
   // Print summary of the fits:
   std::cout.precision(10);
-  std::cout << "DHWorkspace: Printing likelihood results for " << m_anaType
-	    << std::endl;
+  std::cout << "DHWorkspace: Printing likelihood results." << std::endl;
   std::cout << "\tnll(muDH = 1):  " << nllMu1 << std::endl;
   std::cout << "\tnll(muDH = 0):  " << nllMu0 << std::endl;
   std::cout << "\tnll(muDH free): " << nllMuFree << std::endl;
@@ -593,15 +591,15 @@ void DHWorkspace::createNewWS() {
   std::cout << "\tnll(muDH=0)/nll(muhat) = " << nllMu0-nllMuFree << std::endl;
   if (m_allGoodFits) std::cout << "all good fits = TRUE" << std::endl;
   else std::cout << "all good fits = FALSE" << std::endl;
-  std::cout << "Profiled muDH value : " << profiledMuDHVal << std::endl;
+  std::cout << "Profiled muDH value : " << profiledPOIVal << std::endl;
   
   // Write the profiled mu value to file:
-  ofstream fileMuProf;
-  fileMuProf
-    .open(Form("%s/mu/mu_%s.txt", m_outputDir.Data(), currDHSignal.Data()));
-  fileMuProf << profiledMuDHVal << std::endl;
-  fileMuProf.close();
+  ofstream filePoI;
+  filePoI.open(Form("%s/PoI/poi_%s.txt", m_outputDir.Data(), m_anaType.Data()));
+  filePoI << profiledPOIVal << std::endl;
+  filePoI.close();
   
+  delete dhts;
 }
 
 /**
@@ -696,7 +694,7 @@ void DHWorkspace::plotCatePdfAndData(int nBins) {
   TCanvas *can = new TCanvas("can", "can", 800, 800);
   RooPlot* frame = (*m_ws->var(observableName)).frame(nBins);
   m_ws->data(Form("obsData_%s", m_currCateName.Data()))->plotOn(frame);
-  TString modelName = Form("model_%s(%s)", m_currCateName.Data());
+  TString modelName = Form("model_%s", m_currCateName.Data());
   (*m_ws->pdf(modelName)).plotOn(frame, LineColor(2));
   frame->SetYTitle("Entries");
   frame->SetXTitle("Mass [GeV]");
@@ -707,6 +705,7 @@ void DHWorkspace::plotCatePdfAndData(int nBins) {
   text.DrawLatex(0.2, 0.81, m_currCateName);
   
   // Print then delete the canvas:
-  can->Print(Form("%s/Plots/cateFit_%s.eps",m_outputDir.Data(),dataset.Data()));
+  can->Print(Form("%s/Plots/cateFit_%s.eps",
+		  m_outputDir.Data(), m_currCateName.Data()));
   delete can;
 }
