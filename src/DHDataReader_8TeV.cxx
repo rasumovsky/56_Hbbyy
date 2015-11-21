@@ -4,7 +4,7 @@
 //                                                                            //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 21/11/2015                                                          //
+//  Date: 09/07/2015                                                          //
 //                                                                            //
 //  Retrieves data and MC sets for workspace creation.                        //
 //                                                                            //
@@ -18,75 +18,64 @@
    @param configFile - The analysis configuration file.
    @param observable - The mass observable for the datasets.
 */
-DHDataReader::DHDataReader(TString configFile) {
+DHDataReader::DHDataReader(TString configFile, RooRealVar *observable) {
+
   // Load the analysis configuration file:
   m_config = new Config(configFile);
-  m_storedMxAODTrees.clear();
+  
+  if (observable) setMassObservable(observable);
+  else {// construct diphoton invariant mass observable by default.
+    RooRealVar *m_yy = new RooRealVar("m_yy", "m_yy", 
+				      m_config->getNum("DHMyyRangeLo"),
+				      m_config->getNum("DHMyyRangeHi"));
+    setMassObservable(m_yy);
+  }
 }
 
 /**
    -----------------------------------------------------------------------------
    Load the non-resonant data in the signal or control region into a RooDataSet.
-   @param sampleName - The name of the MxAOD sample.
+   @param cateName - The name of the category (NonResCR or NonResSR):
 */
-void DHDataReader::loadMxAOD(TString sampleName) {
-  TString fileName = Form("%s/%s.root",
-			  (m_config->getStr("MxAODDirectory")).Data(), 
-			  sampleName.Data());
-  TFile inputFile(fileName);
-  m_storedMxAODTrees[sampleName] = (TTree*)inputFile.Get("CollectionTree");
+RooDataSet* DHDataReader::loadNonResData(TString cateName) {
+  
+  int cateOfInterest = 0;
+  std::vector<TString> cateNameList = m_config->getStrV("cateNamesNonRes");
+  for (cateOfInterest = 0; cateOfInterest < (int)cateNameList.size(); 
+       cateOfInterest++) {
+    if (cateName.EqualTo(cateNameList[cateOfInterest])) break;
+  }
+  
+  // Create a RooDataSet to return:
+  RooDataSet *currData = new RooDataSet(Form("obsData_%s", cateName.Data()),
+					Form("obsData_%s", cateName.Data()),
+					RooArgSet(*m_observable));
+  // Load the TTree from file:
+  TFile inputFile(m_config->getStr("nonResInput"));
+  TTree *tree = (TTree*)inputFile.Get("nonres");
+  double gg_mass; int catNonRes_idx;
+  tree->SetBranchAddress("gg_mass", &gg_mass);
+  tree->SetBranchAddress("catNonRes_idx", &catNonRes_idx);
+  
+  // Loop over TTree contents:
+  for (int index = 0; index < tree->GetEntries(); index++) {
+    tree->GetEntry(index);
+    
+    // Cut to make sure we are using the proper category:
+    if (catNonRes_idx != cateOfInterest) continue;
+    
+    // Add points to the dataset:
+    m_observable->setVal(gg_mass);
+    currData->add(*m_observable);
+  }
+  return currData;
 }
 
 /**
    -----------------------------------------------------------------------------
-   @param sampleName - The name of the MxAOD sample.
-   @param cateName - The name of the category.
-*/
-RooDataSet* DHDataReader::getDataSet(TString sampleName, TString cateName) {
-  
-  // Get the name of the observable from the config file:
-  TString obsForm = m_config->getStr(Form("OBS_%s",cateName.Data()));
-  TString obsName = ""; double obsMin = 0.0; double obsMax = 0.0;
-  varData(obsForm, obsName, obsMin, obsMax);
-  RooRealVar obs(obsName, obsName, obsMin, obsMax);
-  RooRealVar wt("wt", "wt", 1.0);
-  RooDataSet* data 
-    = new RooDataSet(Form("data_%s_%s",sampleName.Data(),cateName.Data()),
-		     Form("data_%s_%s",sampleName.Data(),cateName.Data()),
-		     RooArgSet(obs,wt), RooFit::WeightVar(wt));
-  
-  // Load relevant branches:
-  float b_weight; float b_mass; TString b_category;
-  m_storedMxAODTrees[sampleName]
-    ->SetBranchAddress("weightname", &b_weight);
-  m_storedMxAODTrees[sampleName]
-    ->SetBranchAddress("massname", &b_mass);
-  m_storedMxAODTrees[sampleName]
-    ->SetBranchAddress("catename", &b_category);
-  
-  
-  // Loop over the contents of the TTree:
-  for (int index = 0; index < m_storedMxAODTrees[sampleName]->GetEntries(); 
-       index++) {
-    m_storedMxAODTrees[sampleName]->GetEntry(index);
-    
-    // Check that we are in the proper category:
-    
-    // Perform necesssary cuts:
-    
-    // Add point to the dataset:
-    obs.setVal(b_mass);
-    wt.setVal(b_weight);
-    data->add(RooArgSet(obs,wt), b_weight);
-  }
-  return data;
-}
-
-/*
-   -----------------------------------------------------------------------------
    Load the resonant data in the signal or control region into a RooDataSet.
    @param cateName - The name of the category (ResonantCR or ResonantSR):
-
+*/
 RooDataSet* DHDataReader::loadResData(TString cateName) {
   
   // Create a RooDataSet to return:
@@ -143,27 +132,36 @@ RooDataSet* DHDataReader::loadResData(TString cateName) {
   }
   return currData;
 }
-*/
 
 /**
    -----------------------------------------------------------------------------
-   Takes in a variable declaration such as "name[1,0,5]" and returns "name".
-   @param varForm - The form of the variable declared.
-   @param varName - The extracted name of the variable.
-   @param varMin - The extracted minimum of the variable.
-   @param varMax - The extracted maximum of the variable.
-   @return - The name of the variable without the rest of the expression.
+   Load the single Higgs MC in the resonant analysis signal region from file,
+   and return a pointer to a RooDataSet object.
+   @param cateName - The name of the category (should be ResonantSR):
 */
-void DHDataReader::varData(TString varForm, TString& varName, double& varMin,
-			   double& varMax) {
-  varName = varForm;
-  varName.Remove(varName.First("["));
-  varForm.ReplaceAll("[","");
-  varForm.ReplaceAll("]","");
-  TString strVarMin = varForm;
-  strVarMin.Remove(strVarMin.First(","));
-  varMin = strVarMin.Atof();
-  TString strVarMax = varForm;
-  strVarMax.Remove(0,strVarMax.First(",")+1);
-  varMax = strVarMax.Atof();
+RooDataSet* DHDataReader::loadSingleHiggs(TString cateName) {
+  RooRealVar *wt = new RooRealVar("wt", "wt", 1);
+  // Create a RooDataSet to return:
+  RooDataSet *currData = new RooDataSet(Form("resSHData_%s", cateName.Data()),
+					Form("resSHData_%s", cateName.Data()),
+					RooArgSet(*m_observable, *wt),
+					RooFit::WeightVar(*wt));
+  TFile inputFile(m_config->getStr("resSHData"));
+  TH1F *histSH = (TH1F*)inputFile.Get("h");
+  for (int i_b = 1; i_b < histSH->GetNbinsX(); i_b++) {
+    double currWeight = histSH->GetBinContent(i_b);
+    m_observable->setVal(histSH->GetBinCenter(i_b));
+    wt->setVal(currWeight);
+    currData->add(RooArgSet(*m_observable,*wt), currWeight);
+  }
+  return currData;
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Provide a pointer to the RooRealVar used as the observable.
+   @param observable - The RooRealVar used as the data observable.
+*/
+void DHDataReader::setMassObservable(RooRealVar *observable) {
+  m_observable = observable;
 }

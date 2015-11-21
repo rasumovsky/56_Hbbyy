@@ -4,7 +4,7 @@
 //  Class: DHDataReader.cxx                                                   //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 21/11/2015                                                          //
+//  Date: 09/07/2015                                                          //
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -35,20 +35,20 @@ class DHDataReader {
  public:
   
   // Constructor and destructor:
-  DHDataReader(TString configFile);
+  DHDataReader(TString configFile, RooRealVar *observable);
   virtual ~DHDataReader() {};
   
   // Mutators:
-  void loadMxAOD(TString sampleName);
-  RooDataSet* getDataSet(TString sampleName, TString cateName);
+  RooDataSet* loadNonResData(TString cateName);
+  RooDataSet* loadResData(TString cateName); 
+  RooDataSet* loadSingleHiggs(TString cateName);
+  void setMassObservable(RooRealVar *observable);
   
  private:
-  void varData(TString varForm, TString& varName, double& varMin,
-	       double& varMax);
   
   Config *m_config;
+  RooRealVar *m_observable;
   
-  std::map<TString,TTree*> m_storedMxAODTrees;
 };
 
 #endif

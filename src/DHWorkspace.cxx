@@ -174,8 +174,8 @@ void DHWorkspace::addCategory() {
   
   //--------------------------------------//
   // Import the observed data set:
-  DHDataReader *dhdr = new DHDataReader(m_configFile,m_ws->var(observableName));
-  RooDataSet *obsData = dhdr->loadData(m_currCateName);
+  DHDataReader *dhdr = new DHDataReader(m_configFile);
+  RooDataSet *obsData = dhdr->getDataSet("data", m_currCateName);
   
   // Rename the imported dataset for consistency:
   TString dataName = Form("obsData_%s", m_currCateName.Data());
