@@ -77,7 +77,7 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString newDHSignal) {
   // Get the Asimov form of the test statistic:
   TFile workspaceFile(wsFileName, "read");
   m_workspace = (RooWorkspace*)workspaceFile.Get("combinedWS");
-  m_dhts = new DHTestStat(newConfigFile, newDHSignal, "new", m_workspace);
+  m_dhts = new DHTestStat(newConfigFile, "new", m_workspace);
   
   // Get the asymptotic test statistic distribution:
   getAsymptoticForm("QMu");// THIS SHOULD BE GENERALIZED!!!
