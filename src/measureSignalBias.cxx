@@ -11,10 +11,10 @@
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "HGamAnalysisFramework/HgammaIncludes.h"
-#include "HGamTools/HggTwoSidedCBPdf.h"
-#include "HGamTools/SigParam.h"
-#include "HGamTools/AtlasStyle.h"
+#include "CommonFunc.h"
+#include "Config.h"
+#include "HggTwoSidedCBPdf.h"
+#include "SigParam.h"
 
 #include "TFile.h"
 #include "TChain.h"
@@ -70,12 +70,14 @@ TString varPrintName(TString varName) {
 int main(int argc, char *argv[])
 {
   // Check that the config file location is provided.
-  if (argc < 2) HG::fatal("No arguemnts provided");
-  HG::Config *settings = new HG::Config(TString(argv[1]));
+  if (argc < 2) {
+    std::cout << "measureSignalBias: No arguemnts provided" << std::endl;
+    exit(0);
+  }
+  Config *settings = new Config(TString(argv[1]));
 
   // Print configuration for benefit of user:
-  std::cout << "measureSignalBias will run with parameters:"
-	    << std::endl;
+  std::cout << "measureSignalBias will run with parameters:" << std::endl;
   settings->printDB();
   
   // Set the function type:
@@ -86,7 +88,7 @@ int main(int argc, char *argv[])
   system(Form("mkdir -vp %s", outputDir.Data()));
   
   // Set the ATLAS Style for plots:
-  SetAtlasStyle();
+  CommonFunc::SetAtlasStyle();
   
   // Choose the category for bias studies:
   int category = settings->getInt("Category");
@@ -98,7 +100,7 @@ int main(int argc, char *argv[])
   TCanvas *can = new TCanvas("can", "can", 800, 600);
   
   // Get the mass point to investigate:
-  double masses = settings->getNum("ResonanceMass");
+  double mass = settings->getNum("ResonanceMass");
   
   // Store parameter names:
   std::vector<TString> pars; pars.clear();

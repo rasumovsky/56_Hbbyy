@@ -12,7 +12,6 @@
 #define DHWorkspace_h
 
 // Package libraries:
-#include "BkgModel.h"
 #include "CommonFunc.h"
 #include "CommonHead.h"
 #include "Config.h"
