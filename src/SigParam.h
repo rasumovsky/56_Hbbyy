@@ -109,6 +109,8 @@ class SigParam {
   double calculateStdDev(double resonanceMass, int cateIndex);
   TF1 *createTF1FromParameterization(TString varName, int cateIndex,
 				     double xMin, double xMax);
+  double extendedTerm();
+  double generatedDataNorm();
   TString getKey(double resonanceMass, int cateIndex);
   double getMeanOrStdDev(TString value, double resonanceMass, int cateIndex);
   double getMeanOrStdDevInData(TString value, double resonanceMass,
@@ -150,6 +152,8 @@ class SigParam {
 		   TString massBranchName, TString weightBranchName);
   void addMassPoint(double resonanceMass, int cateIndex, double diphotonMass,
 		    double eventWeight);
+  std::vector<double> doBiasTest(double resonanceMass, int cateIndex,
+				 TString dataType, int seed);
   void doBinnedFit(bool doBinned, double nBinsPerGeV = 1.0);
   bool generateAndFitData(double resonanceMass, int cateIndex, TString dataType,
 			  int seed = 1);
@@ -201,9 +205,10 @@ class SigParam {
 		  int cateIndex);
   void binSingleDataSet(TString unbinnedName, TString binnedName,
 			double resonanceMass, int cateIndex);
-  RooFitResult* fitResult(int cateIndex, TString dataType = "");
+  RooFitResult* fitResult(int cateIndex, TString dataType = "", 
+			  TString option = "");
   RooFitResult* fitResult(double resonanceMass, int cateIndex, 
-			  TString dataType = "");
+			  TString dataType = "", TString option = "");
   int getNCategories();
   void parameterizeFunction(TString function, double mRegularized,
 			    double mResonance, int cateIndex,
@@ -257,8 +262,11 @@ class SigParam {
   // Fit result information:
   double m_currChi2;
   double m_currNLL;
+  double m_currExtendVal;
+  double m_generatedDataNorm;
   std::map<TString,double> m_testStats;
   
+
   // Plot options:
   bool m_useLogYAxis;
   bool m_doRatioPlot;

@@ -13,7 +13,11 @@
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-// ROOT includes:
+#include "HGamAnalysisFramework/HgammaIncludes.h"
+#include "HGamTools/HggTwoSidedCBPdf.h"
+#include "HGamTools/SigParam.h"
+#include "HGamTools/AtlasStyle.h"
+
 #include "TFile.h"
 #include "TChain.h"
 #include "TString.h"
@@ -22,12 +26,6 @@
 #include "TCanvas.h"
 #include "TPad.h"
 #include "TLatex.h"
-
-// Package includes:
-#include "CommonFunc.h"
-#include "Config.h"
-#include "HggTwoSidedCBPdf.h"
-#include "SigParam.h"
 
 /**
    -----------------------------------------------------------------------------
@@ -184,12 +182,8 @@ void printProgressBar(int index, int total) {
 int main(int argc, char *argv[])
 {
   // Check that the config file location is provided.
-  if (argc < 2) {
-    std::cout << "createDiHiggsParam: No arguemnts provided" << std::endl;
-    exit(0);
-  }
-
-  Config *settings = new Config(TString(argv[1]));
+  if (argc < 2) HG::fatal("No arguemnts provided");
+  HG::Config *settings = new HG::Config(TString(argv[1]));
 
   // Print configuration for benefit of user:
   std::cout << "createDiHiggsParam will run with parameters:"
@@ -204,7 +198,7 @@ int main(int argc, char *argv[])
   system(Form("mkdir -vp %s", outputDir.Data()));
   
   // Set the ATLAS Style for plots:
-  CommonFunc::SetAtlasStyle();
+  SetAtlasStyle();
   
   // Instantiate SigParam class for individual & parameterized fits:
   SigParam *sps
@@ -222,7 +216,7 @@ int main(int argc, char *argv[])
       spp->setParamState(params[i_p], settings->getStr("Param_"+params[i_p]));  
     }
   }
-
+  
   // Prepare for loop over input MxAOD/TTree:
   std::vector<TString> fileNames = settings->getStrV("InputFile");
   // Make local copies of files if requested, to improve speed:
@@ -236,7 +230,7 @@ int main(int argc, char *argv[])
   }
   
   // Get the luminosity and reserve a variable for total event norm:
-  double luminosity = settings->getNum("Luminosity");
+  double luminosity = settings->getNum("Luminosity") / 1000.0;
   double nTotEvt = 1000.0;
   TString currFileName = "";
   
@@ -247,14 +241,18 @@ int main(int argc, char *argv[])
   double resMassToUse = 0.0;
   int v_cutFlow;
   int currCate;
+  float v_myy;
   chain->SetBranchAddress(settings->getStr("MassBranchName"), &v_mass);
   chain->SetBranchAddress(settings->getStr("WeightBranchName"), &v_weight);
   chain->SetBranchAddress(settings->getStr("XSBREffBranchName"), &v_xsbreff);
   chain->SetBranchAddress(settings->getStr("CutFlowBranchName"), &v_cutFlow);
   chain->SetBranchAddress(settings->getStr("CategoryBranchName"), &currCate);
+  chain->SetBranchAddress(settings->getStr("MyyBranchName"), &v_myy);
   int nEvents = chain->GetEntries();
   int nCategories = 0;
   std::vector<double> mResList; mResList.clear();
+  std::map<TString,double> yieldWeighted; yieldWeighted.clear();
+  std::map<TString,int> yieldUnweighted; yieldUnweighted.clear();
   
   //--------------------------------------//
   // Loop over events to build dataset for signal parameterization:
@@ -268,6 +266,8 @@ int main(int argc, char *argv[])
       currFileName = chain->GetFile()->GetName();
       nTotEvt = getNTotEvtFromHist(chain->GetFile());
       resMassToUse = getResMassFromName(currFileName);
+      yieldWeighted[Form("%2.2f",resMassToUse)] = 0.0;
+      yieldUnweighted[Form("%2.2f",resMassToUse)] = 0.0;
     }
     
     // Only use events passing the selection:
@@ -281,12 +281,23 @@ int main(int argc, char *argv[])
     double massToUse = (double)v_mass / 1000.0;
     if (massToUse < 0.0) continue;
     
+    // For the resonant analysis, also place a cut on diphoton mass:
+    if (fabs((v_myy/1000.0) - settings->getNum("SMHiggsMass")) >
+	settings->getNum("ResonantMyyWindowWidth")) {
+      continue;
+    }
+    
     // Calculate the weight to use:
-    double weightToUse = luminosity * v_xsbreff * v_weight / nTotEvt;
+    //double weightToUse = luminosity * v_xsbreff * v_weight / nTotEvt;
+    double weightToUse = luminosity * v_weight;
     
     // Add the mass and weight values to the datasets for fitting:
     sps->addMassPoint(resMassToUse, currCate, massToUse, weightToUse);
     spp->addMassPoint(resMassToUse, currCate, massToUse, weightToUse);
+
+    // Add to the yield:
+    yieldWeighted[Form("%2.2f",resMassToUse)] += weightToUse;
+    yieldUnweighted[Form("%2.2f",resMassToUse)]++;
     
     // Add the mass point to the list of points:
     mResList = checkMResList(mResList, resMassToUse);
@@ -296,7 +307,7 @@ int main(int argc, char *argv[])
   // Now fit and plot the resonance shapes!
   std::cout << "createDiHiggsParam: Start fitting and plotting!" 
 	    << std::endl;
-
+  
   // Check which fits failed or succeeded:
   std::vector<TString> fitFailures; fitFailures.clear();
   std::vector<TString> fitSuccesses; fitSuccesses.clear();
@@ -473,6 +484,15 @@ int main(int argc, char *argv[])
 	    << std::endl;
   for (int i_f = 0; i_f < (int)fitFailures.size(); i_f++) {
     std::cout << "\t\t" << fitFailures[i_f] << std::endl;
+  }
+  
+  // Print yield information:
+  std::cout << "createDiHiggsParam: Printing inclusive yields:" << std::endl;
+  for (int i_m = 0; i_m < (int)mResList.size(); i_m++) {
+    std::cout << "\tmass = " << mResList[i_m] << ", yield = " 
+	      << yieldWeighted[Form("%2.2f",mResList[i_m])] << "("
+	      << yieldUnweighted[Form("%2.2f",mResList[i_m])] << ")" 
+	      << std::endl;
   }
   
   return 0;

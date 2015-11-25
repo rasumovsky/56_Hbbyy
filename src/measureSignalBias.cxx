@@ -11,10 +11,10 @@
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "CommonFunc.h"
-#include "Config.h"
-#include "HggTwoSidedCBPdf.h"
-#include "SigParam.h"
+#include "HGamAnalysisFramework/HgammaIncludes.h"
+#include "HGamTools/HggTwoSidedCBPdf.h"
+#include "HGamTools/SigParam.h"
+#include "HGamTools/AtlasStyle.h"
 
 #include "TFile.h"
 #include "TChain.h"
@@ -70,14 +70,12 @@ TString varPrintName(TString varName) {
 int main(int argc, char *argv[])
 {
   // Check that the config file location is provided.
-  if (argc < 2) {
-    std::cout << "measureSignalBias: No arguemnts provided" << std::endl;
-    exit(0);
-  }
-  Config *settings = new Config(TString(argv[1]));
+  if (argc < 2) HG::fatal("No arguemnts provided");
+  HG::Config *settings = new HG::Config(TString(argv[1]));
 
   // Print configuration for benefit of user:
-  std::cout << "measureSignalBias will run with parameters:" << std::endl;
+  std::cout << "measureSignalBias will run with parameters:"
+	    << std::endl;
   settings->printDB();
   
   // Set the function type:
@@ -85,10 +83,10 @@ int main(int argc, char *argv[])
   
   // Check that output directory exists:
   TString outputDir = settings->getStr("IODirectory");
-  system(Form("mkdir -vp %s", outputDir.Data()));
+  system(Form("mkdir -vp %s/Bias", outputDir.Data()));
   
   // Set the ATLAS Style for plots:
-  CommonFunc::SetAtlasStyle();
+  SetAtlasStyle();
   
   // Choose the category for bias studies:
   int category = settings->getInt("Category");
@@ -102,111 +100,118 @@ int main(int argc, char *argv[])
   // Get the mass point to investigate:
   double mass = settings->getNum("ResonanceMass");
   
-  // Store parameter names:
-  std::vector<TString> pars; pars.clear();
-  // Store parameter original values:
-  std::vector<double> originVals; originVals.clear();
-  // Store data for histograms:
-  std::map<TString,std::vector<double> > storeVals; storeVals.clear();
-  
-  // Load the parameterized fit:
-  SigParam *spi
-    = new SigParam(settings->getStr("SampleName"),outputDir+"/Parameterized");
-  // Load the signal parameterization from file each time:
-  spi->loadParameterization(outputDir+"/Parameterized",
-			    settings->getStr("SampleName"));
+  // Store normalization from fit and data:
+  std::map<TString,std::vector<double> > biasVals; biasVals.clear();
+  biasVals["MassFit"].clear();
+  biasVals["MassData"].clear();
+  biasVals["NormFit"].clear();
+  biasVals["NormData"].clear();
   
   // Now get bias on a point.
   for (int i_t = 0; i_t < settings->getInt("NumberOfToys"); i_t++) {
-    SigParam *spt
-      = new SigParam(settings->getStr("SampleName"), outputDir+"/Individual");
+    SigParam *spi
+      = new SigParam(settings->getStr("SampleName"),outputDir+"/Parameterized");
     // Load the signal parameterization from file each time:
-    spt->loadParameterization(outputDir+"/Individual",
+    spi->loadParameterization(outputDir+"/Parameterized",
 			      settings->getStr("SampleName"));
-    // The first time, load parameter information and also initial values:
-    if (i_t == 0) {
-      pars =spt->variablesForFunction(settings->getStr("SignalFunctionalForm"));
-      for (int i_p = 0; i_p < (int)pars.size(); i_p++) {
-	originVals
-	  .push_back(spt->getParameterValue(pars[i_p], mass, category));
-	//originVals
-	//.push_back(spi->getParameterizedValue(pars[i_p], mass, category));
-	storeVals[pars[i_p]].clear();
+    // Then toss and fit toy, storing bias data for each:
+    std::vector<double> currVals
+      = spi->doBiasTest(mass, category, "mctoy", seed+i_t);
+    if ((int)currVals.size() >= 4) {
+      if (currVals[2] > 0.0001) {
+	biasVals["MassData"].push_back(currVals[0]);
+	biasVals["MassFit"].push_back(currVals[1]);
+	biasVals["NormData"].push_back(currVals[2]);
+	biasVals["NormFit"].push_back(currVals[3]);
       }
     }
-    
-    // Then toss and fit toy:
-    if (spt->generateAndFitData(300, 2, "mctoy", seed+i_t)) {
-      // Retrieve parameter valuess for the fit to this toy:
-      for (int i_p = 0; i_p < (int)pars.size(); i_p++) {
-	storeVals[pars[i_p]]
-	  .push_back(spt->getParameterValue(pars[i_p], mass, category));
-      }
-    }
-    delete spt;
+    delete spi;
   }
   
-  // Store the average, minimum, and maximum value of each parameter:
-  double avg[100] = {0.0};
-  double min[100] = {0.0};
-  double max[100] = {0.0};
-  
-  // Loop over variables and extract average, minimum, maximum:
+  // Create output file to store the bias measurements:
   std::ofstream biasOutput; 
-  biasOutput.open(Form("%s/biasValues_Mass%2.2f.txt",
+  biasOutput.open(Form("%s/Bias/biasValues_Mass%2.2f.txt",
 		       outputDir.Data(), mass));
   
-  for (int i_p = 0; i_p < (int)pars.size(); i_p++) {
-    getAvgMinMax(storeVals[pars[i_p]], avg[i_p], min[i_p], max[i_p]);
-    double bias = 100 * ((originVals[i_p] - avg[i_p]) / avg[i_p]);
-    std::cout << "Var= " << pars[i_p] << ", avg=" << avg[i_p] << ", origin=" 
-	      << originVals[i_p] << ", bias=" << bias << "%" << std::endl;
-    biasOutput << "Var+ " << pars[i_p] << ", avg=" << avg[i_p] << ", origin=" 
-	       << originVals[i_p] << ", bias=" << bias << "%" << std::endl;
-  }
-  biasOutput.close();
-  
-  // Create and plot histograms for each variable distribution:
-  for (int i_p = 0; i_p < (int)pars.size(); i_p++) {
-    TH1F *currHist = new TH1F(pars[i_p], pars[i_p], 50, min[i_p], max[i_p]);
-    for (int i_e = 0; i_e < (int)storeVals[pars[i_p]].size(); i_e++) {
-      currHist->Fill(storeVals[pars[i_p]][i_e]);
+  // Loop over the measurements (mass and normalization):
+  std::vector<TString> names; names.clear();
+  names.push_back("Mass");
+  names.push_back("Norm");
+  for (int i_n = 0; i_n < (int)names.size(); i_n++) {
+    
+    // Then plot the bias on the normalization:
+    double fitAvg = 0.0; double fitMin = 0.0; double fitMax = 0.0;
+    double dataAvg = 0.0; double dataMin = 0.0; double dataMax = 0.0;
+    getAvgMinMax(biasVals[Form("%sFit",names[i_n].Data())],
+		 fitAvg, fitMin, fitMax);
+    getAvgMinMax(biasVals[Form("%sData",names[i_n].Data())], 
+		 dataAvg, dataMin, dataMax);
+    
+    double bias = 100 * ((fitAvg - dataAvg) / dataAvg);
+    
+    std::cout << names[i_n] << "\t "
+	      << dataAvg << "\t " << dataMin << "\t " << dataMax
+	      << "\t " << fitAvg << "\t " << fitMin << "\t " << fitMax
+	      << "\t " << bias << std::endl;
+    biasOutput << names[i_n] << "\t " << fitAvg << "\t " << dataAvg
+	       << "\t " << bias << std::endl;
+    
+    TH1F *hFit = new TH1F("hFit", "hFit", 50, fitMin, fitMax);
+    TH1F *hData = new TH1F("hData", "hData", 50, fitMin, fitMax);
+    
+    for (int i_e = 0; 
+	 i_e < (int)(biasVals[Form("%sFit",(names[i_n]).Data())]).size();
+	 i_e++) {
+      hFit->Fill(biasVals[Form("%sFit",(names[i_n]).Data())][i_e]);
+      hData->Fill(biasVals[Form("%sData",(names[i_n]).Data())][i_e]);
     }
-    currHist->GetXaxis()
-      ->SetTitle(Form("%s value",(varPrintName(pars[i_p])).Data()));
-    currHist->SetFillColor(kBlue-10);
-    currHist->SetLineColor(kBlue+4);
+    hFit->GetXaxis()->SetTitle(names[i_n]);
+    hFit->SetFillColor(kBlue-7);
+    hFit->SetFillStyle(3345);
+    hFit->SetLineColor(kBlue+1);
+    hFit->GetYaxis()->SetRangeUser(0, (1.3 * hFit->GetMaximum()));
+    hData->SetFillColor(kRed-7);
+    hData->SetFillStyle(3354);
+    hData->SetLineColor(kRed+1);
     can->cd(); 
     can->Clear();
-    currHist->Draw("hist");
+    hFit->Draw("hist");
+    if (!names[i_n].Contains("Mass")) hData->Draw("histSAME");
     
     // Draw average value:
-    TLine *lineAvg = new TLine();
-    lineAvg->SetLineStyle(2);
-    lineAvg->SetLineWidth(2);
-    lineAvg->SetLineColor(4);
-    lineAvg->DrawLine(avg[i_p], 0, avg[i_p], currHist->GetMaximum());
+    TLine *lFitAvg = new TLine();
+    lFitAvg->SetLineStyle(2);
+    lFitAvg->SetLineWidth(2);
+    lFitAvg->SetLineColor(kBlue+1);
+    lFitAvg->DrawLine(fitAvg, 0, fitAvg, hFit->GetMaximum());
     // Draw origin value:
-    TLine *lineFit = new TLine();
-    lineFit->SetLineStyle(2);
-    lineFit->SetLineWidth(2);
-    lineFit->SetLineColor(2);
-    lineFit->DrawLine(originVals[i_p], 0, originVals[i_p],
-		      currHist->GetMaximum());
+    TLine *lDataAvg = new TLine();
+    lDataAvg->SetLineStyle(2);
+    lDataAvg->SetLineWidth(2);
+    lDataAvg->SetLineColor(kRed+1);
+    lDataAvg->DrawLine(dataAvg, 0, dataAvg, hFit->GetMaximum());
     
-    TLegend leg(0.55, 0.82, 0.89, 0.92);
+    TLegend leg(0.55, 0.78, 0.89, 0.92);
     leg.SetBorderSize(0);
     leg.SetFillColor(0);
     leg.SetTextSize(0.04);
-    leg.AddEntry(lineAvg,Form("Toy Mean = %2.3f", avg[i_p]), "L");
-    leg.AddEntry(lineFit,Form("Fit val = %2.3f", originVals[i_p]), "L");
+    leg.AddEntry(hFit, "Fit Distribution", "F");
+    leg.AddEntry(lFitAvg, Form("Fit Mean = %2.3f", fitAvg), "L");
+    if (!names[i_n].Contains("Mass")) {
+      leg.AddEntry(hData, "Truth Distribution", "F");
+    }
+    leg.AddEntry(lDataAvg, Form("Truth Value = %2.3f", dataAvg), "L");
     leg.Draw("SAME");
     
-    // Print the canvas:
-    can->Print(Form("%s/biasDist_%s.eps",outputDir.Data(),pars[i_p].Data()));
+    can->Print(Form("%s/Bias/biasDist_%s_Mass%2.2f.eps",
+		    outputDir.Data(), names[i_n].Data(), mass));
+    delete hFit;
+    delete hData;
+    delete lFitAvg;
+    delete lDataAvg;
   }
-  delete spi;
+
+  biasOutput.close();
   delete can;
   return 0;
 }
-

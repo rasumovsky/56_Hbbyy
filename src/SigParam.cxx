@@ -23,7 +23,7 @@
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "SigParam.h"
+#include "HGamTools/SigParam.h"
 
 /**
    -----------------------------------------------------------------------------
@@ -46,7 +46,7 @@ SigParam::SigParam(TString signalType, TString directory) {
   m_ws->factory("wt[1.0]");
   m_ws->factory("mResonance[10,10000]");
   m_ws->factory("expr::mRegularized('(@0-100.0)/100.0',{mResonance})");
-  m_verbose = false;
+  m_verbose = true;
   m_nCategories = 0;
   
   // Define the data sets at each mass in each category for resonance fit:
@@ -67,6 +67,8 @@ SigParam::SigParam(TString signalType, TString directory) {
   // Fit result information:
   m_currChi2 = 0.0;
   m_currNLL = 0.0;
+  m_currExtendVal = 0.0;
+  m_generatedDataNorm = 0.0;
   
   // Set the plot format:
   doBinnedFit(false, 1);
@@ -74,6 +76,8 @@ SigParam::SigParam(TString signalType, TString directory) {
   setPlotFormat(".eps");
   setRatioPlot(true, 0.0, 2.0);
   m_currFunction = "DoubleCB";
+  RooRealVar nameVar("functionName", m_currFunction, 0);
+  m_ws->import(nameVar);
   
   // Default values for the parameterization functions and parameters are set
   // below. These will be overwritten by any calls to setVarParameterizat() or
@@ -90,7 +94,8 @@ SigParam::SigParam(TString signalType, TString directory) {
   setVarParameterization("sigmaGANom", "@0+@1*obs");
   // Double-sided Crystal Ball:
   setVarParameterization("alphaCBLo", "@0+@1/(obs+@2)");
-  setVarParameterization("alphaCBHi", "@0+@1*obs");
+  //setVarParameterization("alphaCBHi", "@0+@1*obs");
+  setVarParameterization("alphaCBHi", "@0+@1/(obs+@2)");
   // Triple Gaussian:
   setVarParameterization("muGA1Nom", "@0+@1*obs+mRes");
   setVarParameterization("muGA2Nom", "@0+@1*obs+mRes");
@@ -134,6 +139,7 @@ SigParam::SigParam(TString signalType, TString directory) {
   setParamState("nCBLo", "[9.0,0.1,20.0]");
   setParamState("a_alphaCBHi", "[2.2,0.0,4.0]");
   setParamState("b_alphaCBHi", "[0.0,-0.5,0.5]");
+  setParamState("c_alphaCBHi", "[0.0,-2.0,1.0]");
   setParamState("nCBHi", "[5.0,0.1,10.0]");
   // Triple Gaussian:
   setParamState("a_muGA1Nom", "[-0.01,-2.0,2.0]");
@@ -787,6 +793,57 @@ bool SigParam::dataExists(double resonanceMass, int cateIndex) {
 
 /**
    -----------------------------------------------------------------------------
+   This method generates and fits toy MC generated from a dataset, and returns
+   the profiled Higgs mass and normalization as well as the truth values.
+   @param resonanceMass - The floating value of the signal mass.
+   @param cateIndex - The index of the category.
+   @param dataType - "asimov", "mctoy", "pdftoy".
+   @param seed - The random seed for pseudo-data generation (not for Asimov).
+   @return - A vector: [0] = the truth resonance mass, [1] = the profiled 
+   resonance mass, [2] = truth data normalization, [3] = profiled normalization.
+*/
+std::vector<double> SigParam::doBiasTest(double resonanceMass, int cateIndex,
+					 TString dataType, int seed) {
+  
+  // First generate the desired data:
+  generateData(resonanceMass, cateIndex, dataType, seed);
+  
+  // Free the parameters before fitting:
+  TString currKey = getKey(resonanceMass, cateIndex);
+  TString pdfName = Form("sigPdf_%sc%d", m_signalType.Data(), cateIndex);
+  if (m_ws->pdf(pdfName)) {
+    setParamsConstant(m_ws->pdf(pdfName), true);
+    setResMassConstant(false, resonanceMass);
+  }
+  else {
+    //pdfName = Form("sigPdf_%s%s", m_signalType.Data(), currKey.Data());
+    std::cout << "SigParam: ERROR! doBiasTest() method currently only configured for parameterized shape, where mResonance can be free for the fit." 
+	      << std::endl;
+    exit(0);
+  }
+    
+  // Then fit that dataset:
+  RooFitResult* currFitResult
+    = fitResult(resonanceMass, cateIndex, dataType, "ExtendedParameterized");
+  
+  // Return the fit bias information:
+  std::vector<double> biasResult; biasResult.clear();
+  
+  // Bad fits have null pointer to status, nonzero value, or infinite/nan NLL
+  if (currFitResult && currFitResult->status() == 0 &&
+      std::isfinite(m_currNLL)) {
+    
+    biasResult.push_back(resonanceMass);
+    biasResult.push_back(m_ws->var("mResonance")->getVal());
+    biasResult.push_back(generatedDataNorm());
+    biasResult.push_back(extendedTerm());
+  }
+  
+  return biasResult;
+}
+
+/**
+   -----------------------------------------------------------------------------
    Option to do a binned fit. Sets the private variable m_binned.
    @param binned - True iff the fit should be binned.
    @param nBinsPerGeV - The number of bins per GeV for the binned data.
@@ -794,7 +851,9 @@ bool SigParam::dataExists(double resonanceMass, int cateIndex) {
 void SigParam::doBinnedFit(bool binned, double nBinsPerGeV) {
   m_binned = binned;
   m_nBinsPerGeV = nBinsPerGeV;
-  std::cout << "SigParam: Binned bool = " << m_binned << std::endl;
+  if (m_verbose) {
+    std::cout << "SigParam: Binned bool = " << m_binned << std::endl;
+  }
 }
 
 /**
@@ -810,15 +869,25 @@ bool SigParam::equalMasses(double massValue1, double massValue2) {
 
 /**
    -----------------------------------------------------------------------------
+   Retrieve the extended term value (normalization) from the most recent fit.
+   @return - The value of the extended term from the last fit.
+*/
+double SigParam::extendedTerm() {
+  return m_currExtendVal;
+}
+
+/**
+   -----------------------------------------------------------------------------
    Perform a single or simultaneous fit.
    @param resonanceMass - The truth mass of the resonance.
    @param cateIndex - The index of the category.
    @param dataType - The type of data being fitted. "" for nominal signal MC,
    "asimov", "mctoy", or "pdftoy" for generated data types.
+   @param option - Fit options (e.g. "Extended", "Parameterized").
    @return - The RooFitResult, which gives fit status.
 */
 RooFitResult* SigParam::fitResult(double resonanceMass, int cateIndex,
-				  TString dataType) {
+				  TString dataType, TString option) {
   if (m_verbose) {
     std::cout << "SigParam: Preparing to fit resonance" << std::endl;
   }
@@ -829,9 +898,17 @@ RooFitResult* SigParam::fitResult(double resonanceMass, int cateIndex,
   
   // Define the PDF and dataset names:
   TString currKey = getKey(resonanceMass,cateIndex);
-  TString sigName = (resonanceMass < 0.0) ?
-    Form("sigPdfTmp_%sc%d", m_signalType.Data(), cateIndex) :
-    Form("sigPdf_%s%s", m_signalType.Data(), currKey.Data());
+  TString sigName = "";
+  if (resonanceMass < 0.0) {
+    sigName = Form("sigPdfTmp_%sc%d", m_signalType.Data(), cateIndex);
+  }
+  else if (option.Contains("Parameterized")) {
+    sigName = Form("sigPdf_%sc%d", m_signalType.Data(), cateIndex);
+  }
+  else {
+    sigName = Form("sigPdf_%s%s", m_signalType.Data(), currKey.Data());
+  }
+  
   // The default dataset (for "" dataType):
   TString dataName = (resonanceMass < 0.0) ? Form("data_c%d",cateIndex) :
     Form("data_%s",currKey.Data());  
@@ -854,35 +931,73 @@ RooFitResult* SigParam::fitResult(double resonanceMass, int cateIndex,
       dataType.Contains("pdftoy")) {
     // Must specify a mass value for fitting generated datasets:
     if (resonanceMass < 0.0) {
-      std::cout << "SigParam: ERROR! Must specify a mass to fit for generated data. Use the same mass that was used to generate Asimov or toy MC data." << std::endl;
+      std::cout << "SigParam: ERROR! Must specify a mass to fit for generated data. Use the same mass that was used to generate Asimov or toy MC data." 
+		<< std::endl;
       exit(0);
     }
     // Try to choose a parameterized PDF, then use individual if that fails:
-    TString pdfName = Form("sigPdf_%sc%d", m_signalType.Data(), cateIndex);
-    if (!m_ws->pdf(pdfName)) {
-      pdfName = Form("sigPdf_%s%s", m_signalType.Data(), currKey.Data());
+    sigName = Form("sigPdf_%sc%d", m_signalType.Data(), cateIndex);
+    if (!m_ws->pdf(sigName)) {
+      sigName = Form("sigPdf_%s%s", m_signalType.Data(), currKey.Data());
     }
     dataName = Form("data_%s_%s", dataType.Data(), currKey.Data());
   }
   
   // Now create pointers to chosen signal and data ahead of fitting!
-  RooAbsPdf *currSignal = m_ws->pdf(sigName);
   RooDataSet *currData = (RooDataSet*)m_ws->data(dataName);
+  RooAbsPdf *currSignal = m_ws->pdf(sigName);
   
+  // In case an extended fit is requested:
+  RooExtendPdf *currExtend = NULL; 
+  RooRealVar *currNorm = NULL;
+  if (option.Contains("Extended")) {
+    currNorm = new RooRealVar("currNorm", "currNorm", 100.0, 0.0, 1000000.0);
+    currExtend = new RooExtendPdf("extendedPdf", "extendedPdf", 
+				  *currSignal, *currNorm);
+  }
+  
+  // Make sure inputs are defined, else exit:
+  if (!currSignal) {
+    std::cout << "SigParam: ERROR! Signal for fit not defined: "
+	      << sigName << std::endl;
+    exit(0);
+  }
+  if (!currData) {
+    std::cout << "SigParam: ERROR! Data for fit not defined: " 
+	      << dataName << std::endl;
+    exit(0);
+  }
+
   int fitPrintLevel = m_verbose ? 0 : -1;
   RooFitResult *result = NULL;
   // Individual fit: apply the mass range requirement.
-  if (resonanceMass > 0) {
+  if (resonanceMass > 0 && !option.Contains("Parameterized")) {
     double fitMin = m_ws->var(Form("m_yy_%s",currKey.Data()))->getMin();
     double fitMax = m_ws->var(Form("m_yy_%s",currKey.Data()))->getMax();
-    result = currSignal->fitTo(*currData, RooFit::PrintLevel(fitPrintLevel),
-			       RooFit::SumW2Error(kTRUE), RooFit::Save(true),
-			       RooFit::Range(fitMin,fitMax));
+    if (option.Contains("Extended")) {
+      result = currExtend->fitTo(*currData, RooFit::PrintLevel(fitPrintLevel),
+				 RooFit::SumW2Error(kTRUE), RooFit::Save(true),
+				 RooFit::Range(fitMin,fitMax));
+      m_currExtendVal = currNorm->getVal();
+    }
+    else {
+      
+      result = currSignal->fitTo(*currData, RooFit::PrintLevel(fitPrintLevel),
+				 RooFit::SumW2Error(kTRUE), RooFit::Save(true),
+				 RooFit::Range(fitMin,fitMax));
+    }
   }
   // Parameterized fit: no explicit mass range requirement.
   else {
-    result = currSignal->fitTo(*currData, RooFit::PrintLevel(fitPrintLevel),
-			       RooFit::SumW2Error(kTRUE), RooFit::Save(true));
+    if (option.Contains("Extended")) {
+      result = currExtend->fitTo(*currData, RooFit::PrintLevel(fitPrintLevel),
+				 RooFit::SumW2Error(kTRUE), RooFit::Save(true));
+      m_currExtendVal = currNorm->getVal();
+    }
+    else {
+      result = currSignal->fitTo(*currData, RooFit::PrintLevel(fitPrintLevel),
+				 RooFit::SumW2Error(kTRUE), RooFit::Save(true));
+    }
   }
   
   m_currNLL = result->minNll();
@@ -905,10 +1020,14 @@ RooFitResult* SigParam::fitResult(double resonanceMass, int cateIndex,
    -----------------------------------------------------------------------------
    Perform a simultaneous fit across multiple masses.
    @param cateIndex - The index of the category.
+   @param dataType - The type of data being fitted. "" for nominal signal MC,
+   "asimov", "mctoy", or "pdftoy" for generated data types.
+   @param option - Fit options (e.g. "Extended").
    @return - The RooFitResult, which gives fit status.
 */
-RooFitResult* SigParam::fitResult(int cateIndex, TString dataType) {
-  return SigParam::fitResult(-999.9, cateIndex, dataType);
+RooFitResult* SigParam::fitResult(int cateIndex, TString dataType,
+				  TString option) {
+  return SigParam::fitResult(-999.9, cateIndex, dataType, option);
 }
 
 /**
@@ -924,7 +1043,8 @@ bool SigParam::functionIsDefined(TString function) {
     return true;
   }
   else {
-    std::cout << "SigParam: ERROR! " << function << " is undefined. Please use one of the following: DoubleCB, CBGA, GAx3, BifurGA, Landau, Voigt, CBPlusVoigt..." << std::endl;
+    std::cout << "SigParam: ERROR! " << function << " is undefined. Please use one of the following: DoubleCB, CBGA, GAx3, BifurGA, Landau, Voigt, CBPlusVoigt..." 
+	      << std::endl;
     return false;
   }
 }
@@ -953,7 +1073,8 @@ bool SigParam::generateAndFitData(double resonanceMass, int cateIndex,
   setParamsConstant(m_ws->pdf(pdfName), false);
     
   // Then fit that dataset:
-  RooFitResult* result = fitResult(resonanceMass, cateIndex, dataType);
+  RooFitResult* result
+    = fitResult(resonanceMass, cateIndex, dataType, "ExtendedParameterized");
   
   // Return the fit status:
   // Bad fits have null pointer to status, nonzero value, or infinite/nan NLL
@@ -1012,6 +1133,15 @@ RooDataSet* SigParam::generateData(double resonanceMass, int cateIndex,
       GenerateAsimovData(*m_ws->pdf("sigPdfAsimov"),
 			 RooArgSet(*m_ws->var(obsName)));
     //GenerateAsimovData(*m_ws->pdf(pdfName), RooArgSet(*m_ws->var(obsName)));
+    
+    // Then add ghost events:
+    double min = m_ws->var(obsName)->getMin();
+    double max = m_ws->var(obsName)->getMax();
+    double ghostWt = 0.0000001;
+    for (double massVal = min; massVal <=max; massVal += fabs((max-min)/10.0)) {
+      m_ws->var(obsName)->setVal(massVal);
+      generatedData->add(RooArgSet(*m_ws->var(obsName)), ghostWt);
+    }
   }
   
   //--------------------//
@@ -1043,8 +1173,9 @@ RooDataSet* SigParam::generateData(double resonanceMass, int cateIndex,
     double min = m_ws->var(obsName)->getMin();
     double max = m_ws->var(obsName)->getMax();
     int bins = (int)(m_nBinsPerGeV * (max - min));
+    TString originObsName = Form("m_yy_%s", currKey.Data());
     TH1F *dataHist = (TH1F*)m_ws->data(dataName)
-      ->createHistogram("histTmp", *m_ws->var(obsName),
+      ->createHistogram("histTmp", *m_ws->var(originObsName),
 			RooFit::Binning(bins,min,max));
     
     // Randomly generate poisson normalization:
@@ -1060,6 +1191,15 @@ RooDataSet* SigParam::generateData(double resonanceMass, int cateIndex,
       m_ws->var("wt")->setVal(currWt);
       generatedData
 	->add(RooArgSet(*m_ws->var(obsName), *m_ws->var("wt")), currWt);
+    }
+    
+    // Then add ghost events:
+    double ghostWt = 0.0000001;
+    for (double massVal = min; massVal <=max; massVal += fabs((max-min)/10.0)) {
+      m_ws->var(obsName)->setVal(massVal);
+      m_ws->var("wt")->setVal(ghostWt);
+      generatedData
+	->add(RooArgSet(*m_ws->var(obsName), *m_ws->var("wt")), ghostWt);
     }
     delete dataHist;
   }
@@ -1082,10 +1222,21 @@ RooDataSet* SigParam::generateData(double resonanceMass, int cateIndex,
 				   currKey.Data()),
 			      Form("data_%s_%s", dataType.Data(),
 				   currKey.Data()));
+  // Save norm. so that it is retrievable via generatedDataNormalization():
+  m_generatedDataNorm = generatedData->sumEntries();
   
   // Import and return new dataset:
   m_ws->import(*generatedData);
   return generatedData;
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Get the weighted normalization of the dataset that was just generated.
+   @return - The weighted sum of entries or the number of entries.
+*/
+double SigParam::generatedDataNorm() {
+  return m_generatedDataNorm;
 }
 
 /**
@@ -1673,18 +1824,26 @@ std::vector<TString> SigParam::listParamsForVar(TString varName) {
    @return - True iff the file is successfully loaded.
 */
 bool SigParam::loadParameterization(TString directory, TString signalType){
-  std::cout << "SigParam: Load parameterization from" << directory
-	    << std::endl;
+  std::cout << "SigParam: Load parameterization from " << directory
+	    << " for signal type " << signalType << std::endl;
   setDirectory(directory);
   bool parameterizationExists = false;
   TFile inputFile(Form("%s/res_%sworkspace.root", m_directory.Data(), 
 		       m_signalType.Data()));
   if (inputFile.IsOpen()) {
     m_ws = (RooWorkspace*)inputFile.Get("signalWS");
-    if (m_ws) parameterizationExists = true;
-    setSignalType(signalType);
-    std::cout << "SigParam: Successfully loaded from file!" << std::endl;
+    if (m_ws) {
+      parameterizationExists = true;
+      setSignalType(signalType);
+      m_currFunction = m_ws->var("functionName")->GetTitle();
+      std::cout << "SigParam: Successfully loaded from file!" << std::endl;
+    }
   }
+  if (!parameterizationExists) {
+    std::cout << "SigParam: ERROR loading from file." << std::endl;
+    exit(0);
+  }
+  
   return parameterizationExists;
 }
 
@@ -2400,15 +2559,18 @@ void SigParam::plotCategoryResonances(int cateIndex) {
    Plot a resonance PDF for one value of the resonance mass in one category.
    @param resonanceMass - The mass value in GeV.
    @param cateIndex - The index of the category.
+   @param dataType - "asimov", "mctoy", "pdftoy".
 */
 void SigParam::plotSingleResonance(double resonanceMass, int cateIndex,
 				   TString dataType) {
   if (m_verbose) {
     std::cout << "SigParam: Plotting resonance at mass " << resonanceMass 
-	      << " in category " << cateIndex << std::endl;
+	      << " in category " << cateIndex << " with dataset " 
+	      << dataType << std::endl;
   }
   
   TString currKey = getKey(resonanceMass,cateIndex);
+  bool parameterized = false;
   
   TCanvas *can = new TCanvas("can","can",800,800);
   can->cd();
@@ -2423,13 +2585,13 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex,
   pad1->Draw();
   pad2->Draw();
   pad1->cd();
-  
+
   TString pdfName = "";
   TString dataName = "";
   TString obsName = "";
   // For fits to Asimov, MC toy, or PDF toy data:
-  if (dataType.EqualTo("asimov") || dataType.EqualTo("mctoy") ||
-      dataType.EqualTo("pdftoy")) {
+  if (dataType.Contains("asimov") || dataType.Contains("mctoy") ||
+      dataType.Contains("pdftoy")) {
     dataName = Form("data_%s_%s", dataType.Data(), currKey.Data());
     
     // Loof for parameterized model and then single mass point model:
@@ -2437,6 +2599,7 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex,
     if (m_ws->pdf(pdfName)) {
       setResMassConstant(true, resonanceMass);
       obsName = "m_yy";
+      parameterized = true;
     }
     else {
       pdfName = Form("sigPdf_%s%s", m_signalType.Data(), currKey.Data());
@@ -2457,10 +2620,9 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex,
 				       m_ws->var(obsName)->getMin()));
       plotData(m_ws->data(dataName), m_ws->var(obsName), rBins, resonanceMass);
       dataName = Form("%s_copy", dataName.Data());
+      parameterized = true;
     }
-    else {
-      pdfName = Form("sigPdf_%s%s", m_signalType.Data(), currKey.Data());
-    }
+    else pdfName = Form("sigPdf_%s%s", m_signalType.Data(), currKey.Data());
   }
   
   // Then check that both data and PDF exist:
@@ -2479,11 +2641,11 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex,
     = m_ws->var(obsName)->frame(RooFit::Bins(rBins),RooFit::Range(rMin,rMax));
   frame->SetYTitle(Form("Events/%2.2f GeV", (1.0/((double)m_nBinsPerGeV))));
   frame->SetXTitle("Mass [GeV]");
-  
+    
   // Then add the data and PDF to the RooPlot:
   m_ws->data(dataName)->plotOn(frame);
   m_ws->pdf(pdfName)->plotOn(frame, RooFit::LineColor(2));
-  
+    
   // Draw the RooPlot:
   frame->Draw();
   // Special y-axis ranges for log-scale plots:
@@ -2493,7 +2655,7 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex,
       ->SetRangeUser(0.00001 *(*m_ws->data(dataName)).sumEntries(), 
 		     (*m_ws->data(dataName)).sumEntries());
   }
-  
+    
   TLatex l; l.SetNDC(); l.SetTextColor(kBlack);
   l.SetTextFont(72); l.SetTextSize(0.05); l.DrawLatex(0.20,0.88,"ATLAS");
   //l.SetTextFont(42); l.SetTextSize(0.05); l.DrawLatex(0.32,0.88,"Simulation");
@@ -2502,7 +2664,7 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex,
   l.DrawLatex(0.2, 0.82, "#sqrt{s} = 13 TeV");
   
   TLatex text; text.SetNDC(); text.SetTextColor(1);
-  if ((int)m_cateNames.size() == m_nCategories) {
+  if ((int)m_cateNames.size() == m_nCategories && m_nCategories > 0) {
     text.DrawLatex(0.2, 0.76, m_cateNames[cateIndex]);
   }
   else {
@@ -2515,7 +2677,9 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex,
   std::vector<TString> currVars = variablesForFunction(m_currFunction);
   for (int i_v = 0; i_v < (int)currVars.size(); i_v++) {
     TString currName = currVars[i_v];
-    double currVal = getParameterValue(currName, resonanceMass, cateIndex);
+    double currVal = 0.0;
+    if (parameterized) getParameterizedValue(currName,resonanceMass,cateIndex);
+    else getParameterValue(currName, resonanceMass, cateIndex);
     currName.ReplaceAll("frac", "fraction_{");
     currName.ReplaceAll("Nom","");
     currName.ReplaceAll("nCB","n_{CB");
@@ -2527,7 +2691,7 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex,
     varText.DrawLatex(0.7, yVal, Form("%s\t = %2.2f",currName.Data(),currVal));
     yVal -= 0.06;
   }
-  
+    
   // Move to second pad for ratio or subtraction plot:
   pad2->cd();
   
@@ -2551,7 +2715,6 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex,
   medianHist->GetYaxis()->SetTitleSize(0.1);
   medianHist->GetXaxis()->SetLabelSize(0.1);
   medianHist->GetYaxis()->SetLabelSize(0.1);
-
   medianHist->Draw();
   
   double currChi2Prob = 0.0;
@@ -2578,6 +2741,7 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex,
   TLatex chiText; chiText.SetNDC(); chiText.SetTextColor(1);
   chiText.SetTextSize(0.1);
   //chiText.DrawLatex(0.7, 0.9, Form("p_{#chi} = %2.2f", currChi2Prob));
+    
   can->Print(Form("%s/plot%s_singleRes_m%2.2f_c%d%s", m_directory.Data(), 
 		  dataType.Data(), resonanceMass, cateIndex,
 		  m_fileFormat.Data()));
@@ -2738,7 +2902,8 @@ void SigParam::resonanceCreator(double resonanceMass, int cateIndex,
 	      << cateIndex << std::endl;
   }
   m_currFunction = function;
-  
+  m_ws->var("functionName")->SetTitle(m_currFunction);
+
   // Check that the dataset has been defined and is not empty.
   if (!dataExists(resonanceMass, cateIndex) &&
       !function.Contains("Parameterized")) {
@@ -2964,11 +3129,10 @@ void SigParam::setRatioPlot(bool doRatioPlot, double ratioMin, double ratioMax){
 void SigParam::setResMassConstant(bool setConstant, double resonanceMass) {
   // Either set the resonance mass fixed or floating in the workspace:
   m_ws->var("mResonance")->setConstant(setConstant);
-  // If mass is fixed, fix it to a particular value:
-  if (setConstant) m_ws->var("mResonance")->setVal(resonanceMass);
+  m_ws->var("mResonance")->setVal(resonanceMass);
   if (m_verbose) {
     std::cout << "SigParam: setResMassConstant(" << setConstant << ", " 
-	      << resonanceMass << std::endl;
+	      << resonanceMass << ")" << std::endl;
   }
 }
 

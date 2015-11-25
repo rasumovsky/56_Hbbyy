@@ -18,8 +18,6 @@
 #include "DHAnalysis.h"
 #include "DHDataReader.h"
 #include "DHTestStat.h"
-#include "PERReader.h"
-#include "PESReader.h"
 #include "RooFitHead.h"
 #include "RooStatsHead.h"
 #include "statistics.h"
