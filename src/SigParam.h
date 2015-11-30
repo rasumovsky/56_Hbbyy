@@ -190,7 +190,7 @@ class SigParam {
  private:
   
   //----------Private Accessors----------//
-  std::vector<int> categoriesForMass(double resonanceMass);
+  //std::vector<int> categoriesForMass(double resonanceMass);
   bool dataExists(double resonanceMass, int cateIndex);
   bool equalMasses(double massValue1, double massValue2);
   bool functionIsDefined(TString function);

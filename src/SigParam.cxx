@@ -46,7 +46,7 @@ SigParam::SigParam(TString signalType, TString directory) {
   m_ws->factory("wt[1.0]");
   m_ws->factory("mResonance[10,10000]");
   m_ws->factory("expr::mRegularized('(@0-100.0)/100.0',{mResonance})");
-  m_verbose = true;
+  m_verbose = false;
   m_nCategories = 0;
   
   // Define the data sets at each mass in each category for resonance fit:
@@ -168,7 +168,7 @@ SigParam::SigParam(TString signalType, TString directory) {
   setParamState("a_sigmaLANom", "[0.0,-10.0,10.0]");
   setParamState("b_sigmaLANom", "[3.90,0.01,10.0]");
   // Voigt:
-   setParamState("a_muVoigtNom", "[-0.0,-2.0,2.0]");
+  setParamState("a_muVoigtNom", "[-0.0,-2.0,2.0]");
   setParamState("b_muVoigtNom", "[-0.1,-0.5,0.5]");
   setParamState("c_muVoigtNom", "[-0.02,-0.5,0.5]");
   setParamState("a_widthVoigtNom", "[5.0,-1.0,20.0]");
@@ -450,7 +450,7 @@ bool SigParam::addSigToWS(RooWorkspace *&workspace, int cateIndex) {
   TString yieldName = Form("sigYield_%sc%d", m_signalType.Data(), cateIndex);
   if (m_ws->function(yieldName)) {
     if (!workspace->function(yieldName)) {
-      workspace->import((*m_ws->function(yieldName)));
+      workspace->import(*m_ws->function(yieldName));
     }
     else {
       std::cout << "SigParam: yield parameter " << yieldName 
@@ -723,24 +723,6 @@ double SigParam::calculateStdDev(double resonanceMass, int cateIndex) {
   observable->setMin(minOrigin);
   observable->setMax(maxOrigin);
   return stdDev;
-}
-
-/**
-   -----------------------------------------------------------------------------
-   Get a list of categories corresponding to a single mass point.
-   @param resonanceMass - The mass value.
-   @return - A vector of category indices.
-*/
-std::vector<int> SigParam::categoriesForMass(double resonanceMass) {
-  // Create a list of mass points in this category.
-  std::vector<int> currCategories; currCategories.clear();
-  for (int i_p = 0; i_p < (int)m_massCatePairs.size(); i_p++) {
-    if (equalMasses((m_massCatePairs[i_p]).first, resonanceMass)) {
-      currCategories.push_back((m_massCatePairs[i_p]).second);
-    }
-  }
-  std::sort(currCategories.begin(), currCategories.end());
-  return currCategories;
 }
 
 /**
@@ -1376,17 +1358,14 @@ double SigParam::getParameterError(TString paramName, double resonanceMass,
     return SigParam::getParameterError(paramName, cateIndex);
   }
   else {
-    RooRealVar *var
-      = m_ws->var(Form("%s_%s%s", paramName.Data(), m_signalType.Data(), 
-		       (getKey(resonanceMass,cateIndex)).Data()));
-    if (!var) {
+    TString varName = Form("%s_%s%s", paramName.Data(), m_signalType.Data(), 
+			   (getKey(resonanceMass,cateIndex)).Data());
+    if (!m_ws->var(varName)) {
       std::cout << "SigParam: requested parameter not found: " 
 		<< paramName << std::endl;
-      return 0.0;
+      exit(0);
     }
-    else {
-      return var->getError();
-    }
+    else return m_ws->var(varName)->getError();
   }
 }
 
@@ -1398,16 +1377,14 @@ double SigParam::getParameterError(TString paramName, double resonanceMass,
    @return - The value of the specified signal parameter. 
 */
 double SigParam::getParameterError(TString paramName, int cateIndex) {
-  RooRealVar *var = m_ws->var(Form("%s_%sc%d", paramName.Data(),
-				   m_signalType.Data(), cateIndex));
-  if (!var) {
+  TString varName
+    = Form("%s_%sc%d", paramName.Data(), m_signalType.Data(), cateIndex);
+  if (!m_ws->var(varName)) {
     std::cout << "SigParam: requested parameter not found: "
 	      << paramName << std::endl;
-    return 0.0;
+    exit(0);
   }
-  else {
-    return var->getError();
-  }
+  else return m_ws->var(varName)->getError();
 }
 
 /**
@@ -1424,18 +1401,16 @@ double SigParam::getParameterValue(TString paramName, double resonanceMass,
     return SigParam::getParameterValue(paramName, cateIndex);
   }
   else {
-    RooRealVar *var = m_ws->var(Form("%s_%s%s", paramName.Data(), 
-				     m_signalType.Data(),
-				     (getKey(resonanceMass,cateIndex)).Data()));
-    if (!var) {
+    TString varName = Form("%s_%s%s", paramName.Data(), m_signalType.Data(),
+			   (getKey(resonanceMass,cateIndex)).Data());
+    if (!m_ws->var(varName)) {
       std::cout << "SigParam: requested parameter not found: param = "
 		<< paramName << ", mass = " << resonanceMass << ", cate = "
 		<< cateIndex << std::endl;
-      exit(0);//return 0.0;
+      exit(0);
     }
-    else {
-      return var->getVal();
-    }
+    
+    else return m_ws->var(varName)->getVal();
   }
 }
 
@@ -1447,16 +1422,14 @@ double SigParam::getParameterValue(TString paramName, double resonanceMass,
    @return - The value of the specified signal parameter. 
 */
 double SigParam::getParameterValue(TString paramName, int cateIndex) {
-  RooRealVar *var = m_ws->var(Form("%s_%sc%d", paramName.Data(),
-				   m_signalType.Data(), cateIndex));
-  if (!var) {
+  TString varName
+    = Form("%s_%sc%d", paramName.Data(), m_signalType.Data(), cateIndex);
+  if (!m_ws->var(varName)) {
     std::cout << "SigParam: requested parameter not found: param = "
 	      << paramName << ", cate = " << cateIndex << std::endl;
-    exit(0);//return 0.0;
+    exit(0);
   }
-  else {
-    return var->getVal();
-  }
+  else return m_ws->var(varName)->getVal();
 }
 
 /**
@@ -1471,6 +1444,11 @@ double SigParam::getParameterValue(TString paramName, int cateIndex) {
 
 double SigParam::getParameterizedValue(TString paramName, double resonanceMass, 
 				       int cateIndex) {
+  if (m_verbose) {
+    std::cout << "getParameterizedValue(" << paramName << ", " << resonanceMass
+	      << ", " << cateIndex << ")" << std::endl;
+  }
+  
   m_ws->var("mResonance")->setVal(resonanceMass);
   TString funcName = Form("%s_%sc%d", paramName.Data(), m_signalType.Data(),
 			  cateIndex);
@@ -1668,23 +1646,26 @@ double SigParam::getYieldInCategory(double resonanceMass, int cateIndex) {
   TString currKey = getKey(resonanceMass,cateIndex);
   // First check if parameterized yield is available:
   if (m_ws->function(Form("sigYield_%sc%d", m_signalType.Data(), cateIndex))) {
-    (*m_ws->var("mResonance")).setVal(resonanceMass);
-    return (*m_ws->function(Form("sigYield_%sc%d", m_signalType.Data(),
-				 cateIndex))).getVal();
+    if (m_verbose) std::cout << "SigParam: parameterized yield" << std::endl;
+    m_ws->var("mResonance")->setVal(resonanceMass);
+    return m_ws->function(Form("sigYield_%sc%d", m_signalType.Data(),
+			       cateIndex))->getVal();
   }
   // Then try to get individual yield:
   else if(m_ws->var(Form("sigYield_%s%s",m_signalType.Data(),currKey.Data()))) {
-    return (*m_ws->var(Form("sigYield_%s%s",m_signalType.Data(),
-			    currKey.Data()))).getVal();
+    if (m_verbose) std::cout << "SigParam: point yield" << std::endl;
+    return m_ws->var(Form("sigYield_%s%s",m_signalType.Data(),
+			  currKey.Data()))->getVal();
   }
   // Then try to get directly from dataset normalization:
   else if ((m_ws->data(Form("data_%s",currKey.Data())))) {
-    return (*m_ws->data(Form("data_%s",currKey.Data()))).sumEntries();
+    if (m_verbose) std::cout << "SigParam: data yield" << std::endl;
+    return m_ws->data(Form("data_%s",currKey.Data()))->sumEntries();
   }
   // Or return error message:
   else {
     std::cout << "SigParam: requested yield not found." << std::endl;
-    return 0.0;
+    exit(0);//return 0.0;
   }
 }
 
@@ -1760,12 +1741,10 @@ double SigParam::getYieldInWindow(double resonanceMass, int cateIndex,
 */
 double SigParam::getYieldInWindow(double resonanceMass, double obsMin,	
 				  double obsMax) {
-  // Create a list of categories for this mass point:
-  std::vector<int> currCategories = categoriesForMass(resonanceMass);
   // Loop through names of datasets, add components:
   double sum = 0.0;
-  for (int i_c = 0; i_c < (int)currCategories.size(); i_c++) {
-    sum += getYieldInWindow(resonanceMass, currCategories[i_c], obsMin, obsMax);
+  for (int i_c = 0; i_c < getNCategories(); i_c++) {
+    sum += getYieldInWindow(resonanceMass, i_c, obsMin, obsMax);
   }
   return sum;
 }
@@ -1779,13 +1758,10 @@ double SigParam::getYieldInWindow(double resonanceMass, double obsMin,
 double SigParam::getYieldTotal(double resonanceMass) {
   std::cout << "SigParam: Get total yield at mass = " 
 	    << resonanceMass << std::endl;
-  
-  // Create a list of categories for this mass point:
-  std::vector<int> currCategories = SigParam::categoriesForMass(resonanceMass);
   // Loop through names of datasets, add components:
   double sum = 0.0;
-  for (int i_c = 0; i_c < (int)currCategories.size(); i_c++) {
-    sum += getYieldInCategory(resonanceMass, currCategories[i_c]);
+  for (int i_c = 0; i_c < getNCategories(); i_c++) {
+    sum += getYieldInCategory(resonanceMass, i_c);
   }
   return sum;
 }
@@ -2569,9 +2545,7 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex,
 	      << dataType << std::endl;
   }
   
-  TString currKey = getKey(resonanceMass,cateIndex);
-  bool parameterized = false;
-  
+  // Create canvas and sub-pads:
   TCanvas *can = new TCanvas("can","can",800,800);
   can->cd();
   TPad *pad1 = new TPad( "pad1", "pad1", 0.00, 0.33, 1.00, 1.00 );
@@ -2586,15 +2560,19 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex,
   pad2->Draw();
   pad1->cd();
 
+  // Settings determining the PDF, data, and observable to plot:
+  TString currKey = getKey(resonanceMass,cateIndex);
   TString pdfName = "";
   TString dataName = "";
   TString obsName = "";
+  bool parameterized = false;
+  
   // For fits to Asimov, MC toy, or PDF toy data:
   if (dataType.Contains("asimov") || dataType.Contains("mctoy") ||
       dataType.Contains("pdftoy")) {
     dataName = Form("data_%s_%s", dataType.Data(), currKey.Data());
     
-    // Loof for parameterized model and then single mass point model:
+    // Loop for parameterized model and then single mass point model:
     pdfName = Form("sigPdf_%sc%d", m_signalType.Data(), cateIndex);
     if (m_ws->pdf(pdfName)) {
       setResMassConstant(true, resonanceMass);
@@ -2678,8 +2656,10 @@ void SigParam::plotSingleResonance(double resonanceMass, int cateIndex,
   for (int i_v = 0; i_v < (int)currVars.size(); i_v++) {
     TString currName = currVars[i_v];
     double currVal = 0.0;
-    if (parameterized) getParameterizedValue(currName,resonanceMass,cateIndex);
-    else getParameterValue(currName, resonanceMass, cateIndex);
+    if (parameterized) {
+      currVal = getParameterizedValue(currName, resonanceMass, cateIndex);
+    }
+    else currVal = getParameterValue(currName, resonanceMass, cateIndex);
     currName.ReplaceAll("frac", "fraction_{");
     currName.ReplaceAll("Nom","");
     currName.ReplaceAll("nCB","n_{CB");
