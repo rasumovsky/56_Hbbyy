@@ -5,7 +5,7 @@
 //                                                                            //
 //  Author: Andrew Hard                                                       //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 08/11/2015                                                          //
+//  Date: 03/12/2015                                                          //
 //                                                                            //
 //  Accessors access class data without modifying the member objects, while   //
 //  mutators modify the state of the class (and also sometimes return data.   //
@@ -154,7 +154,7 @@ class SigParam {
 		    double eventWeight);
   std::vector<double> doBiasTest(double resonanceMass, int cateIndex,
 				 TString dataType, int seed);
-  void doBinnedFit(bool doBinned, double nBinsPerGeV = 1.0);
+  void doBinnedFit(bool doBinned, double geVPerBin = 1.0);
   bool generateAndFitData(double resonanceMass, int cateIndex, TString dataType,
 			  int seed = 1);
   RooDataSet* generateData(double resonanceMass, int cateIndex,
@@ -177,6 +177,8 @@ class SigParam {
   void saveYieldList();
   void setDirectory(TString directory);
   void setLogYAxis(bool useLogYAxis);
+  void setMassWindowSize(double fraction);
+  void setMassWindowFixed(bool fixWindow, double windowMin, double windowMax);
   void setParamState(TString paramName, TString valueAndRange);
   void setPlotFormat(TString fileFormat);
   void setRatioPlot(bool doRatioPlot, double ratioMin, double ratioMax);
@@ -190,7 +192,6 @@ class SigParam {
  private:
   
   //----------Private Accessors----------//
-  //std::vector<int> categoriesForMass(double resonanceMass);
   bool dataExists(double resonanceMass, int cateIndex);
   bool equalMasses(double massValue1, double massValue2);
   bool functionIsDefined(TString function);
@@ -254,7 +255,12 @@ class SigParam {
   
   // True iff fits should be binned.
   bool m_binned;
-  int m_nBinsPerGeV;
+  //int m_nBinsPerGeV;
+  int m_geVPerBin;
+  double m_windowFraction;
+  double m_windowMin;
+  double m_windowMax;
+  bool m_fixWindow;
   
   // Fit parameter options:
   bool m_sameCBGAMean;
@@ -266,7 +272,6 @@ class SigParam {
   double m_generatedDataNorm;
   std::map<TString,double> m_testStats;
   
-
   // Plot options:
   bool m_useLogYAxis;
   bool m_doRatioPlot;

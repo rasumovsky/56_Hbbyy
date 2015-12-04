@@ -77,10 +77,7 @@ int main(int argc, char *argv[])
   std::cout << "measureSignalBias will run with parameters:"
 	    << std::endl;
   settings->printDB();
-  
-  // Set the function type:
-  TString function = settings->getStr("SignalFunctionalForm");
-  
+    
   // Check that output directory exists:
   TString outputDir = settings->getStr("IODirectory");
   system(Form("mkdir -vp %s/Bias", outputDir.Data()));
@@ -107,13 +104,15 @@ int main(int argc, char *argv[])
   biasVals["NormFit"].clear();
   biasVals["NormData"].clear();
   
+  // Get the model type ("Parameterized" or "Individual"):
+  TString modelType = settings->getStr("ModelType");
+  
   // Now get bias on a point.
   for (int i_t = 0; i_t < settings->getInt("NumberOfToys"); i_t++) {
-    SigParam *spi
-      = new SigParam(settings->getStr("SampleName"),outputDir+"/Parameterized");
+    TString directory = Form("%s/%s",outputDir.Data(), modelType.Data());
+    SigParam *spi = new SigParam(settings->getStr("SampleName"), directory);
     // Load the signal parameterization from file each time:
-    spi->loadParameterization(outputDir+"/Parameterized",
-			      settings->getStr("SampleName"));
+    spi->loadParameterization(directory, settings->getStr("SampleName"));
     // Then toss and fit toy, storing bias data for each:
     std::vector<double> currVals
       = spi->doBiasTest(mass, category, "mctoy", seed+i_t);
