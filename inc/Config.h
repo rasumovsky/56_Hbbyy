@@ -36,7 +36,7 @@ class Config {
   Config &operator = (const Config &rhs); // assignment operator
   
   
-  TString getStr(TString key);
+  TString getStr(TString key, bool expand=true);
   TString getStr(TString key, TString dflt);
   std::vector<TString>  getStrV(TString key);
   int getInt(TString key);

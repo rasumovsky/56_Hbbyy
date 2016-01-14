@@ -4,7 +4,7 @@
 //                                                                            //
 //  Creator: Andrew Hard,                                                     //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 20/11/2015                                                          //
+//  Date: 01/13/2016                                                          //
 //                                                                            //
 //  This class builds the workspace for the di-Higgs analysis fits.           //
 //                                                                            //

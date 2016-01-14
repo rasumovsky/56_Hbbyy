@@ -5,7 +5,7 @@
 //                                                                            //
 //  Author: Andrew Hard                                                       //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 03/12/2015                                                          //
+//  Date: 01/11/2016                                                          //
 //                                                                            //
 //  Accessors access class data without modifying the member objects, while   //
 //  mutators modify the state of the class (and also sometimes return data.   //
@@ -44,8 +44,10 @@
 #include <TMath.h>
 #include <TRandom.h>
 #include <TRandom3.h>
+#include "TRegexp.h"
 #include "TROOT.h"
 #include "TString.h"
+#include "TSystem.h"
 #include "TTree.h"
 
 // ROOT math headers:
@@ -109,6 +111,7 @@ class SigParam {
   double calculateStdDev(double resonanceMass, int cateIndex);
   TF1 *createTF1FromParameterization(TString varName, int cateIndex,
 				     double xMin, double xMax);
+  bool dataExists(double resonanceMass, int cateIndex);
   double extendedTerm();
   double generatedDataNorm();
   TString getKey(double resonanceMass, int cateIndex);
@@ -133,12 +136,16 @@ class SigParam {
   std::vector<TString> getVariableNames(double resonanceMass, int cateIndex);
   TString getVarParameterization(TString varName);
   RooWorkspace* getWorkspace();
+  double getYieldErrorInCategory(double resonanceMass, int cateIndex);
+  double getYieldErrorTotal(double resonanceMass);
   double getYieldInCategory(double resonanceMass, int cateIndex);
   double getYieldInWindow(double resonanceMass, int cateIndex, double obsMin,
 			  double obsMax);
-  double getYieldInWindow(double resonanceMass, double obsMin, double obsMax);
+  double getYieldTotalInWindow(double resonanceMass, double obsMin, 
+			       double obsMax);
   double getYieldTotal(double resonanceMass);
   std::vector<TString> listParamsForVar(TString varName);
+  std::vector<double> massPointsForCategory(int cateIndex);
   std::vector<TString> variablesForFunction(TString function);
   
   //----------Public Mutators----------//
@@ -180,7 +187,10 @@ class SigParam {
   void setMassWindowSize(double fraction);
   void setMassWindowFixed(bool fixWindow, double windowMin, double windowMax);
   void setParamState(TString paramName, TString valueAndRange);
+  void setPlotATLASLabel(TString atlasLabel);
   void setPlotFormat(TString fileFormat);
+  void setPlotLuminosity(TString lumiLabel);
+  void setPlotXAxisTitle(TString xAxisTitle);
   void setRatioPlot(bool doRatioPlot, double ratioMin, double ratioMax);
   void setResMassConstant(bool setConstant, double resonanceMass);
   void setResMassConstant(bool setConstant);
@@ -192,12 +202,10 @@ class SigParam {
  private:
   
   //----------Private Accessors----------//
-  bool dataExists(double resonanceMass, int cateIndex);
   bool equalMasses(double massValue1, double massValue2);
   bool functionIsDefined(TString function);
   double massIntToDouble(int massInteger);
   int massDoubleToInt(double resonanceMass);
-  std::vector<double> massPointsForCategory(int cateIndex);
   double normalizationError(RooAbsData *dataSet);
 
   //----------Private Mutators----------//
@@ -216,8 +224,7 @@ class SigParam {
 			    bool parameterized);
   void parameterizeVar(TString varName, double mRegularized, double mResonance,
 		       int cateIndex, bool parameterized);
-  RooDataSet* plotData(RooAbsData *data, RooRealVar *observable, double xBins,
-		       double resonanceMass);
+  RooDataSet* plotData(RooAbsData *data, RooRealVar *observable);
   TGraphErrors* plotSubtraction(RooAbsData *data, RooAbsPdf *pdf, 
 				RooRealVar *observable, double xBins,
 				double &chi2Prob);
@@ -236,7 +243,7 @@ class SigParam {
 
   // Objects for fitting:
   RooWorkspace *m_ws;
-  RooCategory *m_cat;
+  std::map<int,RooCategory*> m_cat;
   
   // Store fit initial values and ranges and parameterizations:
   std::map<TString,TString> m_paramState;
@@ -273,12 +280,15 @@ class SigParam {
   std::map<TString,double> m_testStats;
   
   // Plot options:
-  bool m_useLogYAxis;
+  TString m_atlasLabel;
+  std::vector<TString> m_cateNames;
+  TString m_currFunction;
   bool m_doRatioPlot;
+  TString m_lumiLabel;
   double m_ratioMin;
   double m_ratioMax;
-  TString m_currFunction;
-  std::vector<TString> m_cateNames;
+  bool m_useLogYAxis;
+  TString m_xAxisTitle;
   
   // A bool to control how spammy the tool is:
   bool m_verbose;

@@ -51,9 +51,10 @@ bool Config::isDefined(TString key) {
 /**
    Access a string value from the config database. Exception thrown if no entry exist.
 */
-TString Config::getStr(TString key) {
+TString Config::getStr(TString key, bool expand) {
   ensureDefined(key);
-  return gSystem->ExpandPathName(m_env.GetValue(key,""));
+  if (!expand) return m_env.GetValue(key,"");
+  else return gSystem->ExpandPathName(m_env.GetValue(key,""));
 }
 
 /**

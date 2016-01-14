@@ -4,7 +4,7 @@
 //  Class: DHWorkspace.cxx                                                    //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 20/11/2015                                                          //
+//  Date: 01/13/2016                                                          //
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -16,7 +16,6 @@
 #include "CommonHead.h"
 #include "Config.h"
 #include "DHAnalysis.h"
-#include "DHDataReader.h"
 #include "DHTestStat.h"
 #include "RooFitHead.h"
 #include "RooStatsHead.h"
@@ -34,6 +33,7 @@ class DHWorkspace {
   ModelConfig* getModelConfig();
   
  private:
+
   void addCategory();
   void addSystematic(TString systematicForm);
   void createAsimovData(int valMuDH);  

@@ -4,7 +4,7 @@
 //                                                                            //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 21/11/2015                                                          //
+//  Date: 01/13/2016                                                          //
 //                                                                            //
 //  Retrieves data and MC sets for workspace creation.                        //
 //                                                                            //
@@ -34,7 +34,13 @@ void DHDataReader::loadMxAOD(TString sampleName) {
 			  (m_config->getStr("MxAODDirectory")).Data(), 
 			  sampleName.Data());
   TFile inputFile(fileName);
-  m_storedMxAODTrees[sampleName] = (TTree*)inputFile.Get("CollectionTree");
+  if (inputFile.IsOpen()) {
+    m_storedMxAODTrees[sampleName] = (TTree*)inputFile.Get("CollectionTree");
+  }
+  else {
+    std::cout << "DHDataReader: ERROR Opening file " << sampleName << std::endl;
+    exit(0);
+  }
 }
 
 /**
@@ -55,15 +61,16 @@ RooDataSet* DHDataReader::getDataSet(TString sampleName, TString cateName) {
 		     Form("data_%s_%s",sampleName.Data(),cateName.Data()),
 		     RooArgSet(obs,wt), RooFit::WeightVar(wt));
   
+  // Load the MxAOD file:
+  loadMxAOD(sampleName);
+  
+  // Need to distinguish resonant, nonresonant, etc...
+
   // Load relevant branches:
   float b_weight; float b_mass; TString b_category;
-  m_storedMxAODTrees[sampleName]
-    ->SetBranchAddress("weightname", &b_weight);
-  m_storedMxAODTrees[sampleName]
-    ->SetBranchAddress("massname", &b_mass);
-  m_storedMxAODTrees[sampleName]
-    ->SetBranchAddress("catename", &b_category);
-  
+  m_storedMxAODTrees[sampleName]->SetBranchAddress("weightname", &b_weight);
+  m_storedMxAODTrees[sampleName]->SetBranchAddress("massname", &b_mass);
+  m_storedMxAODTrees[sampleName]->SetBranchAddress("catename", &b_category);
   
   // Loop over the contents of the TTree:
   for (int index = 0; index < m_storedMxAODTrees[sampleName]->GetEntries(); 
