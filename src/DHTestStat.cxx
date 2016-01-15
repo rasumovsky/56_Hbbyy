@@ -39,14 +39,14 @@ DHTestStat::DHTestStat(TString newConfigFile, TString newOptions,
   // Use Asimov data if the analysis is blind.
   m_dataForExpQ0 = "asimovDataMu1";
   m_dataForExpQMu = "asimovDataMu0";
-  m_dataForObsQ0 = (m_config->getBool("doBlind")) ? "asimovDataMu1" : "obsData";
-  m_dataForObsQMu= (m_config->getBool("doBlind")) ? "asimovDataMu0" : "obsData";
+  m_dataForObsQ0 = (m_config->getBool("DoBlind")) ? "asimovDataMu1" : "obsData";
+  m_dataForObsQMu= (m_config->getBool("DoBlind")) ? "asimovDataMu0" : "obsData";
   
   // Load from file if the pointer passed is NULL:
   if (newWorkspace == NULL) {
     inputFile
       = new TFile(Form("%s/%s/DHWorkspace/rootfiles/workspaceDH_%s.root",
-		       (m_config->getStr("masterOutput")).Data(),
+		       (m_config->getStr("MasterOutput")).Data(),
 		       m_jobName.Data(), m_anaType.Data()), "read");
     if (inputFile->IsOpen()) {
       std::cout << "DHTestStat: Loading workspace." << std::endl;
@@ -74,7 +74,7 @@ DHTestStat::DHTestStat(TString newConfigFile, TString newOptions,
 
   // Create output directories:
   m_outputDir = Form("%s/%s/DHTestStat", 
-		     (m_config->getStr("masterOutput")).Data(),
+		     (m_config->getStr("MasterOutput")).Data(),
 		     m_jobName.Data());
   system(Form("mkdir -vp %s", m_outputDir.Data()));
   system(Form("mkdir -vp %s/CL/", m_outputDir.Data()));
@@ -733,6 +733,17 @@ void DHTestStat::loadStatsFromFile() {
   m_calculatedValues[getKey("CLs", 0, 2)] = getCLsFromCL(inExpCLp2);
   m_calculatedValues[getKey("CLs", 1, 0)] = getCLsFromCL(inObsCL);
 }
+/**
+   -----------------------------------------------------------------------------
+   Takes in a variable declaration such as "name[1,0,5]" and returns "name".
+   @param varForm - The form of the variable declared.
+   @return - The name of the variable without the rest of the expression.
+*/
+TString DHTestStat::nameOfVar(TString varForm) {
+  TString name = varForm;
+  name.Remove(name.First("["));
+  return name;
+}
 
 /**
    -----------------------------------------------------------------------------
@@ -820,51 +831,28 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
   pad2->Draw();
     
   // Loop over categories:
-  std::vector<TString> cateNames
-    = m_config->getStrV(Form("cateNames%s", m_anaType.Data()));
+  std::vector<TString> cateNames = m_config->getStrV("CateNames");
   for (int i_c = 0; i_c < (int)cateNames.size(); i_c++) {
-    //can->cd();
-    //can->Clear();
     pad1->cd();
     pad1->Clear();
     
-    TString obsName = m_anaType.EqualTo("NonRes") ? 
-      Form("m_yy_%s", cateNames[i_c].Data()) : 
-      Form("m_bbyy_%s", cateNames[i_c].Data());
+    TString obsName = m_config->getStr(Form("OBS_%s",cateNames[i_c].Data()));
+    obsName = nameOfVar(obsName);
     
     // Set the resonant analysis plot binning and axis scale to paper settings:
-    int nGeVPerBin = 50; 
-    if (cateNames[i_c].EqualTo("ResonantSR")) {
-      nGeVPerBin = 5;
-      m_yMin = 0.002;
-      m_yMax = 40;
-    }
-    else if (cateNames[i_c].EqualTo("ResonantCR")) {
-      nGeVPerBin = 20;
-      m_yMin = 0.3;
-      m_yMax = 40;
-    }
+    int nGeVPerBin = 50;  m_yMin = 0.002;  m_yMax = 40;
     int nBinsForPlot = (int)(((*m_workspace->var(obsName)).getMax() - 
 			      (*m_workspace->var(obsName)).getMin()) /
 			     nGeVPerBin);
     
+    // Plot everything on RooPlot:
     RooPlot* frame = (*m_workspace->var(obsName)).frame(nBinsForPlot);
-    (*m_workspace->data(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data())))
-      .plotOn(frame);
-    
-    (*m_workspace->pdf("model_"+cateNames[i_c]))
-      .plotOn(frame,Components((*m_workspace->pdf("sigPdfDH_"+cateNames[i_c]))),
-	      LineColor(6));
-    (*m_workspace->pdf("model_"+cateNames[i_c]))
-      .plotOn(frame,Components((*m_workspace->pdf("sigPdfSH_"+cateNames[i_c]))),
-	      LineColor(3));
-    (*m_workspace->pdf("model_"+cateNames[i_c]))
-      .plotOn(frame, Components((*m_workspace->pdf("bkgPdf_"+cateNames[i_c]))), 
-	      LineColor(4));
+    (*m_workspace->data(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()))).plotOn(frame);
+    (*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_SigBSM2H_"+cateNames[i_c]))), LineColor(6));
+    (*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_SigSM_"+cateNames[i_c]))), LineColor(3));
+    (*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_BkgNonHiggs_"+cateNames[i_c]))), LineColor(4));
     (*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, LineColor(2));
-    
-    TString xTitle = m_anaType.EqualTo("NonRes") ? 
-      "M_{#gamma#gamma} [GeV]" : "Constrained M_{#gamma#gammajj} [GeV]";
+    TString xTitle =m_config->getStr(Form("OBSPrint_%s",cateNames[i_c].Data()));
     frame->SetXTitle(xTitle);
     frame->SetYTitle(Form("Events / %d GeV", nGeVPerBin));
     frame->Draw();
@@ -874,8 +862,8 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
       frame->GetYaxis()->SetRangeUser(m_yMin, m_yMax);
     }
     
-    TLatex text; text.SetNDC(); text.SetTextColor(1);
-    text.DrawLatex(0.6, 0.89, cateNames[i_c]);
+    //TLatex text; text.SetNDC(); text.SetTextColor(1);
+    //text.DrawLatex(0.6, 0.89, cateNames[i_c]);
     TH1F *histDH = new TH1F("histDH", "histDH", 1, 0, 1);
     TH1F *histSH = new TH1F("histSH", "histSH", 1, 0, 1);
     TH1F *histBkg = new TH1F("histBkg", "histBkg", 1, 0, 1);
@@ -884,7 +872,7 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     histSH->SetLineColor(3);
     histBkg->SetLineColor(4);
     histSig->SetLineColor(2);
-    TLegend leg(0.6, 0.71, 0.92, 0.86);
+    TLegend leg(0.60, 0.55, 0.92, 0.70);
     leg.SetFillColor(0);
     leg.SetTextSize(0.04);
     leg.SetBorderSize(0);
@@ -894,6 +882,21 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     leg.AddEntry(histSig, "Sum", "l");
     leg.Draw("SAME");
     
+    // Print ATLAS text on the plot:    
+    TLatex t; t.SetNDC(); t.SetTextColor(kBlack);
+    t.SetTextFont(72); t.SetTextSize(0.05);
+    t.DrawLatex(0.55, 0.88, "ATLAS");
+    t.SetTextFont(42); t.SetTextSize(0.05);
+    t.DrawLatex(0.67, 0.88, m_config->getStr("ATLASLabel"));
+    //t.SetTextSize(0.04);
+    t.DrawLatex(0.55, 0.82, 
+		Form("#sqrt{s} = 13 TeV: #scale[0.7]{#int}Ldt = %2.1f fb^{-1}",
+		     (m_config->getNum("AnalysisLuminosity")/1000.0)));
+    TString printCateName 
+      = m_config->getStr(Form("PrintCateName_%s", cateNames[i_c].Data()));
+    t.DrawLatex(0.55, 0.76, printCateName);
+    
+    // Second pad on the canvas (Ratio Plot):
     pad2->cd();
     pad2->Clear();
     
@@ -906,6 +909,7 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
 		     Form("model_%s", cateNames[i_c].Data()), obsName, obsMin,
 		     obsMax, nBinsForPlot);
     subData->GetYaxis()->SetTitle("Data / Fit");
+    subData->GetXaxis()->SetTitle(xTitle);
     subData->GetYaxis()->SetRangeUser(ratioMin, ratioMax);
     subData->GetXaxis()->SetTitleOffset(0.95);
     subData->GetYaxis()->SetTitleOffset(0.7);

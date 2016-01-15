@@ -36,7 +36,7 @@ Config::Config(TString fileName) {
 */
 void Config::ensureDefined(TString key) {
   if (!isDefined(key)) {
-    std::cout << "HG::Config no value found for " << key << std::endl;
+    std::cout << "Config: no value found for " << key << std::endl;
     exit(0);
   }
 }

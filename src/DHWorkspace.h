@@ -4,7 +4,7 @@
 //  Class: DHWorkspace.cxx                                                    //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 01/13/2016                                                          //
+//  Date: 01/14/2016                                                          //
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -36,13 +36,14 @@ class DHWorkspace {
 
   void addCategory();
   void addSystematic(TString systematicForm);
-  void createAsimovData(int valMuDH);  
+  void createAsimovData(double valPoI);  
   void createNewWS();
   void loadWSFromFile();
   TString nameOfVar(TString varForm);
   TString nameOfFunc(TString funcForm);
   void plotCatePdfAndData(int nBins);
-
+  void printer(TString statement, bool isFatal);
+  
   // Member variables:
   TString m_configFile;
   TString m_anaType;

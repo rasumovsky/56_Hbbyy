@@ -4,7 +4,7 @@
 //                                                                            //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 01/13/2016                                                          //
+//  Date: 01/14/2016                                                          //
 //                                                                            //
 //  This class builds the workspace for the resonant and non-resonant di-     //
 //  Higgs search at 13 TeV. Most of the model configuration is done in the    //
@@ -84,10 +84,8 @@ DHWorkspace::DHWorkspace(TString newConfigFile, TString newOptions) {
    this method.
 */
 void DHWorkspace::addCategory() {
-  if (m_config->getBool("Verbose")) {
-    std::cout << "DHWorkspace::addCategory()" << std::endl;
-  }
-  
+  printer("DHWorkspace::addCategory()", false);
+    
   // Add a new type to the RooCategory:
   m_categories->defineType(m_currCateName);
   
@@ -107,10 +105,7 @@ void DHWorkspace::addCategory() {
     // Create RooProduct of constraints:
     RooProdPdf constraint("constraint", "constraint", *m_constraints);
     m_ws->import(constraint);
-    
-    
-    // ORIGINAL:
-    
+        
     // Iterate over the expected sets and create products:
     for (std::map<TString,RooArgSet*>::iterator iterEx = m_expectedList.begin();
 	 iterEx != m_expectedList.end(); iterEx++) {
@@ -118,30 +113,7 @@ void DHWorkspace::addCategory() {
       RooArgSet *currExp = iterEx->second;
       RooProduct currExpectation(currExpName, currExpName, *currExp);
       m_ws->import(currExpectation);
-      std::cout << "Currently importing  " << currExpName << std::endl;
     }
-    
-    
-    /*
-    // Iterate over the expected sets and create products:
-    std::vector<TString> components = m_config->getStrV("AllFitComponents");
-    for (int i_c = 0; i_c < (int)components.size(); i_c++) {
-      std::vector<TString> expectationTypes
-	= m_config->getStrV("ExpectationTypes");
-      for (int i_t = 0; i_t < (int)expectationTypes.size(); i_t++) {
-	TString currExpKey = Form("expectation_%s_%s",
-				  expectationTypes[i_t].Data(),
-				  components[i_c].Data());
-	if (m_expectedList.count(currExpKey) > 0) {
-	  RooArgSet *currExp = m_expectedList[currExpKey];
-	  RooProduct currExpectation(currExpKey, currExpKey, *currExp);
-	  m_ws->import(currExpectation);
-	}
-	else m_ws->factory(Form("%s[1.0]",currExpKey.Data()));
-	std::cout << "\tHERE! " << currExpKey << std::endl;
-      }
-    }
-    */
   }
   
   //--------------------------------------//
@@ -153,10 +125,8 @@ void DHWorkspace::addCategory() {
   
   //--------------------------------------//
   // Add variables unrelated to systematics:
-  if (m_config->getBool("Verbose")) {
-    std::cout << "DHWorkspace::addCategory(): Adding non-syst. variables..." 
-	      << std::endl;
-  }
+  printer("DHWorkspace::addCategory(): Adding non-syst. variables...", false);
+  
   if (m_config->isDefined(Form("VARS_%s", m_currCateName.Data()))) {
     std::vector<TString> variables
       = m_config->getStrV(Form("VARS_%s", m_currCateName.Data()));
@@ -174,10 +144,8 @@ void DHWorkspace::addCategory() {
   
   //--------------------------------------//
   // Add expressions:
-  if (m_config->getBool("Verbose")) {
-    std::cout << "DHWorkspace::addCategory(): Adding expressions..." 
-	      << std::endl;
-  }
+  printer("DHWorkspace::addCategory(): Adding expressions...", false);
+  
   if (m_config->isDefined(Form("EXPRS_%s", m_currCateName.Data()))) {
     std::vector<TString> expressions
       = m_config->getStrV(Form("EXPRS_%s", m_currCateName.Data()));
@@ -190,10 +158,8 @@ void DHWorkspace::addCategory() {
   
   //--------------------------------------//
   // Add component PDFs:
-  if (m_config->getBool("Verbose")) {
-    std::cout << "DHWorkspace::addCategory(): Adding component PDFs..." 
-	      << std::endl;
-  }
+  printer("DHWorkspace::addCategory(): Adding component PDFs...", false);
+  
   if (m_config->isDefined(Form("PDFS_%s", m_currCateName.Data()))) {
     std::vector<TString> pdfs
       = m_config->getStrV(Form("PDFS_%s", m_currCateName.Data()));
@@ -206,10 +172,8 @@ void DHWorkspace::addCategory() {
   
   //--------------------------------------//
   // Build the complete model:
-  if (m_config->getBool("Verbose")) {
-    std::cout << "DHWorkspace::addCategory(): Building complete model..." 
-	      << std::endl;
-  }
+  printer("DHWorkspace::addCategory(): Building complete model...", false);
+  
   TString modelForm
     = m_config->getStr(Form("MODEL_%s", m_currCateName.Data()), false);
   TString modelName = nameOfFunc(modelForm);
@@ -229,11 +193,8 @@ void DHWorkspace::addCategory() {
   
   //--------------------------------------//
   // Import the observed data set:
-  if (m_config->getBool("Verbose")) {
-    std::cout << "DHWorkspace::addCategory(): Importing the observed dataset..."
-	      << std::endl;
-  }
-  
+  printer("DHWorkspace::addCategory(): Importing observed dataset...", false);
+    
   // Create RooDataSet object:
   TString dataName = Form("obsData_%s", m_currCateName.Data());
   RooRealVar wt("wt", "wt", 1.0);
@@ -254,13 +215,11 @@ void DHWorkspace::addCategory() {
       massInput >> currMass >> currWeight;
       m_ws->var(observableName)->setVal(currMass);
       wt.setVal(currWeight);
+      obsData->add(RooArgSet(*m_ws->var(observableName),wt), currWeight);
     }
   }
-  else {
-    std::cout << "DHWorkspace: ERROR! input text file " << textFileName 
-	      << " does not exist." << std::endl;
-    exit(0);
-  }
+  else printer(Form("DHWorkspace: ERROR! nonexistent input %s", 
+		    textFileName.Data()), true);
   massInput.close();
   
   // Import RooDataSet into workspace, and add to dataset map (for combination):
@@ -270,8 +229,7 @@ void DHWorkspace::addCategory() {
   // Then make a quick plot before the end:
   plotCatePdfAndData(50);
   
-  std::cout << "DHWorkspace: Finished import for category " << m_currCateName 
-	    << std::endl;
+  printer(Form("DHWorkspace: Added cate. %s", m_currCateName.Data()), false);
 }
 
 /**
@@ -295,10 +253,7 @@ void DHWorkspace::addCategory() {
    @param systematicForm - The form of the systematic, as outlined above.
 */
 void DHWorkspace::addSystematic(TString systematicForm) {
-  if (m_config->getBool("Verbose")) {
-    std::cout << "DHWorkspace::addSystematic(" << systematicForm << ")" 
-	      << std::endl;
-  }
+  printer(Form("DHWorkspace::addSystematic(%s)",systematicForm.Data()), false);
   
   // Get the systematic name:
   TString systematicName = nameOfVar(systematicForm);
@@ -349,7 +304,9 @@ void DHWorkspace::addSystematic(TString systematicForm) {
       TString currComponentVal = currComponentInfo;
       currComponentVal.Remove(0,currComponentVal.First("~")+1);
       components[currComponentName] = currComponentVal.Atof();
-      std::cout << "\tHERE: currComponentName = " << currComponentName << std::endl;
+      if (m_config->getBool("Verbose")) {
+	std::cout << "\tcomponent name = " << currComponentName << std::endl;
+      }
     }
   }
   
@@ -357,17 +314,18 @@ void DHWorkspace::addSystematic(TString systematicForm) {
   if ((centralValue.EqualTo("") || constraint.EqualTo("") || 
        type.EqualTo("") || (int)components.size() == 0) ||
       (constraint.EqualTo("asym") && (int)componentsLo.size() == 0)) {
-    std::cout << "DHWorkspace: ERROR loading systematic " << systematicForm 
-	      << std::endl;
-    exit(0);
+    printer(Form("DHWorkspace: ERROR loading syst. %s", systematicForm.Data()),
+	    true);
   }
   
   //----------------------------------------//
   // Create the nuisance parameter, global observable, and constraint PDF:
   if (!m_ws->var(systematicName)) {
+    
     // Nuisance parameter and global observable:
     m_ws->factory(Form("%s[0,-5,5]", systematicName.Data()));
     m_ws->factory(Form("RNDM_%s[0,-5,5]", systematicName.Data()));
+    
     // Bifurcated Gaussian constraint requires magnitude information:
     if (constraint.EqualTo("bifur")) {
       std::map<TString,double>::iterator iterComponent = components.begin();
@@ -380,16 +338,12 @@ void DHWorkspace::addSystematic(TString systematicForm) {
 			 systematicName.Data(), systematicName.Data(),
 			 systematicName.Data(), magnitudeRatio));
     }
+   
     // Simple Gaussian constraint is straightforward:
     else m_ws->factory(Form("RooGaussian::constr_%s(RNDM_%s,%s,1)", 
 			    systematicName.Data(), systematicName.Data(), 
 			    systematicName.Data()));
-    /*
-    // For now, only allow gaussian constraint term:
-    m_ws->factory(Form("RooGaussian::constr_%s(RNDM_%s,%s,1)",
-		       systematicName.Data(), systematicName.Data(), 
-		       systematicName.Data()));
-    */    
+    
     // Add the new objects to the relevant sets:
     m_nuisanceParameters->add(*m_ws->var(systematicName));
     m_globalObservables->add(*m_ws->var(Form("RNDM_%s",systematicName.Data())));
@@ -444,9 +398,8 @@ void DHWorkspace::addSystematic(TString systematicForm) {
     
     // Exit if improper constraint type:
     else {
-      std::cout << "DHWorkspace: ERROR! Unknown constraint type " << constraint
-		<< std::endl;
-      exit(0);
+      printer(Form("DHWorkspace: Constraint type ERROR %s", constraint.Data()),
+	      true);
     }
     
     // The key should depend on the systematic type and the component name:
@@ -463,40 +416,50 @@ void DHWorkspace::addSystematic(TString systematicForm) {
    -----------------------------------------------------------------------------
    Create Asimov data for the statistical model, using a fit to observed data
    for the shape and normalizaiton of the background.
-   @param valMuDH - The value of the di-Higgs signal strength to use.
+   @param valPoI - The value of the parameter of interest.
 */
-void DHWorkspace::createAsimovData(int valMuDH) {
-  std::cout << "DHWorkspace: Creating Asimov data, mu=" << valMuDH << std::endl;
+void DHWorkspace::createAsimovData(double valPoI) {
+  printer(Form("DHWorkspace::createAsimovData(%2.2f)",valPoI), false);
   
-  // Set mu_DM and mu_SM to the specified values:
-  RooRealVar *poi = NULL;
-  double initialMuDH = 0.0;
-  poi = m_ws->var("mu_DH");
-  initialMuDH = poi->getVal();
-  poi->setVal(valMuDH);
+  // Set the parameter of interest to specified value:
+  //RooRealVar *poi = m_ws->var("npbBSM");
+  //m_poi = new RooArgSet();
+  //m_ws->defineSet("poi", *m_poi);
+  
+
+  RooRealVar *poi = (RooRealVar*)((RooArgSet*)m_ws->set("poi"))->first();
+
+
+
+
+
+  double initialPoIVal = poi->getVal();
+  poi->setVal(valPoI);
   poi->setConstant(true);  
   
   // Create the Asimov dataset using RooStats utility:
-  TString asimovName = Form("asimovDataMu%d_%s",valMuDH,m_currCateName.Data());
+  TString asimovName = (valPoI > 0) ? 
+    Form("asimovDataMu1_%s",m_currCateName.Data()) :
+    Form("asimovDataMu0_%s",m_currCateName.Data());
   RooDataSet *currAsimov = (RooDataSet*)AsymptoticCalculator::GenerateAsimovData(*m_ws->pdf(Form("model_%s",m_currCateName.Data())), *m_ws->set("observables"));
   currAsimov->SetNameTitle(asimovName, asimovName);
   m_ws->import(*currAsimov);
-  
-  m_ws->var("mu_DH")->setVal(initialMuDH);
-  m_ws->var("mu_DH")->setConstant(false);
-    
-  std::cout << "DHWorkspace: Asimov data has " << currAsimov->sumEntries() 
-	    << " entries" << std::endl;
   // Import the dataset to the workspace and add to data map:
   m_ws->import(*currAsimov);
-  if (valMuDH == 1) {
+  if (valPoI > 0) {
     m_combDataAsimov1[(string)m_currCateName]
       = (RooDataSet*)m_ws->data(asimovName);
   }
-  else if (valMuDH == 0) {
+  else {
     m_combDataAsimov0[(string)m_currCateName]
       = (RooDataSet*)m_ws->data(asimovName);
   }
+  printer(Form("DHWorkspace: Asimov data entries=%f",currAsimov->sumEntries()),
+	  false); 
+  
+  // Return PoI to original settings:
+  poi->setVal(initialPoIVal);
+  poi->setConstant(false);
 }
 
 /**
@@ -506,9 +469,9 @@ void DHWorkspace::createAsimovData(int valMuDH) {
    hypotheses.
 */
 void DHWorkspace::createNewWS() {
+  printer("DHWorkspace::createNewWS()", false);
+  
   if (m_config->getBool("Verbose")) {
-    std::cout << "DHWorkspace::createNewWS()" << std::endl;
-    std::cout << "Create a new workspace from scratch." << std::endl;
     std::cout << "\n........................................" << std::endl;
     std::cout << "Luminosity at 13 TeV: "
 	      << m_config->getStr("AnalysisLuminosity") << " pb-1" << std::endl;
@@ -598,10 +561,7 @@ void DHWorkspace::createNewWS() {
   
   std::cout << "DHWorkspace: Printing the combined workspace." << std::endl;
   m_ws->Print("v");
-  
-  std::cout << "STOPPING SHORT FOR DEV." << std::endl;
-  exit(0);
-  
+    
   //----------------------------------------//
   // Create Asimov data:
   
@@ -634,7 +594,7 @@ void DHWorkspace::createNewWS() {
   m_ws->import(*asimovDataMu0);
   m_ws->import(*asimovDataMu1);
   
-   //----------------------------------------//
+  //----------------------------------------//
   // Save information
   
   // snapshot of original parameter values:
@@ -652,9 +612,12 @@ void DHWorkspace::createNewWS() {
   m_ws->writeToFile(Form("%s/rootfiles/workspaceDH_%s.root",
 			 m_outputDir.Data(), m_anaType.Data()));
   
+  //std::cout << "STOPPING SHORT FOR DEV." << std::endl;
+  //exit(0);
+  
   //----------------------------------------//
   // Start profiling the data (must do after writing workspace for some reason):
-  std::cout << "DHWorkspace: Start profiling data" << std::endl;
+  printer("DHWorkspace: Start profiling data", false);
   
   DHTestStat *dhts = new DHTestStat(m_configFile, "FromFile", m_ws);
   dhts->saveSnapshots(true);
@@ -701,6 +664,7 @@ void DHWorkspace::createNewWS() {
    @return - True iff the fits all converged.
 */
 bool DHWorkspace::fitsAllConverged() {
+  printer("DHWorkspace::fitsAllConverge()", false);
   return m_allGoodFits;
 }
 
@@ -710,6 +674,7 @@ bool DHWorkspace::fitsAllConverged() {
    @return - The workspace object storing all class data.
 */
 RooWorkspace* DHWorkspace::getCombinedWorkspace() {
+  printer("DHWorkspace::getCombinedWorkspace()", false);
   return m_ws;
 }
 
@@ -719,6 +684,7 @@ RooWorkspace* DHWorkspace::getCombinedWorkspace() {
    @return - The model configuration storing class data.
 */
 ModelConfig* DHWorkspace::getModelConfig() {
+  printer("DHWorkspace::getModelConfig()", false);
   return m_modelConfig;
 }
 
@@ -728,6 +694,8 @@ ModelConfig* DHWorkspace::getModelConfig() {
    workspace pointers).
 */
 void DHWorkspace::loadWSFromFile() {
+  printer("DHWorkspace::loadWSFromFile()", false);
+  
   //Check to see if the workspace has actually been made.
   TFile inputFile(Form("%s/rootfiles/workspaceDH_%s.root", 
 		       m_outputDir.Data(), m_anaType.Data()), "read");
@@ -770,15 +738,14 @@ TString DHWorkspace::nameOfFunc(TString funcForm) {
   return name;
 }
 
-/*
+/**
    -----------------------------------------------------------------------------
    Plot the data and fit in a single category
    @param nBins - The number of bins in the RooPlot.
 */
 void DHWorkspace::plotCatePdfAndData(int nBins) {
-  std::cout << "DHWorkspace: Plot single category fit for "
-	    << m_currCateName << std::endl;
-  
+  printer(Form("DHWorkspace::plotCatePdfAndData(%d)",nBins), false);
+    
   // Observable information:
   TString observable = m_config->getStr(Form("OBS_%s", m_currCateName.Data()));
   TString observableName = nameOfVar(observable);
@@ -801,4 +768,17 @@ void DHWorkspace::plotCatePdfAndData(int nBins) {
   can->Print(Form("%s/Plots/cateFit_%s.eps",
 		  m_outputDir.Data(), m_currCateName.Data()));
   delete can;
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Prints a statement (if verbose) and exits (if fatal).
+   @param statement - The statement to print.
+   @param isFatal - True iff. this should trigger an exit command.
+*/
+void DHWorkspace::printer(TString statement, bool isFatal) {
+  if (m_config->getBool("Verbose") || isFatal) {
+    std::cout << statement << std::endl;
+  }
+  if (isFatal) exit(0);
 }

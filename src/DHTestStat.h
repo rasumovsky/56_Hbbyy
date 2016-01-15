@@ -66,6 +66,7 @@ class DHTestStat {
   
   TString getKey(TString testStat, bool observed, int N);
   bool mapValueExists(TString mapKey);
+  TString nameOfVar(TString varForm);
   TGraphErrors* plotDivision(TString dataName, TString pdfName, TString obsName,
 			     double xMin, double xMax, double xBins);
   void plotFits(TString fitType, TString datasetName);
