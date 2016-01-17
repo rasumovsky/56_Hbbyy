@@ -242,7 +242,7 @@ int main(int argc, char *argv[])
   
   // Get the luminosity and reserve a variable for total event norm:
   double luminosity = settings->getNum("Luminosity") / 1000.0;
-  double nTotEvt = 1000.0;
+  //double nTotEvt = 1000.0;
   TString currFileName = "";
   
   // Assign the MxAOD/TTree branches to variables:
@@ -275,7 +275,7 @@ int main(int argc, char *argv[])
     // Change the nTotEvt normalization factor for each new file:
     if (!currFileName.EqualTo(chain->GetFile()->GetName())) {
       currFileName = chain->GetFile()->GetName();
-      nTotEvt = getNTotEvtFromHist(chain->GetFile());
+      //nTotEvt = getNTotEvtFromHist(chain->GetFile());
       resMassToUse = getResMassFromName(currFileName, analysisType);
       yieldWeighted[Form("%2.2f",resMassToUse)] = 0.0;
       yieldUnweighted[Form("%2.2f",resMassToUse)] = 0.0;
@@ -520,18 +520,24 @@ int main(int argc, char *argv[])
 	      << std::endl;
   }
   
-  // Finally, print the resonance values at mH=125.09 GeV (if NonResonant ana).
+  // Finally, print the resonance values at the SM Higgs Mass (if NonResonant):
   if (analysisType.Contains("NonResonant")) {
-    double testMass = 125.09;
+    double testMass = settings->getNum("SMHiggsMass");
     std::cout << "createDiHiggsParam: Printing parameterized resonance at mH="
 	      << testMass << " GeV" << std::endl;
     for (int i_c = 0; i_c < nCategories; i_c++) {
       std::cout << "\tCategory = " << i_c << std::endl;
-      for (int i_p = 0; i_p < parameters.size(); i_p++) {
+      for (int i_p = 0; i_p < (int)parameters.size(); i_p++) {
 	std::cout << "\t\t" << parameters[i_p] << "\t" 
 		  << spp->getParameterizedValue(parameters[i_p], testMass, i_c)
 		  << std::endl;
       }
+      
+      
+      // Also integrate to find the resolution:
+      std::cout << "\t\t68% interval is " 
+		<< sps->getMeanOrStdDev("StdDev", testMass, i_c)
+		<< std::endl;
     }
   }
   return 0;

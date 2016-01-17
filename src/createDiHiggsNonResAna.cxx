@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
   
   // Get the luminosity and reserve a variable for total event norm:
   double luminosity = settings->getNum("Luminosity") / 1000.0;
-  double nTotEvt = 1000.0;
+  //double nTotEvt = 1000.0;
   TString currFileName = "";
   
   // Assign a dummy resonance mass:
@@ -222,6 +222,9 @@ int main(int argc, char *argv[])
   int nCategories = 0;
   std::map<TString,double> yieldWeighted; yieldWeighted.clear();
   std::map<TString,int> yieldUnweighted; yieldUnweighted.clear();
+
+  std::map<int,double> yieldInWindow; yieldInWindow.clear();
+  std::map<int,double> yieldTotal; yieldTotal.clear();
   
   //--------------------------------------//
   // Loop over events to build dataset for signal parameterization:
@@ -233,7 +236,7 @@ int main(int argc, char *argv[])
     // Change the nTotEvt normalization factor for each new file:
     if (!currFileName.EqualTo(chain->GetFile()->GetName())) {
       currFileName = chain->GetFile()->GetName();
-      nTotEvt = getNTotEvtFromHist(chain->GetFile());
+      //nTotEvt = getNTotEvtFromHist(chain->GetFile());
       yieldWeighted[Form("%2.2f",resonanceMass)] = 0.0;
       yieldUnweighted[Form("%2.2f",resonanceMass)] = 0.0;
     }
@@ -279,6 +282,18 @@ int main(int argc, char *argv[])
     // Add to the yield:
     yieldWeighted[Form("%2.2f",resonanceMass)] += weightToUse;
     yieldUnweighted[Form("%2.2f",resonanceMass)]++;
+    
+    // Also count events inside myy window:
+    if (yieldTotal.count(0) == 0) {
+      yieldTotal[currCate] = 0.0;
+      yieldInWindow[currCate] = 0.0;
+    }
+    
+    yieldTotal[currCate]++;
+    if (fabs((v_myy/1000.0) - settings->getNum("SMHiggsMass")) <
+	settings->getNum("ResonantMyyWindowWidth")) {
+      yieldInWindow[currCate]++;
+    }
   }
   
   //--------------------------------------//
@@ -357,11 +372,31 @@ int main(int argc, char *argv[])
   std::vector<TString> parameters = sps->variablesForFunction(function);
   for (int i_c = 0; i_c < nCategories; i_c++) {
     std::cout << "\tCategory = " << i_c << std::endl;
-    for (int i_p = 0; i_p < parameters.size(); i_p++) {
+    for (int i_p = 0; i_p < (int)parameters.size(); i_p++) {
       std::cout << "\t\t" << parameters[i_p] << "\t" 
 		<< sps->getParameterValue(parameters[i_p], resonanceMass, i_c)
 		<< std::endl;
     }
+    // Then calculate the standard deviation:  
+    std::cout << "\t\t68% interval is " 
+	      << sps->getMeanOrStdDev("StdDev", resonanceMass, i_c)
+	      << std::endl;
+  }
+  
+  // Then calculate the fraction of events in the myy window:
+  std::cout << "createDiHiggsNonResAna: Calculating myy efficiency."
+	    << std::endl;
+  for (int i_c = 0; i_c < nCategories; i_c++) {
+    std::cout << "\tcategory " << i_c << std::endl;
+    std::cout << "\t  MC = " << (yieldInWindow[i_c] / yieldTotal[i_c])
+	      << std::endl;
+    
+    double width = settings->getNum("ResonantMyyWindowWidth");
+    double numFit = sps->getYieldInWindow(resonanceMass, i_c,
+					  resonanceMass-width, 
+					  resonanceMass+width);
+    double denomFit = sps->getYieldInCategory(resonanceMass, i_c);
+    std::cout << "\t  fit = " << (numFit / denomFit) << std::endl;
   }
   return 0;
 }
