@@ -4,7 +4,7 @@
 //                                                                            //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 01/14/2016                                                          //
+//  Date: 01/19/2016                                                          //
 //                                                                            //
 //  This class builds the workspace for the resonant and non-resonant di-     //
 //  Higgs search at 13 TeV. Most of the model configuration is done in the    //
@@ -223,6 +223,8 @@ void DHWorkspace::addCategory() {
   massInput.close();
   
   // Import RooDataSet into workspace, and add to dataset map (for combination):
+  printer(Form("DHWorkspace: Dataset in %s as %f entries",
+	       m_currCateName.Data(),obsData->sumEntries()), false);
   m_ws->import(*obsData);
   m_combData[(string)m_currCateName] = (RooDataSet*)m_ws->data(dataName);
   
@@ -418,29 +420,16 @@ void DHWorkspace::addSystematic(TString systematicForm) {
    for the shape and normalizaiton of the background.
    @param valPoI - The value of the parameter of interest.
 */
-void DHWorkspace::createAsimovData(double valPoI) {
-  printer(Form("DHWorkspace::createAsimovData(%2.2f)",valPoI), false);
+void DHWorkspace::createAsimovData(int valPoI) {
+  printer(Form("DHWorkspace::createAsimovData(%d)",valPoI), false);
   
-  // Set the parameter of interest to specified value:
-  //RooRealVar *poi = m_ws->var("npbBSM");
-  //m_poi = new RooArgSet();
-  //m_ws->defineSet("poi", *m_poi);
-  
-
   RooRealVar *poi = (RooRealVar*)((RooArgSet*)m_ws->set("poi"))->first();
-
-
-
-
-
   double initialPoIVal = poi->getVal();
   poi->setVal(valPoI);
   poi->setConstant(true);  
   
   // Create the Asimov dataset using RooStats utility:
-  TString asimovName = (valPoI > 0) ? 
-    Form("asimovDataMu1_%s",m_currCateName.Data()) :
-    Form("asimovDataMu0_%s",m_currCateName.Data());
+  TString asimovName = Form("asimovDataMu%d_%s", valPoI, m_currCateName.Data());
   RooDataSet *currAsimov = (RooDataSet*)AsymptoticCalculator::GenerateAsimovData(*m_ws->pdf(Form("model_%s",m_currCateName.Data())), *m_ws->set("observables"));
   currAsimov->SetNameTitle(asimovName, asimovName);
   m_ws->import(*currAsimov);
@@ -515,7 +504,11 @@ void DHWorkspace::createNewWS() {
     m_ws->factory(listPOI[i_p]);
     m_poi->add(*m_ws->var(nameOfVar(listPOI[i_p])));
   }
-
+  
+  // Create a luminosity parameter:
+  m_ws->factory(Form("Luminosity[%f]",
+		     m_config->getNum("AnalysisLuminosity")/1000.0));
+  
   //--------------------------------------//
   // Loop over channels, create model for each:
   std::cout << "DHWorkspace: Looping over categories to define workspace."
@@ -559,11 +552,9 @@ void DHWorkspace::createNewWS() {
   m_modelConfig->SetGlobalObservables((*m_ws->set("globalObservables")));
   m_ws->import(*m_modelConfig);
   
-  std::cout << "DHWorkspace: Printing the combined workspace." << std::endl;
-  m_ws->Print("v");
-    
   //----------------------------------------//
   // Create Asimov data:
+  printer("DHWorkspace: Perform b-only fit before Asimov creation", false);
   
   // Set the POI to zero.
   m_ws->var(nameOfVar(listPOI[0]))->setVal(0.0);
@@ -574,15 +565,28 @@ void DHWorkspace::createNewWS() {
 	    Minos(RooArgSet(*m_ws->set("nuisanceParameters"))),
 	    SumW2Error(kTRUE));
   
+  /* NO
+  // Then set nuisance parameters constant and to zero:
+  RooArgSet *nuisSet = (RooArgSet*)m_ws->set("nuisanceParameters");
+  TIterator *iterNuis = nuisSet->createIterator();
+  RooRealVar *currNuis = NULL;
+  while ((currNuis = (RooRealVar*)iterNuis->Next())) {
+    currNuis->setVal(0);
+    currNuis->setConstant(true);
+  }
+  */ 
+ 
   // Loop over categories for Asimov data following background-only fit:
   for (m_currCateIndex = 0; m_currCateIndex < m_nCategories; m_currCateIndex++){
     m_currCateName = cateNames[m_currCateIndex];
     //(*m_ws->var("nBkg_"+m_currCateName)).setVal((*m_ws->data(Form("obsData_%s",m_currCateName.Data()))).sumEntries());
+    
     // Create background-only Asimov data:
     createAsimovData(0);
     // Create signal + background Asimov data:
     createAsimovData(1);
   }
+  
   RooDataSet* asimovDataMu0 = new RooDataSet("asimovDataMu0", "asimovDataMu0",
   					     *dataArgs, Index(*m_categories), 
   					     Import(m_combDataAsimov0),
@@ -593,9 +597,18 @@ void DHWorkspace::createNewWS() {
 					     WeightVar(wt));
   m_ws->import(*asimovDataMu0);
   m_ws->import(*asimovDataMu1);
+
+  /* NO
+  // Then set nuisance parameters free:
+  iterNuis = nuisSet->createIterator();
+  while ((currNuis = (RooRealVar*)iterNuis->Next())) {
+    currNuis->setConstant(false);
+  }
+  */
   
   //----------------------------------------//
   // Save information
+  printer("DHWorkspace: Saving workspace.", false);
   
   // snapshot of original parameter values:
   RooArgSet* poiAndNuis = new RooArgSet();
@@ -611,9 +624,6 @@ void DHWorkspace::createNewWS() {
   m_ws->importClassCode();
   m_ws->writeToFile(Form("%s/rootfiles/workspaceDH_%s.root",
 			 m_outputDir.Data(), m_anaType.Data()));
-  
-  //std::cout << "STOPPING SHORT FOR DEV." << std::endl;
-  //exit(0);
   
   //----------------------------------------//
   // Start profiling the data (must do after writing workspace for some reason):

@@ -545,7 +545,7 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   statistics::constSet(nuisanceParameters, false, origValNP);
   
   // Finish up, return NLL value.
-  std::cout << "DHTestStat: Fit has competed. Returning NLL." << std::endl;
+  std::cout << "DHTestStat: Fit has completed. Returning NLL." << std::endl;
   return nllValue;
 }
 

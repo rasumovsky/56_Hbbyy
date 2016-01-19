@@ -4,7 +4,7 @@
 //                                                                            //
 //  Creator: Andrew Hard,                                                     //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 01/13/2016                                                          //
+//  Date: 01/19/2016                                                          //
 //                                                                            //
 //  This class builds the workspace for the di-Higgs analysis fits.           //
 //                                                                            //
@@ -16,8 +16,7 @@ int main(int argc, char **argv) {
 
   // Check that arguments are provided.
   if (argc < 3) { 
-    std::cout << "\nUsage: " << argv[0] 
-	      << " <config> <analysisType> <options>" << std::endl;
+    std::cout << "\nUsage: " << argv[0] << " <config> <options>" << std::endl;
     exit(0);
   }
   
