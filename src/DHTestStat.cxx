@@ -847,11 +847,19 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     
     // Plot everything on RooPlot:
     RooPlot* frame = (*m_workspace->var(obsName)).frame(nBinsForPlot);
-    (*m_workspace->data(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()))).plotOn(frame);
-    (*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_SigBSM2H_"+cateNames[i_c]))), LineColor(6));
-    (*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_SigSM_"+cateNames[i_c]))), LineColor(3));
-    (*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_BkgNonHiggs_"+cateNames[i_c]))), LineColor(4));
-    (*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, LineColor(2));
+    if ((m_workspace->pdf("model_"+cateNames[i_c]))) {
+      (*m_workspace->data(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()))).plotOn(frame);
+      if ((m_workspace->pdf("pdf_SigBSM2H_"+cateNames[i_c]))) {
+	(*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_SigBSM2H_"+cateNames[i_c]))), LineColor(6));
+      }
+      if ((m_workspace->pdf("pdf_SigSM_"+cateNames[i_c]))) {
+	(*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_SigSM_"+cateNames[i_c]))), LineColor(3));
+      }
+      if ((m_workspace->pdf("pdf_BkgNonHiggs_"+cateNames[i_c]))) {
+	(*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_BkgNonHiggs_"+cateNames[i_c]))), LineColor(4));
+      }
+      (*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, LineColor(2));
+    }
     TString xTitle =m_config->getStr(Form("OBSPrint_%s",cateNames[i_c].Data()));
     frame->SetXTitle(xTitle);
     frame->SetYTitle(Form("Events / %d GeV", nGeVPerBin));

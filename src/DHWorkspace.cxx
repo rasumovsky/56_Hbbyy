@@ -40,6 +40,7 @@ DHWorkspace::DHWorkspace(TString newConfigFile, TString newOptions) {
   m_config = new Config(m_configFile);
   m_dataToPlot = (m_config->getBool("DoBlind")) ? "asimovDataMu1" : "obsData";
   m_anaType = m_config->getStr("AnalysisType");
+  m_useSystematics = m_config->getBool("UseSystematics");
   
   // Print config file:
   if (m_config->getBool("Verbose")) {
@@ -92,7 +93,7 @@ void DHWorkspace::addCategory() {
   //--------------------------------------//
   // Add systematic uncertainties first:
   // (constraint term, global observables, nuisance parameters, expectation)
-  if (m_currCateIndex == 0) {
+  if (m_useSystematics && m_currCateIndex == 0) {
     m_constraints = new RooArgSet();
     if (m_config->isDefined("SysSources")) {
       std::vector<TString> systematics = m_config->getStrV("SysSources");
@@ -137,7 +138,8 @@ void DHWorkspace::addCategory() {
 	// Create in workspace:
 	m_ws->factory(variables[i_v]);
 	// Also add to list of nuisance parameters:
-	m_nuisanceParameters->add(*m_ws->var(variableName));
+	//m_nuisanceParameters->add(*m_ws->var(variableName));
+	m_nonSysParameters->add(*m_ws->var(variableName));
       }
     }
   }
@@ -179,7 +181,7 @@ void DHWorkspace::addCategory() {
   TString modelName = nameOfFunc(modelForm);
   m_ws->factory(modelForm);
   // Attach constraint term to the first category:
-  if (m_currCateIndex == 0) {
+  if (m_useSystematics && m_currCateIndex == 0) {
     m_ws->factory(Form("PROD::model_%s(%s,constraint)",
 		       m_currCateName.Data(), modelName.Data()));
   }
@@ -418,30 +420,120 @@ void DHWorkspace::addSystematic(TString systematicForm) {
    -----------------------------------------------------------------------------
    Create Asimov data for the statistical model, using a fit to observed data
    for the shape and normalizaiton of the background.
+   
+   WARNING!!! THERE IS AN UNKNOWN BUG WITH THIS METHOD. MANY DAYS HAVE BEEN LOST
+   TO AsymptoticCalculator::GenerateAsimovData...
+   
    @param valPoI - The value of the parameter of interest.
 */
 void DHWorkspace::createAsimovData(int valPoI) {
-  printer(Form("DHWorkspace::createAsimovData(%d)",valPoI), false);
+  printer(Form("DHWorkspace::createAsimovData(%d) in category %s", 
+	       valPoI, m_currCateName.Data()), false);
   
   RooRealVar *poi = (RooRealVar*)((RooArgSet*)m_ws->set("poi"))->first();
   double initialPoIVal = poi->getVal();
   poi->setVal(valPoI);
   poi->setConstant(true);  
-  
+  /*
+  std::cout << "\tpoi= " << poi->GetName() << " " << poi->getVal() << std::endl;
+  std::cout << "\t\tNormalization of signal: " 
+	    << m_ws->function("n_SigBSM2H_bb")->getVal() << std::endl;
+  std::cout << "\t\tNormalization of non-H bkg: " 
+	    << m_ws->function("n_BkgNonHiggs_bb")->getVal() << std::endl;
+  */  
   // Create the Asimov dataset using RooStats utility:
   TString asimovName = Form("asimovDataMu%d_%s", valPoI, m_currCateName.Data());
   RooDataSet *currAsimov = (RooDataSet*)AsymptoticCalculator::GenerateAsimovData(*m_ws->pdf(Form("model_%s",m_currCateName.Data())), *m_ws->set("observables"));
   currAsimov->SetNameTitle(asimovName, asimovName);
-  m_ws->import(*currAsimov);
+  
   // Import the dataset to the workspace and add to data map:
   m_ws->import(*currAsimov);
   if (valPoI > 0) {
-    m_combDataAsimov1[(string)m_currCateName]
-      = (RooDataSet*)m_ws->data(asimovName);
+    m_dataAsimov1[(string)m_currCateName] = (RooDataSet*)m_ws->data(asimovName);
   }
   else {
-    m_combDataAsimov0[(string)m_currCateName]
-      = (RooDataSet*)m_ws->data(asimovName);
+    m_dataAsimov0[(string)m_currCateName] = (RooDataSet*)m_ws->data(asimovName);
+  }
+  printer(Form("DHWorkspace: Asimov data entries=%f",currAsimov->sumEntries()),
+	  false); 
+  
+  // Return PoI to original settings:
+  poi->setVal(initialPoIVal);
+  poi->setConstant(false);
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Create Asimov data for the statistical model, using a fit to observed data
+   for the shape and normalizaiton of the background.
+   @param valPoI - The value of the parameter of interest.
+*/
+void DHWorkspace::createStupidAsimovData(int valPoI) {
+  printer(Form("DHWorkspace::createStupidAsimovData(%d) in category %s", 
+	       valPoI, m_currCateName.Data()), false);
+  
+  // Set the parameter of interest constant and to desired value:
+  RooRealVar *poi = (RooRealVar*)((RooArgSet*)m_ws->set("poi"))->first();
+  double initialPoIVal = poi->getVal();
+  poi->setVal(valPoI);
+  poi->setConstant(true);  
+  
+  // Fetch the observable:
+  RooRealVar *obsForAsimov = NULL;
+  TIterator *iterObs = m_ws->set("observables")->createIterator();
+  RooRealVar* currObs;
+  while ((currObs = (RooRealVar*)iterObs->Next())) {
+    TString currObsName = currObs->GetName();
+    if (currObsName.Contains(m_currCateName)) {
+      obsForAsimov = m_ws->var(currObsName);
+    }
+  }
+  
+  // Create the Asimov dataset object:
+  TString asimovName = Form("asimovDataMu%d_%s", valPoI, m_currCateName.Data());
+  RooRealVar wt("wt", "wt", 1.0);
+  RooDataSet *currAsimov = new RooDataSet(asimovName, asimovName,
+					  RooArgSet(*obsForAsimov, wt),
+					  RooFit::WeightVar(wt));
+  // Total number of events in the current model category:
+  double totalEvents
+    = m_ws->function(Form("n_AllProcesses_%s",m_currCateName.Data()))->getVal();
+  
+  // Prevents spam from the ROOT integration:
+  RooMsgService::instance().setGlobalKillBelow(RooFit::WARNING);
+  
+  // Observable information:
+  int nBins = 1000;
+  double minOrigin = obsForAsimov->getMin();
+  double maxOrigin = obsForAsimov->getMax();
+  double width = ((maxOrigin - minOrigin) / ((double)nBins));
+  
+  // Loop over masses:
+  for (int i_b = 0; i_b < nBins; i_b++) {
+    // Get window min and window max:
+    double windowMin = (((double)i_b) * width) + obsForAsimov->getMin();
+    double windowMax = (((double)(i_b+1)) * width) + obsForAsimov->getMin();
+    double currMass = (windowMax + windowMin) / 2.0;
+    
+    obsForAsimov->setRange(Form("range%d",i_b), windowMin, windowMax);
+    RooAbsReal* currIntegral 
+      = (RooAbsReal*)m_ws->pdf(Form("model_%s",m_currCateName.Data()))
+      ->createIntegral(RooArgSet(*obsForAsimov), RooFit::NormSet(*obsForAsimov),
+		       RooFit::Range(Form("range%d",i_b)));
+    double currWeight = currIntegral->getVal() * totalEvents;
+    
+    obsForAsimov->setVal(currMass);
+    wt.setVal(currWeight);
+    currAsimov->add(RooArgSet(*obsForAsimov,wt), currWeight);
+  }
+    
+  // Import the dataset to the workspace and add to data map:
+  m_ws->import(*currAsimov);
+  if (valPoI > 0) {
+    m_dataAsimov1[(string)m_currCateName] = (RooDataSet*)m_ws->data(asimovName);
+  }
+  else {
+    m_dataAsimov0[(string)m_currCateName] = (RooDataSet*)m_ws->data(asimovName);
   }
   printer(Form("DHWorkspace: Asimov data entries=%f",currAsimov->sumEntries()),
 	  false); 
@@ -485,6 +577,7 @@ void DHWorkspace::createNewWS() {
 				      *m_categories);
 
   // Instantiate parameter sets:
+  m_nonSysParameters = new RooArgSet();
   m_nuisanceParameters = new RooArgSet();
   m_globalObservables = new RooArgSet();
   m_observables = new RooArgSet();
@@ -492,8 +585,8 @@ void DHWorkspace::createNewWS() {
   
   // Maps for datasets:
   m_combData.clear();
-  m_combDataAsimov0.clear();
-  m_combDataAsimov1.clear();
+  m_dataAsimov0.clear();
+  m_dataAsimov1.clear();
   
   // Create a map of names to expected value lists:
   m_expectedList.clear();
@@ -524,6 +617,7 @@ void DHWorkspace::createNewWS() {
   std::cout << "DHWorkspace: Beginning to combine all categories." << std::endl;
   
   // Import variable sets:  
+  m_ws->defineSet("nonSysParameters", *m_nonSysParameters);
   m_ws->defineSet("nuisanceParameters", *m_nuisanceParameters);
   m_ws->defineSet("globalObservables", *m_globalObservables);
   m_ws->defineSet("observables", *m_observables);
@@ -558,53 +652,35 @@ void DHWorkspace::createNewWS() {
   
   // Set the POI to zero.
   m_ws->var(nameOfVar(listPOI[0]))->setVal(0.0);
+  m_ws->var(nameOfVar(listPOI[0]))->setConstant(true);
   
   // Do a simple background only fit before asimov data creation:
-  m_ws->pdf("combinedPdf")
-    ->fitTo(*m_ws->data("obsData"),
-	    Minos(RooArgSet(*m_ws->set("nuisanceParameters"))),
-	    SumW2Error(kTRUE));
-  
-  /* NO
-  // Then set nuisance parameters constant and to zero:
-  RooArgSet *nuisSet = (RooArgSet*)m_ws->set("nuisanceParameters");
-  TIterator *iterNuis = nuisSet->createIterator();
-  RooRealVar *currNuis = NULL;
-  while ((currNuis = (RooRealVar*)iterNuis->Next())) {
-    currNuis->setVal(0);
-    currNuis->setConstant(true);
+  if (m_useSystematics) {
+    m_ws->pdf("combinedPdf")->fitTo(*m_ws->data("obsData"),
+      Minos(RooArgSet(*m_ws->set("nuisanceParameters"))), SumW2Error(kTRUE));
   }
-  */ 
- 
+  else {
+    m_ws->pdf("combinedPdf")->fitTo(*m_ws->data("obsData"), SumW2Error(kTRUE));
+  }
+  
   // Loop over categories for Asimov data following background-only fit:
   for (m_currCateIndex = 0; m_currCateIndex < m_nCategories; m_currCateIndex++){
     m_currCateName = cateNames[m_currCateIndex];
-    //(*m_ws->var("nBkg_"+m_currCateName)).setVal((*m_ws->data(Form("obsData_%s",m_currCateName.Data()))).sumEntries());
-    
-    // Create background-only Asimov data:
-    createAsimovData(0);
-    // Create signal + background Asimov data:
-    createAsimovData(1);
+    // Create B-only then S+B Asimov data:
+    createStupidAsimovData(0);
+    createStupidAsimovData(1);
   }
   
   RooDataSet* asimovDataMu0 = new RooDataSet("asimovDataMu0", "asimovDataMu0",
   					     *dataArgs, Index(*m_categories), 
-  					     Import(m_combDataAsimov0),
+  					     Import(m_dataAsimov0),
 					     WeightVar(wt));
   RooDataSet* asimovDataMu1 = new RooDataSet("asimovDataMu1", "asimovDataMu1",
   					     *dataArgs, Index(*m_categories), 
-  					     Import(m_combDataAsimov1),
+  					     Import(m_dataAsimov1),
 					     WeightVar(wt));
   m_ws->import(*asimovDataMu0);
   m_ws->import(*asimovDataMu1);
-
-  /* NO
-  // Then set nuisance parameters free:
-  iterNuis = nuisSet->createIterator();
-  while ((currNuis = (RooRealVar*)iterNuis->Next())) {
-    currNuis->setConstant(false);
-  }
-  */
   
   //----------------------------------------//
   // Save information

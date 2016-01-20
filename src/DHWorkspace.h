@@ -37,6 +37,7 @@ class DHWorkspace {
   void addCategory();
   void addSystematic(TString systematicForm);
   void createAsimovData(int valPoI);  
+  void createStupidAsimovData(int valPoI);  
   void createNewWS();
   void loadWSFromFile();
   TString nameOfVar(TString varForm);
@@ -52,6 +53,7 @@ class DHWorkspace {
   int m_nCategories;
   int m_muNominalSH;
   TString m_dataToPlot;
+  bool m_useSystematics;
   
   // Helper classes:
   Config *m_config;
@@ -64,6 +66,7 @@ class DHWorkspace {
   // The Final RooWorkspace and ModelConfig and arg sets:
   RooWorkspace *m_ws;
   ModelConfig *m_modelConfig;  
+  RooArgSet *m_nonSysParameters;
   RooArgSet *m_nuisanceParameters;
   RooArgSet *m_globalObservables;
   RooArgSet *m_observables;
@@ -73,8 +76,8 @@ class DHWorkspace {
   RooCategory *m_categories;
   RooSimultaneous *m_combinedPdf;
   std::map<std::string, RooDataSet*> m_combData;
-  std::map<string,RooDataSet*> m_combDataAsimov0;
-  std::map<string,RooDataSet*> m_combDataAsimov1;
+  std::map<string,RooDataSet*> m_dataAsimov0;
+  std::map<string,RooDataSet*> m_dataAsimov1;
   std::map<TString,RooArgSet*> m_expectedList;
   
   // Track whether fits converge:
