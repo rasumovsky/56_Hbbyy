@@ -19,7 +19,7 @@
 #include "DHTestStat.h"
 #include "RooFitHead.h"
 #include "RooStatsHead.h"
-#include "statistics.h"
+//#include "statistics.h"
 
 class DHWorkspace {
 
@@ -30,7 +30,7 @@ class DHWorkspace {
   
   bool fitsAllConverged();
   RooWorkspace* getCombinedWorkspace();
-  ModelConfig* getModelConfig();
+  RooStats::ModelConfig* getModelConfig();
   
  private:
 
@@ -44,6 +44,7 @@ class DHWorkspace {
   TString nameOfFunc(TString funcForm);
   void plotCatePdfAndData(int nBins);
   void printer(TString statement, bool isFatal);
+  void setParameters(RooArgSet *set, bool isConstant, double value = 0.0);
   
   // Member variables:
   TString m_configFile;
@@ -65,7 +66,7 @@ class DHWorkspace {
   
   // The Final RooWorkspace and ModelConfig and arg sets:
   RooWorkspace *m_ws;
-  ModelConfig *m_modelConfig;  
+  RooStats::ModelConfig *m_modelConfig;  
   RooArgSet *m_nonSysParameters;
   RooArgSet *m_nuisanceParameters;
   RooArgSet *m_globalObservables;
@@ -76,8 +77,8 @@ class DHWorkspace {
   RooCategory *m_categories;
   RooSimultaneous *m_combinedPdf;
   std::map<std::string, RooDataSet*> m_combData;
-  std::map<string,RooDataSet*> m_dataAsimov0;
-  std::map<string,RooDataSet*> m_dataAsimov1;
+  std::map<std::string,RooDataSet*> m_dataAsimov0;
+  std::map<std::string,RooDataSet*> m_dataAsimov1;
   std::map<TString,RooArgSet*> m_expectedList;
   
   // Track whether fits converge:

@@ -36,7 +36,7 @@ DHWorkspace::DHWorkspace(TString newConfigFile, TString newOptions) {
   
   m_ws = NULL;
   m_modelConfig = NULL;
-    
+  
   m_config = new Config(m_configFile);
   m_dataToPlot = (m_config->getBool("DoBlind")) ? "asimovDataMu1" : "obsData";
   m_anaType = m_config->getStr("AnalysisType");
@@ -196,7 +196,7 @@ void DHWorkspace::addCategory() {
   //--------------------------------------//
   // Import the observed data set:
   printer("DHWorkspace::addCategory(): Importing observed dataset...", false);
-    
+  
   // Create RooDataSet object:
   TString dataName = Form("obsData_%s", m_currCateName.Data());
   RooRealVar wt("wt", "wt", 1.0);
@@ -654,6 +654,9 @@ void DHWorkspace::createNewWS() {
   m_ws->var(nameOfVar(listPOI[0]))->setVal(0.0);
   m_ws->var(nameOfVar(listPOI[0]))->setConstant(true);
   
+  setParameters((RooArgSet*)m_ws->set("nuisanceParameters"), true, 0.0);
+  setParameters((RooArgSet*)m_ws->set("globalObservables"), true, 0.0);
+  
   // Do a simple background only fit before asimov data creation:
   if (m_useSystematics) {
     m_ws->pdf("combinedPdf")->fitTo(*m_ws->data("obsData"),
@@ -670,6 +673,8 @@ void DHWorkspace::createNewWS() {
     createStupidAsimovData(0);
     createStupidAsimovData(1);
   }
+  setParameters((RooArgSet*)m_ws->set("nuisanceParameters"), false);
+  setParameters((RooArgSet*)m_ws->set("globalObservables"), false);
   
   RooDataSet* asimovDataMu0 = new RooDataSet("asimovDataMu0", "asimovDataMu0",
   					     *dataArgs, Index(*m_categories), 
@@ -867,4 +872,19 @@ void DHWorkspace::printer(TString statement, bool isFatal) {
     std::cout << statement << std::endl;
   }
   if (isFatal) exit(0);
+}
+
+/**
+   -----------------------------------------------------------------------------
+*/
+void DHWorkspace::setParameters(RooArgSet *set, bool isConstant, double value){
+  printer(Form("DHWorkspace::setParameters(%s, %d, %2.2f)", 
+	       ((TString)(set->GetName())).Data(),(int)isConstant,value),false);
+  
+  RooRealVar *arg = NULL;
+  TIterator *iterArg = set->createIterator();
+  while ((arg = (RooRealVar*)iterArg->Next())) {
+    arg->setConstant(isConstant);
+    arg->setVal(value);
+  }
 }
