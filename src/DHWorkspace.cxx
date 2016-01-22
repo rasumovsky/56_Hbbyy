@@ -4,7 +4,7 @@
 //                                                                            //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 01/19/2016                                                          //
+//  Date: 01/21/2016                                                          //
 //                                                                            //
 //  This class builds the workspace for the resonant and non-resonant di-     //
 //  Higgs search at 13 TeV. Most of the model configuration is done in the    //
@@ -199,10 +199,10 @@ void DHWorkspace::addCategory() {
   
   // Create RooDataSet object:
   TString dataName = Form("obsData_%s", m_currCateName.Data());
-  RooRealVar wt("wt", "wt", 1.0);
   RooDataSet *obsData = new RooDataSet(dataName, dataName,
-				       RooArgSet(*m_ws->var(observableName),wt),
-				       RooFit::WeightVar(wt));
+				       RooArgSet(*m_ws->var(observableName),
+						 *m_ws->var("wt")),
+				       RooFit::WeightVar(*m_ws->var("wt")));
   // Open input text file to read mass points (and possibly weights...):
   TString textFileName = Form("%s/%s/DHMassPoints/masspoint_%s_%s.txt", 
 			      (m_config->getStr("MasterOutput")).Data(),
@@ -216,8 +216,9 @@ void DHWorkspace::addCategory() {
     while (!massInput.eof()) {
       massInput >> currMass >> currWeight;
       m_ws->var(observableName)->setVal(currMass);
-      wt.setVal(currWeight);
-      obsData->add(RooArgSet(*m_ws->var(observableName),wt), currWeight);
+      m_ws->var("wt")->setVal(currWeight);
+      obsData->add(RooArgSet(*m_ws->var(observableName),*m_ws->var("wt")),
+		   currWeight);
     }
   }
   else printer(Form("DHWorkspace: ERROR! nonexistent input %s", 
@@ -467,34 +468,36 @@ void DHWorkspace::createAsimovData(int valPoI) {
    Create Asimov data for the statistical model, using a fit to observed data
    for the shape and normalizaiton of the background.
    @param valPoI - The value of the parameter of interest.
+   @param nBinsAsimov - The number of Asimov bins to generate.
 */
-void DHWorkspace::createStupidAsimovData(int valPoI) {
+void DHWorkspace::createStupidAsimovData(int valPoI, int nBinsAsimov) {
   printer(Form("DHWorkspace::createStupidAsimovData(%d) in category %s", 
 	       valPoI, m_currCateName.Data()), false);
   
-  // Set the parameter of interest constant and to desired value:
-  RooRealVar *poi = (RooRealVar*)((RooArgSet*)m_ws->set("poi"))->first();
-  double initialPoIVal = poi->getVal();
-  poi->setVal(valPoI);
-  poi->setConstant(true);  
+  // Get the parameter of interest:
+  TString namePoI = m_ws->set("poi")->first()->GetName();
+  double initialPoIVal = m_ws->var(namePoI)->getVal();
+  m_ws->var(namePoI)->setVal(valPoI);
+  m_ws->var(namePoI)->setConstant(true);  
   
-  // Fetch the observable:
-  RooRealVar *obsForAsimov = NULL;
+  // Get the observable:
+  TString nameObs = "";  
   TIterator *iterObs = m_ws->set("observables")->createIterator();
   RooRealVar* currObs;
   while ((currObs = (RooRealVar*)iterObs->Next())) {
     TString currObsName = currObs->GetName();
-    if (currObsName.Contains(m_currCateName)) {
-      obsForAsimov = m_ws->var(currObsName);
-    }
+    if (currObsName.Contains(m_currCateName)) nameObs = currObs->GetName();
   }
+  delete currObs;
+  delete iterObs;
   
   // Create the Asimov dataset object:
   TString asimovName = Form("asimovDataMu%d_%s", valPoI, m_currCateName.Data());
-  RooRealVar wt("wt", "wt", 1.0);
-  RooDataSet *currAsimov = new RooDataSet(asimovName, asimovName,
-					  RooArgSet(*obsForAsimov, wt),
-					  RooFit::WeightVar(wt));
+  RooDataSet *currAsimov
+    = new RooDataSet(asimovName, asimovName,
+		     RooArgSet(*m_ws->var(nameObs), *m_ws->var("wt")),
+		     RooFit::WeightVar(*m_ws->var("wt")));
+  
   // Total number of events in the current model category:
   double totalEvents
     = m_ws->function(Form("n_AllProcesses_%s",m_currCateName.Data()))->getVal();
@@ -502,31 +505,35 @@ void DHWorkspace::createStupidAsimovData(int valPoI) {
   // Prevents spam from the ROOT integration:
   RooMsgService::instance().setGlobalKillBelow(RooFit::WARNING);
   
-  // Observable information:
-  int nBins = 1000;
-  double minOrigin = obsForAsimov->getMin();
-  double maxOrigin = obsForAsimov->getMax();
-  double width = ((maxOrigin - minOrigin) / ((double)nBins));
+  // Calculate the bin width:
+  double originMin = m_ws->var(nameObs)->getMin();
+  double originMax = m_ws->var(nameObs)->getMax();
+  double width = ((originMax - originMin) / ((double)nBinsAsimov));
   
-  // Loop over masses:
-  for (int i_b = 0; i_b < nBins; i_b++) {
+  // Get a PDF:
+  RooAbsPdf *currPdf = (RooAbsPdf*)(m_ws->pdf(Form("model_%s",m_currCateName.Data()))->Clone("newPDF"));
+  
+  // Loop over Asimov bins:
+  for (int i_b = 0; i_b < nBinsAsimov; i_b++) {
     // Get window min and window max:
-    double windowMin = (((double)i_b) * width) + obsForAsimov->getMin();
-    double windowMax = (((double)(i_b+1)) * width) + obsForAsimov->getMin();
+    double windowMin = (((double)i_b)*width) + m_ws->var(nameObs)->getMin();
+    double windowMax = (((double)(i_b+1))*width) + m_ws->var(nameObs)->getMin();
     double currMass = (windowMax + windowMin) / 2.0;
-    
-    obsForAsimov->setRange(Form("range%d",i_b), windowMin, windowMax);
-    RooAbsReal* currIntegral 
-      = (RooAbsReal*)m_ws->pdf(Form("model_%s",m_currCateName.Data()))
-      ->createIntegral(RooArgSet(*obsForAsimov), RooFit::NormSet(*obsForAsimov),
-		       RooFit::Range(Form("range%d",i_b)));
+    m_ws->var(nameObs)->setRange(Form("range%d",i_b), windowMin, windowMax);
+    // WARNING! The implementation below causes a segfault whenever the user 
+    // tries to access the combinedPdf object in the future... Not sure why.
+    //RooAbsReal* currIntegral = (RooAbsReal*)m_ws->pdf(Form("model_%s",m_currCateName.Data()))->createIntegral(RooArgSet(*m_ws->var(nameObs)), RooFit::NormSet(*m_ws->var(nameObs)), RooFit::Range(Form("range%d",i_b)));
+    RooAbsReal* currIntegral = (RooAbsReal*)currPdf->createIntegral(RooArgSet(*m_ws->var(nameObs)), RooFit::NormSet(*m_ws->var(nameObs)), RooFit::Range(Form("range%d",i_b)));
     double currWeight = currIntegral->getVal() * totalEvents;
     
-    obsForAsimov->setVal(currMass);
-    wt.setVal(currWeight);
-    currAsimov->add(RooArgSet(*obsForAsimov,wt), currWeight);
+    m_ws->var(nameObs)->setVal(currMass);
+    m_ws->var("wt")->setVal(currWeight);
+    currAsimov->add(RooArgSet(*m_ws->var(nameObs),m_ws->var("wt")), currWeight);
+    delete currIntegral;
   }
-    
+  
+  m_ws->var(nameObs)->setRange("rangeFull", originMin, originMax);
+  
   // Import the dataset to the workspace and add to data map:
   m_ws->import(*currAsimov);
   if (valPoI > 0) {
@@ -539,8 +546,10 @@ void DHWorkspace::createStupidAsimovData(int valPoI) {
 	  false); 
   
   // Return PoI to original settings:
-  poi->setVal(initialPoIVal);
-  poi->setConstant(false);
+  m_ws->var(namePoI)->setVal(initialPoIVal);
+  m_ws->var(namePoI)->setConstant(false);
+  
+  delete currAsimov;
 }
 
 /**
@@ -602,6 +611,9 @@ void DHWorkspace::createNewWS() {
   m_ws->factory(Form("Luminosity[%f]",
 		     m_config->getNum("AnalysisLuminosity")/1000.0));
   
+  // Also create weight parameter for datasets:
+  m_ws->factory("wt[1.0]");
+  
   //--------------------------------------//
   // Loop over channels, create model for each:
   std::cout << "DHWorkspace: Looping over categories to define workspace."
@@ -628,13 +640,12 @@ void DHWorkspace::createNewWS() {
   m_ws->import(*m_combinedPdf);
   
   // Define the combined dataset:
-  RooRealVar wt("wt", "wt", 1);
   RooArgSet *dataArgs = new RooArgSet();
   dataArgs->add(*m_observables);
-  dataArgs->add(wt);
+  dataArgs->add(*m_ws->var("wt"));
   RooDataSet* obsData = new RooDataSet("obsData", "obsData", *dataArgs, 
 				       Index(*m_categories), Import(m_combData),
-				       WeightVar(wt));
+				       WeightVar(*m_ws->var("wt")));
   m_ws->import(*obsData);
   
   // Define the ModelConfig for the analysis and import to the workspace:
@@ -658,32 +669,26 @@ void DHWorkspace::createNewWS() {
   setParameters((RooArgSet*)m_ws->set("globalObservables"), true, 0.0);
   
   // Do a simple background only fit before asimov data creation:
-  if (m_useSystematics) {
-    m_ws->pdf("combinedPdf")->fitTo(*m_ws->data("obsData"),
-      Minos(RooArgSet(*m_ws->set("nuisanceParameters"))), SumW2Error(kTRUE));
-  }
-  else {
-    m_ws->pdf("combinedPdf")->fitTo(*m_ws->data("obsData"), SumW2Error(kTRUE));
-  }
+  m_ws->pdf("combinedPdf")->fitTo(*m_ws->data("obsData"), SumW2Error(kTRUE));
   
   // Loop over categories for Asimov data following background-only fit:
   for (m_currCateIndex = 0; m_currCateIndex < m_nCategories; m_currCateIndex++){
     m_currCateName = cateNames[m_currCateIndex];
-    // Create B-only then S+B Asimov data:
-    createStupidAsimovData(0);
-    createStupidAsimovData(1);
+    createStupidAsimovData(0, m_config->getNum("NBinsAsimov")); // Bkg-only
+    createStupidAsimovData(1, m_config->getNum("NBinsAsimov")); // S+B
   }
+  
   setParameters((RooArgSet*)m_ws->set("nuisanceParameters"), false);
   setParameters((RooArgSet*)m_ws->set("globalObservables"), false);
   
   RooDataSet* asimovDataMu0 = new RooDataSet("asimovDataMu0", "asimovDataMu0",
   					     *dataArgs, Index(*m_categories), 
   					     Import(m_dataAsimov0),
-					     WeightVar(wt));
+					     WeightVar(*m_ws->var("wt")));
   RooDataSet* asimovDataMu1 = new RooDataSet("asimovDataMu1", "asimovDataMu1",
   					     *dataArgs, Index(*m_categories), 
   					     Import(m_dataAsimov1),
-					     WeightVar(wt));
+					     WeightVar(*m_ws->var("wt")));
   m_ws->import(*asimovDataMu0);
   m_ws->import(*asimovDataMu1);
   
@@ -710,7 +715,7 @@ void DHWorkspace::createNewWS() {
   // Start profiling the data (must do after writing workspace for some reason):
   printer("DHWorkspace: Start profiling data", false);
   
-  DHTestStat *dhts = new DHTestStat(m_configFile, "FromFile", m_ws);
+  DHTestStat *dhts = new DHTestStat(m_configFile, "new", m_ws);
   dhts->saveSnapshots(true);
   dhts->setPlotDirectory(Form("%s/Plots/", m_outputDir.Data()));
   dhts->setPlotAxis(true, 0.005, 50);
@@ -878,8 +883,8 @@ void DHWorkspace::printer(TString statement, bool isFatal) {
    -----------------------------------------------------------------------------
 */
 void DHWorkspace::setParameters(RooArgSet *set, bool isConstant, double value){
-  printer(Form("DHWorkspace::setParameters(%s, %d, %2.2f)", 
-	       ((TString)(set->GetName())).Data(),(int)isConstant,value),false);
+  printer(Form("DHWorkspace::setParameters(%d, %2.2f)",(int)isConstant,value),
+	  false);
   
   RooRealVar *arg = NULL;
   TIterator *iterArg = set->createIterator();

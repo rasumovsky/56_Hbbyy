@@ -4,7 +4,7 @@
 //  Class: DHWorkspace.cxx                                                    //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 01/14/2016                                                          //
+//  Date: 01/21/2016                                                          //
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -37,7 +37,7 @@ class DHWorkspace {
   void addCategory();
   void addSystematic(TString systematicForm);
   void createAsimovData(int valPoI);  
-  void createStupidAsimovData(int valPoI);  
+  void createStupidAsimovData(int valPoI, int nBinsAsimov);  
   void createNewWS();
   void loadWSFromFile();
   TString nameOfVar(TString varForm);

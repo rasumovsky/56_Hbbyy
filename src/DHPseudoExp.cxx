@@ -4,7 +4,7 @@
 //                                                                            //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 23/06/2015                                                          //
+//  Date: 01/21/2016                                                          //
 //                                                                            //
 //  This program creates pseudoexperiment ensembles for the di-Higgs bbyy     //
 //  search with 13 TeV data at ATLAS.                                         //
@@ -30,46 +30,59 @@
 #include "RooStatsHead.h"
 #include "statistics.h"
 
+void mapToVectors(std::map<std::string,double> map, 
+		  std::vector<std::string> names, std::vector<double> values) {
+  names.clear(); 
+  values.clear();
+  for (std::map<std::string,double>::iterator mapIter = map.begin(); 
+       mapIter != map.end(); mapIter++) {
+    names.push_back(mapIter->first);
+    values.push_back(mapIter->second);
+  }
+}
+
 /**
    -----------------------------------------------------------------------------
    The main method. 
    @param configFile - the name of the analysis config file.
-   @param DHSignal - the name of the DH signal model.
    @param options - the options (see header note).
    @param seed - the random seed for pseudoexperiment creation.
    @param toysPerJob - the number of pseudoexperiments to create per job.
-   @param muDHVal - the value of the DH signal strength to use.
+   @param poiVal - the value of the parameter of interest to use.
 */
 int main(int argc, char **argv) {
-  if (argc < 7) {
-    std::cout << "Usage: " << argv[0] << " <configFile> <DHSignal> <options> <seed> <toysPerJob> <mu_DH>" << std::endl;
+  if (argc < 6) {
+    std::cout << "Usage: " << argv[0] 
+	      << " <configFile> <options> <seed> <toysPerJob> <poiVal>" 
+	      << std::endl;
     exit(0);
   }
   
   // Assign input parameters:
   TString configFile = argv[1];
-  TString DHSignal = argv[2];
-  TString options = argv[3];
-  int seed = atoi(argv[4]);
-  int nToysPerJob = atoi(argv[5]);
-  int inputMuDH = atoi(argv[6]);
+  //TString DHSignal = argv[2];
+  TString options = argv[2];
+  int seed = atoi(argv[3]);
+  int nToysPerJob = atoi(argv[4]);
+  int inputPoIVal = atoi(argv[5]);
   
   // Load the analysis configurations from file:
   Config *config = new Config(configFile);
-  TString anaType = DHAnalysis::getAnalysisType(config, DHSignal);
+  TString anaType = config->getStr("AnalysisType");
+  
   // Copy the input workspace file locally:
   TString originFile = Form("%s/%s/DHWorkspace/rootfiles/workspaceDH_%s.root",
-			    (config->getStr("masterOutput")).Data(), 
-			    (config->getStr("jobName")).Data(), anaType.Data());
+			    (config->getStr("MasterOutput")).Data(), 
+			    (config->getStr("JobName")).Data(), anaType.Data());
   TString copiedFile = Form("workspaceDH_%s.root", anaType.Data());
   system(Form("cp %s %s", originFile.Data(), copiedFile.Data()));
   
   // Create output TTree:
   TString outputDir = Form("%s/%s/DHPseudoExp", 
-			   (config->getStr("masterOutput")).Data(),
-			   (config->getStr("jobName")).Data());
+			   (config->getStr("MasterOutput")).Data(),
+			   (config->getStr("JobName")).Data());
   TString tempOutputFileName = Form("%s/single_files/toy_mu%i_%i.root",
-				    outputDir.Data(), inputMuDH, seed);
+				    outputDir.Data(), inputPoIVal, seed);
   
   // Construct the output directories:
   system(Form("mkdir -vp %s/err", outputDir.Data()));
@@ -118,39 +131,37 @@ int main(int argc, char **argv) {
   
   // Loop to generate pseudo experiments:
   std::cout << "DHPseudoExp: Generating " << nToysPerJob
-	    << " toys with mu_DH = " << inputMuDH << endl;
+	    << " toys with mu_DH = " << inputPoIVal << endl;
   for (int i_t = 0; i_t < nToysPerJob; i_t++) {
     
     // Load model, data, etc. from workspace:
     TFile inputFile(copiedFile, "read");
     RooWorkspace *workspace = (RooWorkspace*)inputFile.Get("combinedWS");    
      
-    DHTestStat *dhts = new DHTestStat(configFile, DHSignal, "new", workspace);
+    DHTestStat *dhts = new DHTestStat(configFile, "new", workspace);
     
     RooDataSet *newToyData
-      = dhts->createPseudoData(seed, inputMuDH, 1, options.Contains("FixMu"));
+      = dhts->createPseudoData(seed, inputPoIVal, options.Contains("FixMu"));
     numEvents = workspace->data("toyData")->sumEntries();
     
     // Mu = 0 fits:
     nllMu0 = dhts->getFitNLL("toyData", 0, true, muDHVal);
     convergedMu0 = dhts->fitsAllConverged();
-    namesNP = dhts->getNPNames();
-    valuesNPMu0 = dhts->getNPValues();
-    namesGlobs = dhts->getGlobsNames();
-    valuesGlobsMu0 = dhts->getGlobsValues();
-    
+    mapToVectors(dhts->getNuisanceParameters(), namesNP, valuesNPMu0);
+    mapToVectors(dhts->getGlobalObservables(), namesGlobs, valuesGlobsMu0);
+        
     // Mu = 1 fits:
     nllMu1 = dhts->getFitNLL("toyData", 1, true, muDHVal);
     convergedMu1 = dhts->fitsAllConverged();
-    valuesNPMu1 = dhts->getNPValues();
-    valuesGlobsMu1 = dhts->getGlobsValues();
-    
+    mapToVectors(dhts->getNuisanceParameters(), namesNP, valuesNPMu1);
+    mapToVectors(dhts->getGlobalObservables(), namesGlobs, valuesGlobsMu1);
+        
     // Mu free fits:
     nllMuFree = dhts->getFitNLL("toyData", 1, false, muDHVal);
     convergedMuFree = dhts->fitsAllConverged();
-    valuesNPMuFree = dhts->getNPValues();
-    valuesGlobsMuFree = dhts->getGlobsValues();
-    
+    mapToVectors(dhts->getNuisanceParameters(), namesNP, valuesNPMuFree);
+    mapToVectors(dhts->getGlobalObservables(), namesGlobs, valuesGlobsMuFree);
+        
     // Calculate profile likelihood ratios:
     llrL1L0 = nllMu1 - nllMu0;
     llrL1Lfree = muDHVal > 1.0 ? 0.0 : (nllMu1 - nllMuFree);

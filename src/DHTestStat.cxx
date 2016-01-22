@@ -23,7 +23,7 @@
 DHTestStat::DHTestStat(TString newConfigFile, TString newOptions,
 		       RooWorkspace *newWorkspace) {
   std::cout << "DHTestStat: Initializing...\n\t" << newConfigFile << "\n\t"
-	    << "\n\t" << newOptions << "\n\t" << std::endl;
+	    << newOptions << "\n\t" << std::endl;
   
   // Assign input variables:
   m_options = newOptions;
@@ -500,12 +500,12 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   std::cout << "DHTestStat: Parameters have been set for fit." << std::endl;
   
   // The actual fit command:
-  int status = 0; 
   RooNLLVar* varNLL = (RooNLLVar*)combPdf
     ->createNLL(*m_workspace->data(datasetName), Constrain(*nuisanceParameters),
 		Extended(combPdf->canBeExtended()));
+  
   RooFitResult *fitResult = statistics::minimize(varNLL, "", NULL, true);
-  if (fitResult->status() != 0) m_allGoodFits = false;
+  if (!fitResult || fitResult->status() != 0) m_allGoodFits = false;
   
   // Save a snapshot if requested:
   if (m_doSaveSnapshot) {
