@@ -218,6 +218,7 @@ void DHTestStat::clearData() {
   m_calculatedValues.clear();
   m_mapGlobs.clear();
   m_mapNP.clear();
+  m_mapPars.clear();
   m_doSaveSnapshot = false;
   m_doPlot = false;
   m_plotDir = "";
@@ -507,6 +508,20 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   RooFitResult *fitResult = statistics::minimize(varNLL, "", NULL, true);
   if (!fitResult || fitResult->status() != 0) m_allGoodFits = false;
   
+  m_workspace->var("lumi")->setVal(0);
+  m_workspace->var("RNDM_lumi")->setVal(0);
+  cout << "NLLVAL1 = " << varNLL->getVal() << std::endl;
+  m_workspace->var("lumi")->setVal(2);
+  m_workspace->var("RNDM_lumi")->setVal(0);
+  cout << "NLLVAL2 = " << varNLL->getVal() << std::endl;
+  m_workspace->var("lumi")->setVal(0);
+  m_workspace->var("RNDM_lumi")->setVal(2);
+  cout << "NLLVAL3 = " << varNLL->getVal() << std::endl;
+  m_workspace->var("lumi")->setVal(2);
+  m_workspace->var("RNDM_lumi")->setVal(2);
+  cout << "NLLVAL4 = " << varNLL->getVal() << std::endl;
+  
+  
   // Save a snapshot if requested:
   if (m_doSaveSnapshot) {
     TString muDHValue = fixPoI ? (Form("%d",(int)valPoI)) : "Free";
@@ -539,6 +554,15 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   RooRealVar *currGlob = NULL;
   while ((currGlob = (RooRealVar*)iterGlobs->Next())) {
     m_mapGlobs[(std::string)currGlob->GetName()] = currGlob->getVal();
+  }
+  
+  // Save names and values of other parameters in the fit:
+  RooArgSet *parameters = (RooArgSet*)m_workspace->set("nonSysParameters");
+  m_mapPars.clear();
+  TIterator *iterPars = parameters->createIterator();
+  RooRealVar *currPar = NULL;
+  while ((currPar = (RooRealVar*)iterPars->Next())) {
+    m_mapPars[(std::string)currPar->GetName()] = currPar->getVal();
   }
   
   // release nuisance parameters after fit and recovery the default values
@@ -584,6 +608,15 @@ TString DHTestStat::getKey(TString testStat, bool observed, int N) {
 */
 std::map<std::string,double> DHTestStat::getNuisanceParameters() {
   return m_mapNP;
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Get a map of non-systematic parameter names to values from most recent fit.
+   @return - A map of parameter names and most recent fit values.
+*/
+std::map<std::string,double> DHTestStat::getParameters() {
+  return m_mapPars;
 }
 
 /**

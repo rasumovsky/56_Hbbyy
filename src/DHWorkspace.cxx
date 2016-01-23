@@ -309,9 +309,6 @@ void DHWorkspace::addSystematic(TString systematicForm) {
       TString currComponentVal = currComponentInfo;
       currComponentVal.Remove(0,currComponentVal.First("~")+1);
       components[currComponentName] = currComponentVal.Atof();
-      if (m_config->getBool("Verbose")) {
-	std::cout << "\tcomponent name = " << currComponentName << std::endl;
-      }
     }
   }
   
@@ -323,31 +320,45 @@ void DHWorkspace::addSystematic(TString systematicForm) {
 	    true);
   }
   
+  // Print out a summary of the systematic:
+  if (m_config->getBool("Verbose")) {
+    std::cout << "DHWorkspace: Printing " << systematicName 
+	      << " systematic settings" << std::endl;
+    std::cout << "\tcentralValue = " << centralValue << std::endl;
+    std::cout << "\tconstraint   = " << constraint << std::endl;
+    std::cout << "\ttype         = " << type << std::endl;
+    std::cout << "\tcomponents   = ";
+    
+    for (std::map<TString,double>::iterator compIter = components.begin();
+	 compIter != components.end(); compIter++) {
+      std::cout << "[" << compIter->first << ", " << compIter->second
+		<< "] ";
+    }
+    std::cout << "\n";
+    if (constraint.EqualTo("asym")) {
+      std::cout << "\tcomponentsLo = ";
+      for (std::map<TString,double>::iterator compLoIter = componentsLo.begin();
+	   compLoIter != componentsLo.end(); compLoIter++) {
+     	std::cout << "[" << compLoIter->first << ", " << compLoIter->second
+		  << "] ";
+      }
+      std::cout << "\n";
+    } 
+  }
+  
   //----------------------------------------//
   // Create the nuisance parameter, global observable, and constraint PDF:
   if (!m_ws->var(systematicName)) {
     
-    // Nuisance parameter and global observable:
+    // Nuisance parameter:
     m_ws->factory(Form("%s[0,-5,5]", systematicName.Data()));
+    // Global observable:
     m_ws->factory(Form("RNDM_%s[0,-5,5]", systematicName.Data()));
     
-    // Bifurcated Gaussian constraint requires magnitude information:
-    if (constraint.EqualTo("bifur")) {
-      std::map<TString,double>::iterator iterComponent = components.begin();
-      TString componentName = iterComponent->first;
-      double magnitude = iterComponent->second;
-      double magnitudeLo = (componentsLo.count(componentName) > 0) ?
-	componentsLo[componentName] : 0.0;
-      double magnitudeRatio = (magnitude / magnitudeLo);
-      m_ws->factory(Form("RooBifurGauss::constr_%s(RNDM_%s,%s,1,%f)",
-			 systematicName.Data(), systematicName.Data(),
-			 systematicName.Data(), magnitudeRatio));
-    }
-   
     // Simple Gaussian constraint is straightforward:
-    else m_ws->factory(Form("RooGaussian::constr_%s(RNDM_%s,%s,1)", 
-			    systematicName.Data(), systematicName.Data(), 
-			    systematicName.Data()));
+    m_ws->factory(Form("RooGaussian::constr_%s(%s,RNDM_%s,1)", 
+		       systematicName.Data(), systematicName.Data(), 
+		       systematicName.Data()));
     
     // Add the new objects to the relevant sets:
     m_nuisanceParameters->add(*m_ws->var(systematicName));
@@ -369,42 +380,66 @@ void DHWorkspace::addSystematic(TString systematicForm) {
     // Define the variable name and expected name:
     TString varName = Form("%s_%s",systematicName.Data(),componentName.Data());
     TString expName = Form("expected_%s", varName.Data());
+
+    // BETA VALUE NEEDED!
+    double betaVal = 1.0;
     
-    // Asymmetric uncertainty:
+    // Beta parameter:
+    m_ws->factory(Form("beta_%s[%f]", varName.Data(), betaVal));
+    
+    // Nuis times beta:
+    m_ws->factory(Form("prod::%s_times_beta(%s, beta_%s)",varName.Data(),
+		       systematicName.Data(), varName.Data()));
+    
+    //---------- Asymmetric constraint ----------//
     if (constraint.EqualTo("asym")) {
-      std::cout << "DHWorkspace: " << systematicName << " has asym. uncertainty"
-		<< std::endl;
-      m_ws->factory(Form("prod::%s_times_beta(%s,beta_%s[1]",
-			 varName.Data(),systematicName.Data(),varName.Data()));
+      printer(Form("DHWorkspace: %s asym constraint",systematicName.Data()),
+	      false);
+      // Prepare variables for the FlexibleInterpVar:
+      vector<int> code; code.clear(); code.push_back(4);
       vector<double> magHi; magHi.clear(); magHi.push_back(1+magnitude);
       vector<double> magLo; magLo.clear(); magLo.push_back(1-magnitudeLo);
-      RooArgList nuisList(*m_ws->factory(Form("%s_times_beta",
-					      systematicName.Data())));
-      RooStats::HistFactory::FlexibleInterpVar
-	expVar(expName, expName, nuisList, centralValue.Atof(), magLo, magHi);
+      RooArgList nuisList(*m_ws->factory(Form("%s_times_beta",varName.Data())));
+      RooStats::HistFactory::FlexibleInterpVar expVar(expName, expName, 
+						      nuisList,
+						      centralValue.Atof(), 
+						      magLo, magHi, code);
       m_ws->import(expVar);
     }
-    
-    // Gaussian constraint:
-    else if (constraint.EqualTo("gaus")) {
-      std::cout << "DHWorkspace: " << systematicName << " has gaus uncertainty"
-		<< std::endl;
-      m_ws->factory(Form("sum::%s(nominal_%s[%f], prod::uncer_%s(prod::%s_times_beta(%s, beta_%s[1]), sigma_%s[%f]))", expName.Data(), varName.Data(), centralValue.Atof(), varName.Data(), varName.Data(), systematicName.Data(), varName.Data(), varName.Data(), magnitude));
-    }
-    
-    // Lognormal constraint:
-    else if (constraint.EqualTo("logn")) {
-      std::cout << "DHWorkspace: " << systematicName << " has gaus uncertainty"
-		<< std::endl;
-      double valLogKappa = sqrt(log(1+pow(magnitude,2)));
-      m_ws->factory(Form("RooExponential::expTerm_%s(prod::%s_times_beta(%s,beta_%s[1]),logKappa_%s[%f])", varName.Data(), varName.Data(), systematicName.Data(), varName.Data(), varName.Data(), valLogKappa));
-      m_ws->factory(Form("prod::%s(expTerm_%s,nominal_%s[%f])", expName.Data(), varName.Data(), varName.Data(), centralValue.Atof()));
-    }
-    
-    // Exit if improper constraint type:
     else {
-      printer(Form("DHWorkspace: Constraint type ERROR %s", constraint.Data()),
-	      true);
+      // Nominal expression:
+      m_ws->factory(Form("nominal_%s[%f]",varName.Data(),centralValue.Atof()));
+      // Uncertainty magnitude expression:
+      m_ws->factory(Form("sigma_%s[%f]", varName.Data(), magnitude));
+      
+      //---------- Gaussian constraint ----------//
+      if (constraint.EqualTo("gaus")) {
+	printer(Form("DHWorkspace: %s gaus constraint", systematicName.Data()),
+		false);
+	// Uncertainty wrapper expression:
+	m_ws->factory(Form("prod::uncert_%s(%s_times_beta,sigma_%s)",
+			   varName.Data(), varName.Data(), varName.Data()));
+	// Expected expression:
+	m_ws->factory(Form("sum::%s(nominal_%s,uncert_%s)", expName.Data(),
+			   varName.Data(), varName.Data()));
+      }
+      
+      //---------- Log-normal constraint ----------//
+      else if (constraint.EqualTo("logn")) {
+	printer(Form("DHWorkspace: %s logn constraint",systematicName.Data()),
+		false);
+	// Log-kappa implementation:
+	m_ws->factory(Form("expr::logKappa_%s('log(1+@0/@1)',sigma_%s,nominal_%s)", varName.Data(), varName.Data(), varName.Data()));
+	// Uncertainty wrapper expression:
+	m_ws->factory(Form("RooExponential::uncert_%s(%s_times_beta,logKappa_%s)", varName.Data(), varName.Data(), varName.Data()));
+	// Expected expression:
+	m_ws->factory(Form("prod::%s(nominal_%s,uncert_%s)", expName.Data(),
+			   varName.Data(), varName.Data()));
+      }
+      
+      // Exit if improper constraint type:
+      else printer(Form("DHWorkspace: Constraint type ERROR %s",
+			constraint.Data()), true);
     }
     
     // The key should depend on the systematic type and the component name:
@@ -881,11 +916,13 @@ void DHWorkspace::printer(TString statement, bool isFatal) {
 
 /**
    -----------------------------------------------------------------------------
+   @param set - The RooArgSet containing the parameters to be set.
+   @param isConstant - True iff the parameters should be fixed to one value.
+   @param value - The value to which the parameters will be set. 
 */
 void DHWorkspace::setParameters(RooArgSet *set, bool isConstant, double value){
   printer(Form("DHWorkspace::setParameters(%d, %2.2f)",(int)isConstant,value),
 	  false);
-  
   RooRealVar *arg = NULL;
   TIterator *iterArg = set->createIterator();
   while ((arg = (RooRealVar*)iterArg->Next())) {

@@ -8,7 +8,6 @@ else
     configfile=$2
     input_file=$3
     exe_name=$4
-    signal=$5
     option=$6
     seed=$7
     toysperjob=$8
@@ -16,7 +15,7 @@ else
     date
     echo
     
-    echo $jobname $configfile $input_file $exe_name $signal $option $seed $toysperjob
+    echo $jobname $configfile $input_file $exe_name $option $seed $toysperjob
     
     out="${jobname}_${seed}"
     output_dir="/afs/cern.ch/user/a/ahard/work_directory/files_Hbbgg/FullAnalysis/${jobname}/DHPseudoExp"
@@ -47,8 +46,8 @@ else
     echo "Printing directory contents before running."
     ls
     
-    ./bin/${exe_name} ${configfile} ${signal} ${option} ${seed} ${toysperjob} 0 1> ${out}_mu0.log 2>${out}_mu0.err;
-    ./bin/${exe_name} ${configfile} ${signal} ${option} ${seed} ${toysperjob} 1 1> ${out}_mu1.log 2>${out}_mu1.err;
+    ./bin/${exe_name} ${configfile} ${option} ${seed} ${toysperjob} 0 1> ${out}_mu0.log 2>${out}_mu0.err;
+    ./bin/${exe_name} ${configfile} ${option} ${seed} ${toysperjob} 1 1> ${out}_mu1.log 2>${out}_mu1.err;
     
     mv *.log ${output_dir}/log/
     mv *.err ${output_dir}/err/

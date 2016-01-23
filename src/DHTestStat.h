@@ -47,6 +47,7 @@ class DHTestStat {
 		   double &profiledMu);
   std::map<std::string,double> getGlobalObservables();
   std::map<std::string,double> getNuisanceParameters();
+  std::map<std::string,double> getParameters();
   double getP0FromQ0(double q0);
   double getPbFromN(double N);
   double getPbFromQMu(double qMu, double sigma, double mu);
@@ -106,7 +107,8 @@ class DHTestStat {
   // Store fit parameters from NLL calculation:
   std::map<std::string,double> m_mapGlobs;
   std::map<std::string,double> m_mapNP;
-
+  std::map<std::string,double> m_mapPars;
+  
   // In case special parameter settings are used for a fit:
   std::map<TString,double> m_paramValToSet;
   std::map<TString,bool> m_paramConstToSet;

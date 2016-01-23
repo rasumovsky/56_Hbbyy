@@ -4,7 +4,7 @@
 //                                                                            //
 //  Author: Andrew Hard                                                       //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 24/06/2015                                                          //
+//  Date: 23/01/2016                                                          //
 //                                                                            //
 //  This program compares test statistic values from pseudo-experiment        //
 //  ensembles and asymptotic formulae.                                        //
@@ -19,30 +19,34 @@
    -----------------------------------------------------------------------------
    Constructor for the DHToyAnalysis class.
 */
-DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString newDHSignal) {
+DHToyAnalysis::DHToyAnalysis(TString newConfigFile) {
   
   // Load the config file:
-  Config *config = new Config(newConfigFile);
-  TString jobName = config->getStr("jobName");
-  TString anaType = DHAnalysis::getAnalysisType(config, newDHSignal);
+  m_config = new Config(newConfigFile);
+  TString jobName = m_config->getStr("JobName");
+  TString anaType = m_config->getStr("AnalysisType");
   
   // set input and output directories:
-  m_outputDir = Form("%s/%s/DHToyAnalysis", 
-		     (config->getStr("masterOutput")).Data(), jobName.Data());
+  m_outputDir = Form("%s/%s/DHToyAnalysis",
+		     (m_config->getStr("MasterOutput")).Data(),
+		     jobName.Data());
   TString toyDir = Form("%s/%s/DHPseudoExp", 
-			(config->getStr("masterOutput")).Data(),jobName.Data());
+			(m_config->getStr("MasterOutput")).Data(), 
+			jobName.Data());
   TString wsFileName = Form("%s/%s/DHWorkspace/rootfiles/workspaceDH_%s.root",
-			    (config->getStr("masterOutput")).Data(),
+			    (m_config->getStr("MasterOutput")).Data(),
 			    jobName.Data(), anaType.Data());
   
   // Set the internal (private) variable initial conditions:
-  m_namesGlobs.clear();
-  m_namesNuis.clear();
-  m_nGlobs = 0;
-  m_nNuis = 0;
   m_nBins = 500;
   m_binMin = 0;
   m_binMax = 20;
+  
+  // Set the fit types:
+  m_fitTypes.clear();
+  m_fitTypes.push_back("0"); 
+  m_fitTypes.push_back("1");
+  m_fitTypes.push_back("Free");
   
   // Create output directory:
   system(Form("mkdir -vp %s", m_outputDir.Data()));
@@ -89,6 +93,20 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString newDHSignal) {
   plotTestStatComparison("QMu");
   plotTestStatComparison("Q0");
   
+  // Then plot the nuis, globs, and other parameters:
+  for (int i_g = 0; i_g < (int)m_namesGlobs.size(); i_g++) {
+    plotHist(m_namesGlobs[i_g], 0);
+    plotHist(m_namesGlobs[i_g], 1);
+  }
+  for (int i_n = 0; i_n < (int)m_namesNuis.size(); i_n++) {
+    plotHist(m_namesNuis[i_n], 0);
+    plotHist(m_namesNuis[i_n], 1);
+  }
+  for (int i_p = 0; i_p < (int)m_namesPars.size(); i_p++) {
+    plotHist(m_namesPars[i_p], 0);
+    plotHist(m_namesPars[i_p], 1);
+  }
+  
   // Remove the temporary file lists:
   system(Form("rm %s", listMu0.Data()));
   system(Form("rm %s", listMu1.Data()));
@@ -108,8 +126,8 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString newDHSignal) {
 */
 void DHToyAnalysis::fillToyHistograms(int muValue, DHToyTree *toyTree) {
   int nEvents = toyTree->fChain->GetEntries();
-  std::cout << "DHToyAnalysis: Loop over " << nEvents
-	    << " pseudoexperiments with mu = " << muValue << std::endl;
+  printer(Form("DHToyAnalysis: Loop over %d pseudoexperiments with mu = %d",
+	       nEvents, muValue), false);
   
   // Instantiate the histograms:
   m_hMuProfiled[muValue] = new TH1F(Form("hMuProfiled%d",muValue),
@@ -120,25 +138,56 @@ void DHToyAnalysis::fillToyHistograms(int muValue, DHToyTree *toyTree) {
   m_hQ0[muValue] = new TH1F(Form("hQ0%d",muValue),Form("hQ0%d",muValue),
 			    m_nBins, m_binMin, m_binMax);
   
-  for (int i_p = 0; i_p < 20; i_p++) {
-    m_hNuisMu0[i_p][muValue] = new TH1F(Form("hNuisMu0_%d",muValue),
-					Form("hNuisMu0_%d",muValue),100,-5,5);
-    m_hNuisMu1[i_p][muValue] = new TH1F(Form("hNuisMu1_%d",muValue),
-					Form("hNuisMu1_%d",muValue),100,-5,5);
-    m_hNuisMuFree[i_p][muValue] = new TH1F(Form("hNuisMuFree_%d",muValue),
-					   Form("hNuisMuFree_%d",muValue),
-					   100,-5,5);
-    
-    m_hGlobsMu0[i_p][muValue] = new TH1F(Form("hGlobsMu0_%d",muValue),
-					 Form("hGlobsMu0_%d",muValue),100,-5,5);
-    m_hGlobsMu1[i_p][muValue] = new TH1F(Form("hGlobsMu1_%d",muValue),
-					 Form("hGlobsMu1_%d",muValue),100,-5,5);
-    m_hGlobsMuFree[i_p][muValue] = new TH1F(Form("hGlobsMuFree_%d",muValue),
-					    Form("hGlobsMuFree_%d",muValue),
-					    100,-5,5);
+  // Store names and numbers of parameters:
+  m_namesGlobs.clear();
+  m_namesNuis.clear();
+  m_namesPars.clear();
+  
+  std::cout << "Check0" << std::endl;
+  
+  // Get names of NP (and Globs):
+  RooArgSet *setNuis = (RooArgSet*)m_workspace->set("nuisanceParameters");
+  RooRealVar *nuis = NULL;
+  TIterator *iterNuis = setNuis->createIterator();
+  while ((nuis = (RooRealVar*)iterNuis->Next())) {
+    std::cout << "Check0.1" << std::endl;
+    TString nameNuis = nuis->GetName();
+    //std::cout << "nuis name = " << nameNuis << std::endl;
+    TString nameGlob = Form("RNDM_%s",nameNuis.Data());
+    //std::cout << "glob name = " << nameGlob << std::endl;
+    for (int i_f = 0; i_f < (int)m_fitTypes.size(); i_f++) {
+      TString nuisKey = Form("%s_Mu%sFit_Mu%dData",
+			     nameNuis.Data(), m_fitTypes[i_f].Data(), muValue);
+      m_histStorage[nuisKey] = new TH1F(nuisKey, nuisKey, 100, -5, 5);
+      TString globKey = Form("%s_Mu%sFit_Mu%dData",
+			     nameGlob.Data(), m_fitTypes[i_f].Data(), muValue);
+      m_histStorage[globKey] = new TH1F(globKey, globKey, 100, -5, 5);
+    }
+    m_namesNuis.push_back(nameNuis);
+    m_namesNuis.push_back(nameGlob);
+  }
+
+  std::cout << "Check1" << std::endl;
+  
+  // Also get names of non-systematic parameters:
+  RooArgSet *setPars = (RooArgSet*)m_workspace->set("nonSysParameters");
+  RooRealVar *pars = NULL;
+  TIterator *iterPars = setPars->createIterator();
+  while ((pars = (RooRealVar*)iterPars->Next())) {
+    TString namePars = pars->GetName();
+    for (int i_f = 0; i_f < (int)m_fitTypes.size(); i_f++) {
+      TString parsKey = Form("%s_Mu%sFit_Mu%dData",
+			     namePars.Data(), m_fitTypes[i_f].Data(), muValue);
+      m_histStorage[parsKey] = new TH1F(parsKey, parsKey, 100, -5, 5);
+    }
+    m_namesPars.push_back(namePars);
   }
   
+  std::cout << "Check2" << std::endl;
+  
+  //----------------------------------------//
   // Loop over events in the TTree:
+  printer("DHToyAnalysis: Looping over TTree events.", false);
   bool isFirstLoop = true;
   for (int i_e = 0; i_e < nEvents; i_e++) {
     toyTree->fChain->GetEntry(i_e);
@@ -149,46 +198,58 @@ void DHToyAnalysis::fillToyHistograms(int muValue, DHToyTree *toyTree) {
     
     // Get the test statistic values:
     double valueQMu = m_dhts->getQMuFromNLL(toyTree->nllMu1, toyTree->nllMuFree,
-					    toyTree->muDHVal, 1);
+					    toyTree->profiledPOIVal, 1);
     double valueQ0 = m_dhts->getQ0FromNLL(toyTree->nllMu0, toyTree->nllMuFree,
-					  toyTree->muDHVal);
+					  toyTree->profiledPOIVal);
     
     // Fill histograms for the test statistics and POI:
     m_hQMu[muValue]->Fill(valueQMu);
     m_hQ0[muValue]->Fill(valueQ0);
-    m_hMuProfiled[muValue]->Fill(toyTree->muDHVal);
+    m_hMuProfiled[muValue]->Fill(toyTree->profiledPOIVal);
     
-    // Fill the nuisance parameter histograms:
-    if (isFirstLoop) m_nNuis = (int)((*toyTree->namesNP).size());
-    // loop over the nuisance parameters in the tree:
-    for (int i_p = 0; i_p < m_nNuis; i_p++) {
-      m_hNuisMu0[i_p][muValue]->Fill((*toyTree->valuesNPMu0)[i_p] );
-      m_hNuisMu1[i_p][muValue]->Fill((*toyTree->valuesNPMu1)[i_p] );
-      m_hNuisMuFree[i_p][muValue]->Fill((*toyTree->valuesNPMuFree)[i_p]);
-      if (isFirstLoop) m_namesNuis.push_back((*toyTree->namesNP)[i_p]);
+    // Loop over the nuis:
+    for (int i_n = 0; i_n < (int)((*toyTree->namesNP).size()); i_n++) {
+      TString currNPName = (*toyTree->namesNP)[i_n];
+      m_histStorage[Form("%s_Mu0Fit_Mu%dData", currNPName.Data(), muValue)]
+	->Fill((*toyTree->valuesNPMu0)[i_n]);
+      m_histStorage[Form("%s_Mu1Fit_Mu%dData", currNPName.Data(), muValue)]
+	->Fill((*toyTree->valuesNPMu1)[i_n]);
+      m_histStorage[Form("%s_MuFreeFit_Mu%dData", currNPName.Data(), muValue)]
+	->Fill((*toyTree->valuesNPMuFree)[i_n]);
     }
     
-    // Fill the global observable histograms:
-    if (isFirstLoop) m_nGlobs = (int)((*toyTree->namesGlobs).size());
-    // loop over the nuisance parameters in the tree:
-    for (int i_p = 0; i_p < m_nGlobs; i_p++) {
-      m_hGlobsMu0[i_p][muValue]->Fill((*toyTree->valuesGlobsMu0)[i_p]);
-      m_hGlobsMu1[i_p][muValue]->Fill((*toyTree->valuesGlobsMu1)[i_p]);
-      m_hGlobsMuFree[i_p][muValue]->Fill((*toyTree->valuesGlobsMuFree)[i_p]);
-      if (isFirstLoop) m_namesNuis.push_back((*toyTree->namesNP)[i_p]);
+    // Loop over the globs:
+    for (int i_g = 0; i_g < (int)((*toyTree->namesGlobs).size()); i_g++) {
+      TString currGlobName = (*toyTree->namesGlobs)[i_g];
+      m_histStorage[Form("%s_Mu0Fit_Mu%dData", currGlobName.Data(), muValue)]
+	->Fill((*toyTree->valuesGlobsMu0)[i_g]);
+      m_histStorage[Form("%s_Mu1Fit_Mu%dData", currGlobName.Data(), muValue)]
+	->Fill((*toyTree->valuesGlobsMu1)[i_g]);
+      m_histStorage[Form("%s_MuFreeFit_Mu%dData", currGlobName.Data(), muValue)]
+	->Fill((*toyTree->valuesGlobsMuFree)[i_g]);
     }
     
-    isFirstLoop = false;
+    // Loop over the non-systematic parameters:
+    for (int i_p = 0; i_p < (int)((*toyTree->namesPars).size()); i_p++) {
+      TString currParsName = (*toyTree->namesPars)[i_p];
+      m_histStorage[Form("%s_Mu0Fit_Mu%dData", currParsName.Data(), muValue)]
+	->Fill((*toyTree->valuesParsMu0)[i_p]);
+      m_histStorage[Form("%s_Mu1Fit_Mu%dData", currParsName.Data(), muValue)]
+	->Fill((*toyTree->valuesParsMu1)[i_p]);
+      m_histStorage[Form("%s_MuFreeFit_Mu%dData", currParsName.Data(), muValue)]
+	->Fill((*toyTree->valuesParsMuFree)[i_p]);
+    }
   }
   
-  // Then scale the histograms:
+  // Then scale the statistics histograms:
   m_hQMu[muValue]->Scale(1.0 / m_hQMu[muValue]->Integral(1, m_nBins));
   m_hQ0[muValue]->Scale(1.0 / m_hQ0[muValue]->Integral(1, m_nBins));
 }
 
 /**
    -----------------------------------------------------------------------------
-   Get the asymptotic form of the test statistic. Stored in hAsimov histogram.
+   Get the asymptotic form of the test statistic. Stored in the m_hAsymptotic
+   histogram.
    @param statistic - the test statistic for asymptotic formula.
 */
 void DHToyAnalysis::getAsymptoticForm(TString statistic) {
@@ -241,40 +302,17 @@ TH1F* DHToyAnalysis::getAsymptoticHist() {
 
 /**
    -----------------------------------------------------------------------------
-   Get the histogram of a particular global observable.
+   Retrieve the histogram of a particular nuisance parameter, global observable,
+   or general parameter.
    @param paramName - the name of the global observable.
    @param fitType - the type of fit generating the distribution.
    @param toyMu - the mu value used to generate the toy data that was fitted.
 */
-TH1F* DHToyAnalysis::getGlobsHist(TString paramName, TString fitType,
-				  int toyMu) {
-  int paramIndex = 0;
-  for (paramIndex = 0; paramIndex < (int)m_namesGlobs.size(); paramIndex++) {
-    if (TString(m_namesGlobs[paramIndex]).Contains(paramName)) break;
-  }
-  if (fitType.EqualTo("Mu0")) return m_hGlobsMu0[paramIndex][toyMu];
-  else if (fitType.EqualTo("Mu1")) return m_hGlobsMu1[paramIndex][toyMu];
-  else if (fitType.EqualTo("MuFree")) return m_hGlobsMuFree[paramIndex][toyMu];
-  else return NULL;
-}
-
-/**
-   -----------------------------------------------------------------------------
-   Get the histogram of a particular nuisance parameter.
-   @param paramName - the name of the nuisance parameter.
-   @param fitType - the type of fit generating the distribution.
-   @param toyMu - the mu value used to generate the toy data that was fitted.
-*/
-TH1F* DHToyAnalysis::getNuisHist(TString paramName, TString fitType,
-				 int toyMu) {
-  int paramIndex = 0;
-  for (paramIndex = 0; paramIndex < (int)m_namesNuis.size(); paramIndex++) {
-    if (TString(m_namesNuis[paramIndex]).Contains(paramName)) break;
-  }
-  if (fitType.EqualTo("Mu0")) return m_hNuisMu0[paramIndex][toyMu];
-  else if (fitType.EqualTo("Mu1")) return m_hNuisMu1[paramIndex][toyMu];
-  else if (fitType.EqualTo("MuFree")) return m_hNuisMuFree[paramIndex][toyMu];
-  else return NULL;
+TH1F* DHToyAnalysis::getHist(TString paramName, TString fitType, int toyMu) {
+  TString mapKey = Form("%s_Mu%sFit_Mu%dData", paramName.Data(),
+			fitType.Data(), toyMu);
+  if (m_histStorage.count(mapKey) > 0) return m_histStorage[mapKey];
+  else printer(Form("DHToyAnalysis:: ERROR no hist %s",mapKey.Data()), true);
 }
 
 /**
@@ -295,31 +333,23 @@ TH1F* DHToyAnalysis::getMuHist(int toyMu) {
 TH1F* DHToyAnalysis::getStatHist(TString statistic, int toyMu) {
   if (statistic.EqualTo("Q0")) return m_hQ0[toyMu];
   else if (statistic.EqualTo("QMu")) return m_hQMu[toyMu];
-  else if (statistic.EqualTo("QMuTilde")) return m_hQMuTilde[toyMu];
-  else return NULL;
+  //else if (statistic.EqualTo("QMuTilde")) return m_hQMuTilde[toyMu];
+  else printer(Form("DHToyAnalysis: ERROR! no %s", statistic.Data()), true);
 }
 
 /**
    -----------------------------------------------------------------------------
    Plot the distributions of nuisance parameters and global observables
-   @param paramName - the name of the global observable or nuisance parameter.
-   @param paramType - global observable "Globs" or nuisance parameter "Nuis"
+   @param paramName - the name of the global observable.
    @param toyMu - the mu value used to generate the toy data that was fitted.
 */
-void DHToyAnalysis::plotParameter(TString paramName, TString paramType,
-				  int toyMu) {
+void DHToyAnalysis::plotHist(TString paramName, int toyMu) {
   
   TH1F *histMu0 = NULL; TH1F *histMu1 = NULL; TH1F *histMuFree = NULL;
-  if (paramType.EqualTo("Globs")) {
-    histMu0 = getGlobsHist(paramName, "Mu0", toyMu);
-    histMu1 = getGlobsHist(paramName, "Mu1", toyMu);
-    histMuFree = getGlobsHist(paramName, "MuFree", toyMu);
-  }
-  else if (paramType.EqualTo("Nuis")) {
-    histMu0 = getNuisHist(paramName, "Mu0", toyMu);
-    histMu1 = getNuisHist(paramName, "Mu1", toyMu);
-    histMuFree = getNuisHist(paramName, "MuFree", toyMu);
-  }
+  
+  histMu0 = getHist(paramName, "0", toyMu);
+  histMu1 = getHist(paramName, "1", toyMu);
+  histMuFree = getHist(paramName, "Free", toyMu);
   
   TCanvas *can = new TCanvas("can", "can",800, 800);
   can->cd();
@@ -343,12 +373,7 @@ void DHToyAnalysis::plotParameter(TString paramName, TString paramType,
   
   // Format axis titles:
   histMu0->GetYaxis()->SetTitle("Fraction of toys");
-  if (paramName.Contains("nBkg") && !paramType.EqualTo("Globs")) {
-    histMu0->GetXaxis()->SetTitle("Background normalization");
-  }
-  else {
-    histMu0->GetXaxis()->SetTitle("parameter pulls [#sigma]");
-  }
+  histMu0->GetXaxis()->SetTitle(paramName);
   
   // Draw histograms:
   gPad->SetLogy();
@@ -356,23 +381,31 @@ void DHToyAnalysis::plotParameter(TString paramName, TString paramType,
   histMu1->Draw("histSAME");
   histMuFree->Draw("histSAME");
   
+  // Create a legend:
   TLegend leg(0.2,0.71,0.4,0.86);
   leg.SetBorderSize(0);
   leg.SetTextSize(0.04);
   leg.SetFillColor(0);
   leg.AddEntry(histMu0,"#mu=0 fixed","l");
   leg.AddEntry(histMu1,"#mu=1 fixed","l");
-  leg.AddEntry(histMuFree,"#mu floating","l");
+  leg.AddEntry(histMuFree,"#hat{#mu}","l");
   leg.Draw("SAME");
   
-  TLatex typeText;
-  typeText.SetNDC();
-  typeText.SetTextColor(kBlack);
-  typeText.SetTextFont(42); 
-  typeText.SetTextSize(0.05);
-  typeText.DrawLatex(0.2, 0.87, paramName);
-  
-  if (!paramName.Contains("nBkg")) {
+  // Draw fancy lines at the sigma values for globs and nuis:
+  bool isNuisOrGlob = false;
+  for (int i_g = 0; i_g < (int)m_namesGlobs.size(); i_g++) {
+    if (paramName.EqualTo(m_namesGlobs[i_g])) {
+      isNuisOrGlob = true;
+      break;
+    }
+  }
+  for (int i_n = 0; i_n < (int)m_namesNuis.size(); i_n++) {
+    if (isNuisOrGlob || paramName.EqualTo(m_namesNuis[i_n])) {
+      isNuisOrGlob = true;
+      break;
+    }
+  }
+  if (isNuisOrGlob) {
     TLine *line[5];
     for (int i_l = 0; i_l < 5; i_l++) {
       line[i_l] = new TLine();
@@ -383,6 +416,7 @@ void DHToyAnalysis::plotParameter(TString paramName, TString paramType,
     }
   }
   
+  // Print the canvas:
   can->Print(Form("%s/plot_%s_toy%i.eps", m_outputDir.Data(), paramName.Data(), 
 		  toyMu));
   can->Clear();
@@ -646,6 +680,19 @@ void DHToyAnalysis::plotTestStatComparison(TString statistic) {
   can->Print(Form("%s/plot_comp_%s.eps", m_outputDir.Data(), statistic.Data()));
   can->Print(Form("%s/plot_comp_%s.png", m_outputDir.Data(), statistic.Data()));
   can->Clear();
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Prints a statement (if verbose) and exits (if fatal).
+   @param statement - The statement to print.
+   @param isFatal - True iff. this should trigger an exit command.
+*/
+void DHToyAnalysis::printer(TString statement, bool isFatal) {
+  if (m_config->getBool("Verbose") || isFatal) {
+    std::cout << statement << std::endl;
+  }
+  if (isFatal) exit(0);
 }
 
 /**

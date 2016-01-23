@@ -1,8 +1,8 @@
 //////////////////////////////////////////////////////////
 // This class has been automatically generated on
-// Wed Jun 24 10:28:49 2015 by ROOT version 5.34/09
+// Sat Jan 23 16:36:33 2016 by ROOT version 5.34/09
 // from TTree toy/toy
-// found on file: toy_mu0_1987.root
+// found on file: toy_mu1_63237.root
 //////////////////////////////////////////////////////////
 
 #ifndef DHToyTree_h
@@ -28,7 +28,7 @@ public :
    // Declaration of leaf types
    Int_t           seed;
    Double_t        numEvents;
-   Double_t        muDHVal;
+   Double_t        profiledPOIVal;
    Bool_t          convergedMu0;
    Bool_t          convergedMu1;
    Bool_t          convergedMuFree;
@@ -38,7 +38,6 @@ public :
    Double_t        llrL1L0;
    Double_t        llrL0Lfree;
    Double_t        llrL1Lfree;
-   vector<double>  *numEventsPerCate;
    vector<string>  *namesNP;
    vector<double>  *valuesNPMu0;
    vector<double>  *valuesNPMu1;
@@ -47,11 +46,15 @@ public :
    vector<double>  *valuesGlobsMu1;
    vector<double>  *valuesGlobsMu0;
    vector<double>  *valuesGlobsMuFree;
+   vector<string>  *namesPars;
+   vector<double>  *valuesParsMu1;
+   vector<double>  *valuesParsMu0;
+   vector<double>  *valuesParsMuFree;
 
    // List of branches
    TBranch        *b_seed;   //!
    TBranch        *b_numEvents;   //!
-   TBranch        *b_muDHVal;   //!
+   TBranch        *b_profiledPOIVal;   //!
    TBranch        *b_convergedMu0;   //!
    TBranch        *b_convergedMu1;   //!
    TBranch        *b_convergedMuFree;   //!
@@ -61,7 +64,6 @@ public :
    TBranch        *b_llrL1L0;   //!
    TBranch        *b_llrL0Lfree;   //!
    TBranch        *b_llrL1Lfree;   //!
-   TBranch        *b_numEventsPerCate;   //!
    TBranch        *b_namesNP;   //!
    TBranch        *b_valuesNPMu0;   //!
    TBranch        *b_valuesNPMu1;   //!
@@ -70,6 +72,10 @@ public :
    TBranch        *b_valuesGlobsMu1;   //!
    TBranch        *b_valuesGlobsMu0;   //!
    TBranch        *b_valuesGlobsMuFree;   //!
+   TBranch        *b_namesPars;   //!
+   TBranch        *b_valuesParsMu1;   //!
+   TBranch        *b_valuesParsMu0;   //!
+   TBranch        *b_valuesParsMuFree;   //!
 
    DHToyTree(TTree *tree=0);
    virtual ~DHToyTree();
@@ -90,9 +96,9 @@ DHToyTree::DHToyTree(TTree *tree) : fChain(0)
 // if parameter tree is not specified (or zero), connect the file
 // used to generate this class and read the Tree.
    if (tree == 0) {
-      TFile *f = (TFile*)gROOT->GetListOfFiles()->FindObject("toy_mu0_1987.root");
+      TFile *f = (TFile*)gROOT->GetListOfFiles()->FindObject("toy_mu1_63237.root");
       if (!f || !f->IsOpen()) {
-         f = new TFile("toy_mu0_1987.root");
+         f = new TFile("toy_mu1_63237.root");
       }
       f->GetObject("toy",tree);
 
@@ -136,7 +142,6 @@ void DHToyTree::Init(TTree *tree)
    // (once per file to be processed).
 
    // Set object pointer
-   numEventsPerCate = 0;
    namesNP = 0;
    valuesNPMu0 = 0;
    valuesNPMu1 = 0;
@@ -145,6 +150,10 @@ void DHToyTree::Init(TTree *tree)
    valuesGlobsMu1 = 0;
    valuesGlobsMu0 = 0;
    valuesGlobsMuFree = 0;
+   namesPars = 0;
+   valuesParsMu1 = 0;
+   valuesParsMu0 = 0;
+   valuesParsMuFree = 0;
    // Set branch addresses and branch pointers
    if (!tree) return;
    fChain = tree;
@@ -153,7 +162,7 @@ void DHToyTree::Init(TTree *tree)
 
    fChain->SetBranchAddress("seed", &seed, &b_seed);
    fChain->SetBranchAddress("numEvents", &numEvents, &b_numEvents);
-   fChain->SetBranchAddress("muDHVal", &muDHVal, &b_muDHVal);
+   fChain->SetBranchAddress("profiledPOIVal", &profiledPOIVal, &b_profiledPOIVal);
    fChain->SetBranchAddress("convergedMu0", &convergedMu0, &b_convergedMu0);
    fChain->SetBranchAddress("convergedMu1", &convergedMu1, &b_convergedMu1);
    fChain->SetBranchAddress("convergedMuFree", &convergedMuFree, &b_convergedMuFree);
@@ -163,7 +172,6 @@ void DHToyTree::Init(TTree *tree)
    fChain->SetBranchAddress("llrL1L0", &llrL1L0, &b_llrL1L0);
    fChain->SetBranchAddress("llrL0Lfree", &llrL0Lfree, &b_llrL0Lfree);
    fChain->SetBranchAddress("llrL1Lfree", &llrL1Lfree, &b_llrL1Lfree);
-   fChain->SetBranchAddress("numEventsPerCate", &numEventsPerCate, &b_numEventsPerCate);
    fChain->SetBranchAddress("namesNP", &namesNP, &b_namesNP);
    fChain->SetBranchAddress("valuesNPMu0", &valuesNPMu0, &b_valuesNPMu0);
    fChain->SetBranchAddress("valuesNPMu1", &valuesNPMu1, &b_valuesNPMu1);
@@ -172,6 +180,10 @@ void DHToyTree::Init(TTree *tree)
    fChain->SetBranchAddress("valuesGlobsMu1", &valuesGlobsMu1, &b_valuesGlobsMu1);
    fChain->SetBranchAddress("valuesGlobsMu0", &valuesGlobsMu0, &b_valuesGlobsMu0);
    fChain->SetBranchAddress("valuesGlobsMuFree", &valuesGlobsMuFree, &b_valuesGlobsMuFree);
+   fChain->SetBranchAddress("namesPars", &namesPars, &b_namesPars);
+   fChain->SetBranchAddress("valuesParsMu1", &valuesParsMu1, &b_valuesParsMu1);
+   fChain->SetBranchAddress("valuesParsMu0", &valuesParsMu0, &b_valuesParsMu0);
+   fChain->SetBranchAddress("valuesParsMuFree", &valuesParsMuFree, &b_valuesParsMuFree);
    Notify();
 }
 

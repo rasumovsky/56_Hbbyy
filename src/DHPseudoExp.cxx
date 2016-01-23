@@ -23,7 +23,7 @@
 #include "CommonHead.h"
 #include "CommonFunc.h"
 #include "Config.h"
-#include "DHAnalysis.h"
+//#include "DHAnalysis.h"
 #include "DHTestStat.h"
 #include "RooBernsteinM.h"
 #include "RooFitHead.h"
@@ -60,7 +60,6 @@ int main(int argc, char **argv) {
   
   // Assign input parameters:
   TString configFile = argv[1];
-  //TString DHSignal = argv[2];
   TString options = argv[2];
   int seed = atoi(argv[3]);
   int nToysPerJob = atoi(argv[4]);
@@ -96,8 +95,8 @@ int main(int argc, char **argv) {
   // Variables to store in the TTree:
   double numEvents;
   bool convergedMu1, convergedMu0, convergedMuFree;
-  double muDHVal, nllMu0, nllMu1, nllMuFree, llrL1L0, llrL0Lfree, llrL1Lfree;
-  
+  double profiledPOIVal;
+  double nllMu0, nllMu1, nllMuFree, llrL1L0, llrL0Lfree, llrL1Lfree;
   std::vector<std::string> namesNP; namesNP.clear();
   std::vector<double> valuesNPMu0; valuesNPMu0.clear();
   std::vector<double> valuesNPMu1; valuesNPMu1.clear();
@@ -106,10 +105,14 @@ int main(int argc, char **argv) {
   std::vector<double> valuesGlobsMu0; valuesGlobsMu0.clear();
   std::vector<double> valuesGlobsMu1; valuesGlobsMu1.clear();
   std::vector<double> valuesGlobsMuFree; valuesGlobsMuFree.clear();
-    
+  std::vector<string> namesPars; namesPars.clear();
+  std::vector<double> valuesParsMu0; valuesParsMu0.clear();
+  std::vector<double> valuesParsMu1; valuesParsMu1.clear();
+  std::vector<double> valuesParsMuFree; valuesParsMuFree.clear();
+  
   fOutputTree.Branch("seed", &seed, "seed/I");
   fOutputTree.Branch("numEvents", &numEvents, "numEvents/D");
-  fOutputTree.Branch("muDHVal", &muDHVal, "muDHVal/D");
+  fOutputTree.Branch("profiledPOIVal", &profiledPOIVal, "profiledPOIVal/D");
   fOutputTree.Branch("convergedMu0", &convergedMu0, "convergedMu0/O");
   fOutputTree.Branch("convergedMu1", &convergedMu1, "convergedMu1/O");
   fOutputTree.Branch("convergedMuFree", &convergedMuFree, "convergedMuFree/O");
@@ -128,6 +131,10 @@ int main(int argc, char **argv) {
   fOutputTree.Branch("valuesGlobsMu1", &valuesGlobsMu1);
   fOutputTree.Branch("valuesGlobsMu0", &valuesGlobsMu0);
   fOutputTree.Branch("valuesGlobsMuFree", &valuesGlobsMuFree);
+  fOutputTree.Branch("namesPars", &namesPars);
+  fOutputTree.Branch("valuesParsMu1", &valuesParsMu1);
+  fOutputTree.Branch("valuesParsMu0", &valuesParsMu0);
+  fOutputTree.Branch("valuesParsMuFree", &valuesParsMuFree);
   
   // Loop to generate pseudo experiments:
   std::cout << "DHPseudoExp: Generating " << nToysPerJob
@@ -145,27 +152,30 @@ int main(int argc, char **argv) {
     numEvents = workspace->data("toyData")->sumEntries();
     
     // Mu = 0 fits:
-    nllMu0 = dhts->getFitNLL("toyData", 0, true, muDHVal);
+    nllMu0 = dhts->getFitNLL("toyData", 0, true, profiledPOIVal);
     convergedMu0 = dhts->fitsAllConverged();
     mapToVectors(dhts->getNuisanceParameters(), namesNP, valuesNPMu0);
     mapToVectors(dhts->getGlobalObservables(), namesGlobs, valuesGlobsMu0);
-        
+    mapToVectors(dhts->getParameters(), namesPars, valuesParsMu0);
+    
     // Mu = 1 fits:
-    nllMu1 = dhts->getFitNLL("toyData", 1, true, muDHVal);
+    nllMu1 = dhts->getFitNLL("toyData", 1, true, profiledPOIVal);
     convergedMu1 = dhts->fitsAllConverged();
     mapToVectors(dhts->getNuisanceParameters(), namesNP, valuesNPMu1);
     mapToVectors(dhts->getGlobalObservables(), namesGlobs, valuesGlobsMu1);
-        
+    mapToVectors(dhts->getParameters(), namesPars, valuesParsMu1);
+    
     // Mu free fits:
-    nllMuFree = dhts->getFitNLL("toyData", 1, false, muDHVal);
+    nllMuFree = dhts->getFitNLL("toyData", 1, false, profiledPOIVal);
     convergedMuFree = dhts->fitsAllConverged();
     mapToVectors(dhts->getNuisanceParameters(), namesNP, valuesNPMuFree);
     mapToVectors(dhts->getGlobalObservables(), namesGlobs, valuesGlobsMuFree);
-        
+    mapToVectors(dhts->getParameters(), namesPars, valuesParsMuFree);
+    
     // Calculate profile likelihood ratios:
     llrL1L0 = nllMu1 - nllMu0;
-    llrL1Lfree = muDHVal > 1.0 ? 0.0 : (nllMu1 - nllMuFree);
-    llrL0Lfree = muDHVal < 0.0 ? 0.0 : (nllMu0 - nllMuFree);
+    llrL1Lfree = profiledPOIVal > 1.0 ? 0.0 : (nllMu1 - nllMuFree);
+    llrL0Lfree = profiledPOIVal < 0.0 ? 0.0 : (nllMu0 - nllMuFree);
     
     // Fill the tree:
     fOutputTree.Fill();
@@ -182,6 +192,6 @@ int main(int argc, char **argv) {
   fOutputFile.cd();
   fOutputTree.Write();
   fOutputFile.Close();
-  system(Form("rm %s",copiedFile.Data()));
+  system(Form("rm %s", copiedFile.Data()));
   return 0;
 }

@@ -8,7 +8,6 @@
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "BkgModel.h"
 #include "Config.h"
 #include "DHAnalysis.h"
 #include "DHCheckJobs.h"
@@ -27,4 +26,4 @@ void submitMLViaBsub(TString exeConfigFile, TString exeOption,
 		     TString exeSignal);
 
 void submitPEViaBsub(TString exeConfigFile, TString exeOption,
-		     TString exeSignal, int exeSeed, int exeToysPerJob);
+		     int exeSeed, int exeToysPerJob);

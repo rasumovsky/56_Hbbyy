@@ -15,11 +15,9 @@
 #include "CommonFunc.h"
 #include "CommonHead.h"
 #include "Config.h"
-#include "DHAnalysis.h"
 #include "DHTestStat.h"
 #include "RooFitHead.h"
 #include "RooStatsHead.h"
-//#include "statistics.h"
 
 class DHWorkspace {
 

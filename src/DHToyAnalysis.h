@@ -5,7 +5,7 @@
 //                                                                            //
 //  Author: Andrew Hard                                                       //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 24/06/2015                                                          //
+//  Date: 23/01/2016                                                          //
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -25,27 +25,28 @@ class DHToyAnalysis {
 
  public:
   
-  DHToyAnalysis(TString newConfigFile, TString newDMSignal);
+  DHToyAnalysis(TString newConfigFile);
   virtual ~DHToyAnalysis() {};
   
   void fillToyHistograms(int muValue, DHToyTree *toyTree);
   void getAsymptoticForm(TString statistic);
   TH1F* getAsymptoticHist();
-  TH1F* getGlobsHist(TString paramName, TString fitType, int toyMu);
-  TH1F* getNuisHist(TString paramName, TString fitType, int toyMu);
+  TH1F* getHist(TString paramName, TString fitType, int toyMu);
   TH1F* getMuHist(int toyMu);
   TH1F* getStatHist(TString statistic, int toyMu);
-  void plotParameter(TString paramName, TString paramType, int toyMu);
+  void plotHist(TString paramName, int toyMu);
   void plotProfiledMu(); 
   void plotTestStat(TString statistic);
   void plotTestStatComparison(TString statistic);
     
  private:
-  
+
+  void printer(TString statement, bool isFatal);
   TString printStatName(TString statistic);
   
   // Private member variables:
   TString m_outputDir;
+  Config *m_config;
   
   // Classes for statistics access:
   DHTestStat *m_dhts;
@@ -56,25 +57,23 @@ class DHToyAnalysis {
   int m_binMin;
   int m_binMax;
   
+  // Fit types:
+  std::vector<TString> m_fitTypes;
+  
   // Histograms:
   TH1F *m_hAsymptotic;
   TH1F *m_hMuProfiled[2];
   TH1F *m_hQ0[2];
   TH1F *m_hQMu[2];
-  TH1F *m_hQMuTilde[2];
-  TH1F *m_hNuisMu0[20][2];
-  TH1F *m_hNuisMu1[20][2];
-  TH1F *m_hNuisMuFree[20][2];
-  TH1F *m_hGlobsMu0[20][2];
-  TH1F *m_hGlobsMu1[20][2];
-  TH1F *m_hGlobsMuFree[20][2];
+  //TH1F *m_hQMuTilde[2];
+  
+  // For the nuis, globs, and regular parameters:
+  std::map<TString,TH1F*> m_histStorage;
   
   // Parameter data:
-  std::vector<std::string> m_namesGlobs;
-  std::vector<std::string> m_namesNuis;
-  int m_nGlobs;
-  int m_nNuis;
-  
+  std::vector<TString> m_namesGlobs;
+  std::vector<TString> m_namesNuis;
+  std::vector<TString> m_namesPars;
 };
 
 #endif
