@@ -23,7 +23,6 @@
 #include "CommonHead.h"
 #include "CommonFunc.h"
 #include "Config.h"
-//#include "DHAnalysis.h"
 #include "DHTestStat.h"
 #include "RooBernsteinM.h"
 #include "RooFitHead.h"
@@ -31,7 +30,7 @@
 #include "statistics.h"
 
 void mapToVectors(std::map<std::string,double> map, 
-		  std::vector<std::string> names, std::vector<double> values) {
+		  std::vector<std::string>& names, std::vector<double>& values){
   names.clear(); 
   values.clear();
   for (std::map<std::string,double>::iterator mapIter = map.begin(); 
@@ -109,9 +108,11 @@ int main(int argc, char **argv) {
   std::vector<double> valuesParsMu0; valuesParsMu0.clear();
   std::vector<double> valuesParsMu1; valuesParsMu1.clear();
   std::vector<double> valuesParsMuFree; valuesParsMuFree.clear();
+  std::vector<double> numEventsPerCate; numEventsPerCate.clear();
   
   fOutputTree.Branch("seed", &seed, "seed/I");
   fOutputTree.Branch("numEvents", &numEvents, "numEvents/D");
+  fOutputTree.Branch("numEventsPerCate", &numEventsPerCate);
   fOutputTree.Branch("profiledPOIVal", &profiledPOIVal, "profiledPOIVal/D");
   fOutputTree.Branch("convergedMu0", &convergedMu0, "convergedMu0/O");
   fOutputTree.Branch("convergedMu1", &convergedMu1, "convergedMu1/O");
@@ -122,7 +123,6 @@ int main(int argc, char **argv) {
   fOutputTree.Branch("llrL1L0", &llrL1L0, "llrL1L0/D");
   fOutputTree.Branch("llrL0Lfree", &llrL0Lfree, "llrL0Lfree/D");
   fOutputTree.Branch("llrL1Lfree", &llrL1Lfree, "llrL1Lfree/D");
-  //fOutputTree.Branch("numEventsPerCate", &numEventsPerCate);
   fOutputTree.Branch("namesNP", &namesNP);
   fOutputTree.Branch("valuesNPMu0", &valuesNPMu0);
   fOutputTree.Branch("valuesNPMu1", &valuesNPMu1);
@@ -150,26 +150,29 @@ int main(int argc, char **argv) {
     RooDataSet *newToyData
       = dhts->createPseudoData(seed, inputPoIVal, options.Contains("FixMu"));
     numEvents = workspace->data("toyData")->sumEntries();
+    numEventsPerCate = dhts->getNEventsToys();
+
+    // Globs are only set once for each dataset:
+    mapToVectors(dhts->getGlobalObservables(), namesGlobs, valuesGlobsMu0);
+    mapToVectors(dhts->getGlobalObservables(), namesGlobs, valuesGlobsMu1);
+    mapToVectors(dhts->getGlobalObservables(), namesGlobs, valuesGlobsMuFree);
     
     // Mu = 0 fits:
     nllMu0 = dhts->getFitNLL("toyData", 0, true, profiledPOIVal);
     convergedMu0 = dhts->fitsAllConverged();
     mapToVectors(dhts->getNuisanceParameters(), namesNP, valuesNPMu0);
-    mapToVectors(dhts->getGlobalObservables(), namesGlobs, valuesGlobsMu0);
     mapToVectors(dhts->getParameters(), namesPars, valuesParsMu0);
     
     // Mu = 1 fits:
     nllMu1 = dhts->getFitNLL("toyData", 1, true, profiledPOIVal);
     convergedMu1 = dhts->fitsAllConverged();
     mapToVectors(dhts->getNuisanceParameters(), namesNP, valuesNPMu1);
-    mapToVectors(dhts->getGlobalObservables(), namesGlobs, valuesGlobsMu1);
     mapToVectors(dhts->getParameters(), namesPars, valuesParsMu1);
     
     // Mu free fits:
     nllMuFree = dhts->getFitNLL("toyData", 1, false, profiledPOIVal);
     convergedMuFree = dhts->fitsAllConverged();
     mapToVectors(dhts->getNuisanceParameters(), namesNP, valuesNPMuFree);
-    mapToVectors(dhts->getGlobalObservables(), namesGlobs, valuesGlobsMuFree);
     mapToVectors(dhts->getParameters(), namesPars, valuesParsMuFree);
     
     // Calculate profile likelihood ratios:

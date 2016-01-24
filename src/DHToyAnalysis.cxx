@@ -26,6 +26,8 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile) {
   TString jobName = m_config->getStr("JobName");
   TString anaType = m_config->getStr("AnalysisType");
   
+  printer(Form("DHToyAnalysis::DHToyAnalysis(%s)",newConfigFile.Data()),false);
+
   // set input and output directories:
   m_outputDir = Form("%s/%s/DHToyAnalysis",
 		     (m_config->getStr("MasterOutput")).Data(),
@@ -73,16 +75,16 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile) {
   TChain* chainMu1 = CommonFunc::MakeChain("toy", listMu1, "badfile");
   DHToyTree *treeMu0 = new DHToyTree(chainMu0);
   DHToyTree *treeMu1 = new DHToyTree(chainMu1);
-  
-  // Store the toy data:
-  fillToyHistograms(0, treeMu0);
-  fillToyHistograms(1, treeMu1);
-  
+    
   // Get the Asimov form of the test statistic:
   TFile workspaceFile(wsFileName, "read");
   m_workspace = (RooWorkspace*)workspaceFile.Get("combinedWS");
   m_dhts = new DHTestStat(newConfigFile, "new", m_workspace);
   
+  // Store the toy data:
+  fillToyHistograms(0, treeMu0);
+  fillToyHistograms(1, treeMu1);
+
   // Get the asymptotic test statistic distribution:
   getAsymptoticForm("QMu");// THIS SHOULD BE GENERALIZED!!!
   
@@ -125,9 +127,7 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile) {
    @param toyTree - the TTree containing the pseudo data.
 */
 void DHToyAnalysis::fillToyHistograms(int muValue, DHToyTree *toyTree) {
-  int nEvents = toyTree->fChain->GetEntries();
-  printer(Form("DHToyAnalysis: Loop over %d pseudoexperiments with mu = %d",
-	       nEvents, muValue), false);
+  printer(Form("DHToyAnalysis::fillToyHistograms(%d)",muValue), false);
   
   // Instantiate the histograms:
   m_hMuProfiled[muValue] = new TH1F(Form("hMuProfiled%d",muValue),
@@ -142,19 +142,14 @@ void DHToyAnalysis::fillToyHistograms(int muValue, DHToyTree *toyTree) {
   m_namesGlobs.clear();
   m_namesNuis.clear();
   m_namesPars.clear();
-  
-  std::cout << "Check0" << std::endl;
-  
+    
   // Get names of NP (and Globs):
   RooArgSet *setNuis = (RooArgSet*)m_workspace->set("nuisanceParameters");
   RooRealVar *nuis = NULL;
   TIterator *iterNuis = setNuis->createIterator();
   while ((nuis = (RooRealVar*)iterNuis->Next())) {
-    std::cout << "Check0.1" << std::endl;
     TString nameNuis = nuis->GetName();
-    //std::cout << "nuis name = " << nameNuis << std::endl;
     TString nameGlob = Form("RNDM_%s",nameNuis.Data());
-    //std::cout << "glob name = " << nameGlob << std::endl;
     for (int i_f = 0; i_f < (int)m_fitTypes.size(); i_f++) {
       TString nuisKey = Form("%s_Mu%sFit_Mu%dData",
 			     nameNuis.Data(), m_fitTypes[i_f].Data(), muValue);
@@ -166,8 +161,6 @@ void DHToyAnalysis::fillToyHistograms(int muValue, DHToyTree *toyTree) {
     m_namesNuis.push_back(nameNuis);
     m_namesNuis.push_back(nameGlob);
   }
-
-  std::cout << "Check1" << std::endl;
   
   // Also get names of non-systematic parameters:
   RooArgSet *setPars = (RooArgSet*)m_workspace->set("nonSysParameters");
@@ -183,11 +176,10 @@ void DHToyAnalysis::fillToyHistograms(int muValue, DHToyTree *toyTree) {
     m_namesPars.push_back(namePars);
   }
   
-  std::cout << "Check2" << std::endl;
-  
   //----------------------------------------//
   // Loop over events in the TTree:
-  printer("DHToyAnalysis: Looping over TTree events.", false);
+  int nEvents = toyTree->fChain->GetEntries();
+  printer(Form("DHToyAnalysis: Looping over %d toy events.",nEvents), false);
   bool isFirstLoop = true;
   for (int i_e = 0; i_e < nEvents; i_e++) {
     toyTree->fChain->GetEntry(i_e);
@@ -344,15 +336,16 @@ TH1F* DHToyAnalysis::getStatHist(TString statistic, int toyMu) {
    @param toyMu - the mu value used to generate the toy data that was fitted.
 */
 void DHToyAnalysis::plotHist(TString paramName, int toyMu) {
+  printer(Form("DHToyAnalysis::plotHist(%s, %d)",paramName.Data(),toyMu),false);
   
-  TH1F *histMu0 = NULL; TH1F *histMu1 = NULL; TH1F *histMuFree = NULL;
-  
-  histMu0 = getHist(paramName, "0", toyMu);
-  histMu1 = getHist(paramName, "1", toyMu);
-  histMuFree = getHist(paramName, "Free", toyMu);
+  // Retrieve the histograms for the parameter after various fits:
+  TH1F *histMu0 = getHist(paramName, "0", toyMu);
+  TH1F *histMu1 = getHist(paramName, "1", toyMu);
+  TH1F *histMuFree = getHist(paramName, "Free", toyMu);
   
   TCanvas *can = new TCanvas("can", "can",800, 800);
   can->cd();
+  gPad->SetLogy();
   
   // Format histograms:
   double min = 0.0001;
@@ -376,13 +369,12 @@ void DHToyAnalysis::plotHist(TString paramName, int toyMu) {
   histMu0->GetXaxis()->SetTitle(paramName);
   
   // Draw histograms:
-  gPad->SetLogy();
   histMu0->Draw("hist");
   histMu1->Draw("histSAME");
   histMuFree->Draw("histSAME");
   
   // Create a legend:
-  TLegend leg(0.2,0.71,0.4,0.86);
+  TLegend leg(0.2,0.74,0.4,0.89);
   leg.SetBorderSize(0);
   leg.SetTextSize(0.04);
   leg.SetFillColor(0);
@@ -409,10 +401,11 @@ void DHToyAnalysis::plotHist(TString paramName, int toyMu) {
     TLine *line[5];
     for (int i_l = 0; i_l < 5; i_l++) {
       line[i_l] = new TLine();
-      line[i_l]->SetLineStyle(2); 
+      line[i_l]->SetLineStyle(1); 
       line[i_l]->SetLineWidth(1);
       line[i_l]->SetLineColor(kBlack);
-      line[i_l]->DrawLine(i_l-2, min, i_l-2, max);
+      line[i_l]->DrawLine(i_l-2, histMu0->GetYaxis()->GetXmin(),
+			  i_l-2, histMu0->GetYaxis()->GetXmax());
     }
   }
   

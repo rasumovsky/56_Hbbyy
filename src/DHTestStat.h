@@ -46,6 +46,7 @@ class DHTestStat {
   double getFitNLL(TString datasetName, double muVal, bool fixMu,
 		   double &profiledMu);
   std::map<std::string,double> getGlobalObservables();
+  std::vector<double> getNEventsToys();
   std::map<std::string,double> getNuisanceParameters();
   std::map<std::string,double> getParameters();
   double getP0FromQ0(double q0);
@@ -62,7 +63,7 @@ class DHTestStat {
   void setPlotAxis(bool useLogScale, double yMin, double yMax);
   void setPlotDirectory(TString directory);
   void setParam(TString paramName, double paramVal, bool doSetConstant);
-  
+      
  private:
   
   TString getKey(TString testStat, bool observed, int N);
@@ -71,7 +72,10 @@ class DHTestStat {
   TGraphErrors* plotDivision(TString dataName, TString pdfName, TString obsName,
 			     double xMin, double xMax, double xBins);
   void plotFits(TString fitType, TString datasetName);
-  
+  void printer(TString statement, bool isFatal);
+  void printSet(TString setName, RooArgSet* set);
+  void storeParams(RooArgSet *set, std::map<std::string,double>& map);
+
   // From the initialization:
   TString m_anaType;    // The analysis type ("Res", "NonRes").
   TString m_DHSignal;   // The specific signal under study.
@@ -108,6 +112,9 @@ class DHTestStat {
   std::map<std::string,double> m_mapGlobs;
   std::map<std::string,double> m_mapNP;
   std::map<std::string,double> m_mapPars;
+  
+  // Store number of toy MC events generated:
+  std::vector<double> m_numEventsPerCate;
   
   // In case special parameter settings are used for a fit:
   std::map<TString,double> m_paramValToSet;

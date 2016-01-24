@@ -244,9 +244,9 @@ void DHTestStat::clearFitParamSettings() {
    @return - A pseudo-dataset.
 */
 RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
-  std::cout << "DHTestStat: Create pseudodata with seed = " << seed 
-	    << ", PoI = " << valPoI << std::endl;
-  
+  printer(Form("DHTestStatLLcreatePseudoData(seed=%d, PoI=%d, fixPoI=%d)",
+	       seed, valPoI, (int)fixPoI), false);
+    
   // Load the original parameters from profiling:
   m_workspace->loadSnapshot("paramsOrigin");
   
@@ -254,19 +254,21 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   RooArgSet* nuisanceParameters = (RooArgSet*)m_mc->GetNuisanceParameters();
   RooArgSet* globalObservables = (RooArgSet*)m_mc->GetGlobalObservables();
   RooArgSet* observables = (RooArgSet*)m_mc->GetObservables();
-  RooArgSet* originValsNP
-    = (RooArgSet*)m_mc->GetNuisanceParameters()->snapshot();
   RooRealVar* firstPoI = (RooRealVar*)m_mc->GetParametersOfInterest()->first();
+  
+  std::cout << "toy values BEFORE randomization etc." << std::endl;
+  printSet("nuisanceParameters", nuisanceParameters);
+  printSet("globalObservables", globalObservables);
   
   RooRandom::randomGenerator()->SetSeed(seed);
   statistics::constSet(nuisanceParameters, true);
   statistics::constSet(globalObservables, false);
   
-  map<string,RooDataSet*> toyDataMap; 
+  map<string,RooDataSet*> toyDataMap; toyDataMap.clear();
   RooCategory *categories = (RooCategory*)m_workspace->obj("categories");
   TIterator *cateIter = combPdf->indexCat().typeIterator();
   RooCatType *cateType = NULL;
-  RooDataSet *dataTemp[20];
+  //RooDataSet *dataTemp[20];
   
   // Loop over all channels:
   int index = 0;
@@ -274,7 +276,11 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   statistics::randomizeSet(combPdf, globalObservables, seed); 
   statistics::constSet(globalObservables, true);
   
-  //numEventsPerCate.clear();
+  std::cout << "toy values AFTER randomization etc." << std::endl;
+  printSet("nuisanceParameters", nuisanceParameters);
+  printSet("globalObservables", globalObservables);
+
+  m_numEventsPerCate.clear();
   
   // Set the parameter of interest value and status:
   firstPoI->setVal(valPoI);
@@ -292,10 +298,7 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
     }
     else {
       m_workspace->Print("v");
-      std::cout << "DHTestStat: Error! Parameter " << iterParam->first
-		<< " not found in workspace! See printout above for clues..."
-		<< std::endl;
-      exit(0);
+      printer(Form("DHTestStat: Error! Parameter %s not found in workspace! See printout above for clues...", (iterParam->first).Data()), true);
     }
   }
   
@@ -305,45 +308,49 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
     RooArgSet *currObs = currPDF->getObservables(observables);
     RooArgSet *currGlobs = currPDF->getObservables(globalObservables);
     RooRealVar *t = (RooRealVar*)currObs->first();
-    
-    //statistics::randomizeSet(currPDF, currGlobs, -1);
-    //statistics::constSet(currGlobs, true);
-    
+        
     // If you want to bin the pseudo-data (speeds up calculation):
     if (m_options.Contains("Binned")) {
       currPDF->setAttribute("PleaseGenerateBinned");
       TIterator *iterObs = currObs->createIterator();
       RooRealVar *currObs = NULL;
       // Bin each of the observables:
-      while ((currObs = (RooRealVar*)iterObs->Next())) {
-	currObs->setBins(120);
-      }
-      dataTemp[index]
+      while ((currObs = (RooRealVar*)iterObs->Next())) currObs->setBins(120);
+      toyDataMap[(std::string)cateType->GetName()]
 	= (RooDataSet*)currPDF->generate(*currObs, AutoBinned(true),
 					 Extended(currPDF->canBeExtended()),
 					 GenBinned("PleaseGenerateBinned"));
     }
     // Construct unbinned pseudo-data by default:
     else {
-      dataTemp[index] = (RooDataSet*)currPDF->generate(*currObs,Extended(true));
+      toyDataMap[(std::string)cateType->GetName()]
+	= (RooDataSet*)currPDF->generate(*currObs,Extended(true));
     }
-    
-    toyDataMap[(std::string)cateType->GetName()] = dataTemp[index];
-    //numEventsPerCate.push_back((double)dataTemp[index]->sumEntries());
-    index++;
+    double currEvt = toyDataMap[(std::string)cateType->GetName()]->sumEntries();
+    m_numEventsPerCate.push_back(currEvt);
   }
   
-  // Import the new data into the workspace:
+  // Create the combined toy RooDataSet:
   RooDataSet* pseudoData = new RooDataSet("toyData", "toyData", *observables, 
 					  RooFit::Index(*categories),
 					  RooFit::Import(toyDataMap));
   
+  // Save the parameters used to generate toys:
+  storeParams(nuisanceParameters, m_mapNP);
+  storeParams(globalObservables, m_mapGlobs);
+  storeParams((RooArgSet*)m_workspace->set("nonSysParameters"), m_mapPars);
+
   // release nuisance parameters:
+  m_workspace->loadSnapshot("paramsOrigin");
   statistics::constSet(nuisanceParameters, false);
-  
-  // Import into the workspace:
+  statistics::constSet(globalObservables, true);
+
+  std::cout << "toy values FINAL reloading." << std::endl;
+  printSet("nuisanceParameters", nuisanceParameters);
+  printSet("globalObservables", globalObservables);
+
+  // Import into the workspace then return:
   m_workspace->import(*pseudoData);
-  
   return pseudoData;
 }
 
@@ -451,9 +458,9 @@ double DHTestStat::getCLsFromQMu(double qMu, bool observed, double N) {
    @return - The NLL value.
 */
 double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
-			     double &profiledValPoI) { 
-  std::cout << "DHTestStat: getFitNLL(" << datasetName << ", " << valPoI
-	    << ", " << fixPoI << ")" << std::endl;
+			     double &profiledValPoI) {
+  printer(Form("DHTestStat: getFitNLL(%s, PoI=%f, fixPoI=%d)",
+	       datasetName.Data(), valPoI, (int)fixPoI), false);
   
   RooAbsPdf* combPdf = m_mc->GetPdf();
   RooArgSet* nuisanceParameters = (RooArgSet*)m_mc->GetNuisanceParameters();
@@ -473,10 +480,14 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
     exit(0);
   }
   
-  // release nuisance parameters after fit and recovery the default values
+  // release nuisance parameters before fit and set to the default values
   statistics::constSet(nuisanceParameters, false, origValNP);
   // the global observables should be fixed to the nominal values...
   statistics::constSet(globalObservables, true);
+  
+  std::cout << "Pre-fit parameter values" << std::endl;
+  printSet("nuisanceParameters", nuisanceParameters);
+  printSet("globalObservables", globalObservables);
   
   firstPoI->setVal(valPoI);
   firstPoI->setConstant(fixPoI);
@@ -492,22 +503,28 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
     }
     else {
       m_workspace->Print("v");
-      std::cout << "DHTestStat: Error! Parameter " << iterParam->first
-		<< " not found in workspace! See printout above for clues..."
-		<< std::endl;
-      exit(0);
+      printer(Form("DHTestStat: Error! Parameter %s not found in workspace! See printout above for clues...", ((TString)iterParam->first).Data()), true);
     }
   }
-  std::cout << "DHTestStat: Parameters have been set for fit." << std::endl;
   
   // The actual fit command:
+  /*
   RooNLLVar* varNLL = (RooNLLVar*)combPdf
     ->createNLL(*m_workspace->data(datasetName), Constrain(*nuisanceParameters),
 		Extended(combPdf->canBeExtended()));
+  */  
+  RooNLLVar* varNLL
+    = (RooNLLVar*)combPdf->createNLL(*m_workspace->data(datasetName),
+				     Extended(combPdf->canBeExtended()));
   
   RooFitResult *fitResult = statistics::minimize(varNLL, "", NULL, true);
   if (!fitResult || fitResult->status() != 0) m_allGoodFits = false;
   
+  std::cout << "Post-fit parameter values" << std::endl;
+  printSet("nuisanceParameters", nuisanceParameters);
+  printSet("globalObservables", globalObservables);
+  
+  /*
   m_workspace->var("lumi")->setVal(0);
   m_workspace->var("RNDM_lumi")->setVal(0);
   cout << "NLLVAL1 = " << varNLL->getVal() << std::endl;
@@ -520,7 +537,7 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   m_workspace->var("lumi")->setVal(2);
   m_workspace->var("RNDM_lumi")->setVal(2);
   cout << "NLLVAL4 = " << varNLL->getVal() << std::endl;
-  
+  */  
   
   // Save a snapshot if requested:
   if (m_doSaveSnapshot) {
@@ -540,30 +557,10 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   double nllValue = varNLL->getVal();
   delete varNLL;
   
-  // Save names and values of nuisance parameters:
-  m_mapNP.clear();
-  TIterator *iterNuis = nuisanceParameters->createIterator();
-  RooRealVar *currNuis = NULL;
-  while ((currNuis = (RooRealVar*)iterNuis->Next())) {
-    m_mapNP[(std::string)currNuis->GetName()] = currNuis->getVal();
-  }
-  
-  // Save names and values of global observables:
-  m_mapGlobs.clear();
-  TIterator *iterGlobs = globalObservables->createIterator();
-  RooRealVar *currGlob = NULL;
-  while ((currGlob = (RooRealVar*)iterGlobs->Next())) {
-    m_mapGlobs[(std::string)currGlob->GetName()] = currGlob->getVal();
-  }
-  
-  // Save names and values of other parameters in the fit:
-  RooArgSet *parameters = (RooArgSet*)m_workspace->set("nonSysParameters");
-  m_mapPars.clear();
-  TIterator *iterPars = parameters->createIterator();
-  RooRealVar *currPar = NULL;
-  while ((currPar = (RooRealVar*)iterPars->Next())) {
-    m_mapPars[(std::string)currPar->GetName()] = currPar->getVal();
-  }
+  // Save names and values of nuisance parameters, globs, other parameters:
+  storeParams(nuisanceParameters, m_mapNP);
+  storeParams(globalObservables, m_mapGlobs);
+  storeParams((RooArgSet*)m_workspace->set("nonSysParameters"), m_mapPars);
   
   // release nuisance parameters after fit and recovery the default values
   statistics::constSet(nuisanceParameters, false, origValNP);
@@ -599,6 +596,15 @@ TString DHTestStat::getKey(TString testStat, bool observed, int N) {
   else if (N < 0) currKey += Form("_n%d",N);
   
   return currKey;
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Get the number of events in each category in the most recent pseudo-dataset.
+   @return - A vector containing the weighted # events per category.
+*/
+std::vector<double> DHTestStat::getNEventsToys() {
+  return m_numEventsPerCate;
 }
 
 /**
@@ -1003,6 +1009,37 @@ bool DHTestStat::mapValueExists(TString mapKey) {
 
 /**
    -----------------------------------------------------------------------------
+   Prints a statement (if verbose) and exits (if fatal).
+   @param statement - The statement to print.
+   @param isFatal - True iff. this should trigger an exit command.
+*/
+void DHTestStat::printer(TString statement, bool isFatal) {
+  if (m_config->getBool("Verbose") || isFatal) {
+    std::cout << statement << std::endl;
+  }
+  if (isFatal) exit(0);
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Print the names and values of parameters in a RooArgSet:
+   @param setName - The name of the RooArgSet.
+   @param set - The RooArgSet.
+*/
+void DHTestStat::printSet(TString setName, RooArgSet* set) {
+  printer(Form("DHTestStat::printSet(%s)",setName.Data()), false);
+  TIterator *iterSet = set->createIterator();
+  RooRealVar *curr = NULL;
+  // Bin each of the observables:
+  while ((curr = (RooRealVar*)iterSet->Next())) {
+    TString currLine = Form("\t %s = %f", ((TString)curr->GetName()).Data(),
+			    curr->getVal());
+    printer(currLine, false);
+  }
+}
+
+/**
+   -----------------------------------------------------------------------------
    Choose whether or not to save snapshots from profiling data.
    @param doSaveSnapshot - True iff you want to save snapshots in future fits.
 */
@@ -1041,4 +1078,19 @@ void DHTestStat::setParam(TString paramName, double paramVal,
 			  bool doSetConstant) {
   m_paramValToSet[paramName] = paramVal;
   m_paramConstToSet[paramName] = doSetConstant;
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Store the parameter names and values.
+   @param set - The RooArgSet to store.
+   @param map - The map to hold the values.
+*/
+void DHTestStat::storeParams(RooArgSet *set, std::map<std::string,double>& map){
+  map.clear();
+  TIterator *iterSet = set->createIterator();
+  RooRealVar *curr = NULL;
+  while ((curr = (RooRealVar*)iterSet->Next())) {
+    map[(std::string)curr->GetName()] = curr->getVal();
+  }
 }

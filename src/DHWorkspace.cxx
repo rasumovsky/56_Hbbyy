@@ -94,7 +94,7 @@ void DHWorkspace::addCategory() {
   // Add systematic uncertainties first:
   // (constraint term, global observables, nuisance parameters, expectation)
   if (m_useSystematics && m_currCateIndex == 0) {
-    m_constraints = new RooArgSet();
+    //m_constraints = new RooArgSet();
     if (m_config->isDefined("SysSources")) {
       std::vector<TString> systematics = m_config->getStrV("SysSources");
       for (int i_s = 0; i_s < (int)systematics.size(); i_s++) {
@@ -104,9 +104,12 @@ void DHWorkspace::addCategory() {
     }
     
     // Create RooProduct of constraints:
-    RooProdPdf constraint("constraint", "constraint", *m_constraints);
-    m_ws->import(constraint);
-        
+    //RooProdPdf constraint("constraint", "constraint", *m_constraints);
+    //m_ws->import(constraint);
+    RooProdPdf *constraint 
+      = new RooProdPdf("constraint", "constraint", *m_constraints);
+    m_ws->import(*constraint);
+    
     // Iterate over the expected sets and create products:
     for (std::map<TString,RooArgSet*>::iterator iterEx = m_expectedList.begin();
 	 iterEx != m_expectedList.end(); iterEx++) {
@@ -116,7 +119,7 @@ void DHWorkspace::addCategory() {
       m_ws->import(currExpectation);
     }
   }
-  
+    
   //--------------------------------------//
   // Add the observable:
   TString observable = m_config->getStr(Form("OBS_%s", m_currCateName.Data()));
@@ -135,10 +138,7 @@ void DHWorkspace::addCategory() {
       TString variableName = nameOfVar(variables[i_v]);
       // Make sure variable hasn't already been created:
       if (!m_ws->var(variableName)) {
-	// Create in workspace:
 	m_ws->factory(variables[i_v]);
-	// Also add to list of nuisance parameters:
-	//m_nuisanceParameters->add(*m_ws->var(variableName));
 	m_nonSysParameters->add(*m_ws->var(variableName));
       }
     }
@@ -356,7 +356,7 @@ void DHWorkspace::addSystematic(TString systematicForm) {
     m_ws->factory(Form("RNDM_%s[0,-5,5]", systematicName.Data()));
     
     // Simple Gaussian constraint is straightforward:
-    m_ws->factory(Form("RooGaussian::constr_%s(%s,RNDM_%s,1)", 
+    m_ws->factory(Form("RooGaussian::constr_%s(%s,RNDM_%s,1.0)", 
 		       systematicName.Data(), systematicName.Data(), 
 		       systematicName.Data()));
     
@@ -626,6 +626,7 @@ void DHWorkspace::createNewWS() {
   m_globalObservables = new RooArgSet();
   m_observables = new RooArgSet();
   m_poi = new RooArgSet();
+  m_constraints = new RooArgSet();
   
   // Maps for datasets:
   m_combData.clear();
@@ -732,10 +733,12 @@ void DHWorkspace::createNewWS() {
   printer("DHWorkspace: Saving workspace.", false);
   
   // snapshot of original parameter values:
-  RooArgSet* poiAndNuis = new RooArgSet();
-  poiAndNuis->add(*m_modelConfig->GetNuisanceParameters());
-  poiAndNuis->add(*m_modelConfig->GetParametersOfInterest());
-  m_ws->saveSnapshot("paramsOrigin", *poiAndNuis);
+  RooArgSet* allParams = new RooArgSet();
+  allParams->add(*m_ws->set("nonSysParameters"));
+  allParams->add(*m_modelConfig->GetGlobalObservables());
+  allParams->add(*m_modelConfig->GetNuisanceParameters());
+  allParams->add(*m_modelConfig->GetParametersOfInterest());
+  m_ws->saveSnapshot("paramsOrigin", *allParams);
   
   // Print the workspace before saving:
   std::cout << "DHWorkspace: Printing the workspace to be saved." << std::endl;
@@ -916,6 +919,7 @@ void DHWorkspace::printer(TString statement, bool isFatal) {
 
 /**
    -----------------------------------------------------------------------------
+   Set the parameters in a set to a particular value and fixed or floating.
    @param set - The RooArgSet containing the parameters to be set.
    @param isConstant - True iff the parameters should be fixed to one value.
    @param value - The value to which the parameters will be set. 
