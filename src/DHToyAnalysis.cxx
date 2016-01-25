@@ -171,7 +171,8 @@ void DHToyAnalysis::fillToyHistograms(int muValue, DHToyTree *toyTree) {
     for (int i_f = 0; i_f < (int)m_fitTypes.size(); i_f++) {
       TString parsKey = Form("%s_Mu%sFit_Mu%dData",
 			     namePars.Data(), m_fitTypes[i_f].Data(), muValue);
-      m_histStorage[parsKey] = new TH1F(parsKey, parsKey, 100, -5, 5);
+      m_histStorage[parsKey]
+	= new TH1F(parsKey, parsKey, 100, pars->getMin(), pars->getMax());
     }
     m_namesPars.push_back(namePars);
   }
@@ -374,7 +375,7 @@ void DHToyAnalysis::plotHist(TString paramName, int toyMu) {
   histMuFree->Draw("histSAME");
   
   // Create a legend:
-  TLegend leg(0.2,0.74,0.4,0.89);
+  TLegend leg(0.2, 0.77, 0.42, 0.90);
   leg.SetBorderSize(0);
   leg.SetTextSize(0.04);
   leg.SetFillColor(0);

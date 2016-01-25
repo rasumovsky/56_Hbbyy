@@ -158,19 +158,19 @@ int main(int argc, char **argv) {
     mapToVectors(dhts->getGlobalObservables(), namesGlobs, valuesGlobsMuFree);
     
     // Mu = 0 fits:
-    nllMu0 = dhts->getFitNLL("toyData", 0, true, profiledPOIVal);
+    nllMu0 = dhts->getFitNLL("toyData", 0, true, profiledPOIVal, false);
     convergedMu0 = dhts->fitsAllConverged();
     mapToVectors(dhts->getNuisanceParameters(), namesNP, valuesNPMu0);
     mapToVectors(dhts->getParameters(), namesPars, valuesParsMu0);
     
     // Mu = 1 fits:
-    nllMu1 = dhts->getFitNLL("toyData", 1, true, profiledPOIVal);
+    nllMu1 = dhts->getFitNLL("toyData", 1, true, profiledPOIVal, false);
     convergedMu1 = dhts->fitsAllConverged();
     mapToVectors(dhts->getNuisanceParameters(), namesNP, valuesNPMu1);
     mapToVectors(dhts->getParameters(), namesPars, valuesParsMu1);
     
     // Mu free fits:
-    nllMuFree = dhts->getFitNLL("toyData", 1, false, profiledPOIVal);
+    nllMuFree = dhts->getFitNLL("toyData", 1, false, profiledPOIVal, false);
     convergedMuFree = dhts->fitsAllConverged();
     mapToVectors(dhts->getNuisanceParameters(), namesNP, valuesNPMuFree);
     mapToVectors(dhts->getParameters(), namesPars, valuesParsMuFree);

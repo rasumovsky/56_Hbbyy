@@ -338,8 +338,8 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   storeParams(globalObservables, m_mapGlobs);
   storeParams((RooArgSet*)m_workspace->set("nonSysParameters"), m_mapPars);
 
-  // release nuisance parameters:
-  m_workspace->loadSnapshot("paramsOrigin");
+  // release nuisance parameters (but don't change the values!):
+  //m_workspace->loadSnapshot("paramsOrigin");
   statistics::constSet(nuisanceParameters, false);
   statistics::constSet(globalObservables, true);
 
@@ -456,14 +456,14 @@ double DHTestStat::getCLsFromQMu(double qMu, bool observed, double N) {
    @return - The NLL value.
 */
 double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
-			     double &profiledValPoI) {
-  printer(Form("DHTestStat: getFitNLL(%s, PoI=%f, fixPoI=%d)",
-	       datasetName.Data(), valPoI, (int)fixPoI), false);
+			     double &profiledValPoI, bool resetParams) {
+  printer(Form("DHTestStat: getFitNLL(%s, PoI=%f, fixPoI=%d, resetPars=%d)",
+	       datasetName.Data(),valPoI,(int)fixPoI,(int)resetParams),false);
   
   RooAbsPdf* combPdf = m_mc->GetPdf();
   RooArgSet* nuisanceParameters = (RooArgSet*)m_mc->GetNuisanceParameters();
   RooArgSet* globalObservables = (RooArgSet*)m_mc->GetGlobalObservables();
-  m_workspace->loadSnapshot("paramsOrigin");
+  if (resetParams) m_workspace->loadSnapshot("paramsOrigin");
   RooArgSet* origValNP = (RooArgSet*)m_workspace->getSnapshot("paramsOrigin");
   RooArgSet* poi = (RooArgSet*)m_mc->GetParametersOfInterest();
   RooRealVar* firstPoI = (RooRealVar*)poi->first();
@@ -521,7 +521,6 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   std::cout << "Post-fit parameter values" << std::endl;
   printSet("nuisanceParameters", nuisanceParameters);
   printSet("globalObservables", globalObservables);
-  
   /*
   m_workspace->var("lumi")->setVal(0);
   m_workspace->var("RNDM_lumi")->setVal(0);
@@ -535,8 +534,7 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   m_workspace->var("lumi")->setVal(2);
   m_workspace->var("RNDM_lumi")->setVal(2);
   cout << "NLLVAL4 = " << varNLL->getVal() << std::endl;
-  */  
-  
+  */    
   // Save a snapshot if requested:
   if (m_doSaveSnapshot) {
     TString muDHValue = fixPoI ? (Form("%d",(int)valPoI)) : "Free";

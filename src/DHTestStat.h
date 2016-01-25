@@ -44,7 +44,7 @@ class DHTestStat {
   double getCLFromQMu(double qMu, bool observed, double N);
   double getCLsFromQMu(double qMu, bool observed, double N);
   double getFitNLL(TString datasetName, double muVal, bool fixMu,
-		   double &profiledMu);
+		   double &profiledMu, bool resetParams=true);
   std::map<std::string,double> getGlobalObservables();
   std::vector<double> getNEventsToys();
   std::map<std::string,double> getNuisanceParameters();

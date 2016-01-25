@@ -34,7 +34,6 @@ class DHWorkspace {
 
   void addCategory();
   void addSystematic(TString systematicForm);
-  void createAsimovData(int valPoI);  
   void createStupidAsimovData(int valPoI, int nBinsAsimov);  
   void createNewWS();
   void loadWSFromFile();

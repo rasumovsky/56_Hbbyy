@@ -367,7 +367,7 @@ void DHWorkspace::addSystematic(TString systematicForm) {
     TString varName = Form("%s_%s",systematicName.Data(),componentName.Data());
     TString expName = Form("expected_%s", varName.Data());
 
-    // BETA VALUE NEEDED!
+    // BETA VALUE NEEDED (correlated 1, anticorrelated -1)
     double betaVal = 1.0;
     
     // Beta parameter:
@@ -438,7 +438,7 @@ void DHWorkspace::addSystematic(TString systematicForm) {
   }
 }
 
-/**
+/*
    -----------------------------------------------------------------------------
    Create Asimov data for the statistical model, using a fit to observed data
    for the shape and normalizaiton of the background.
@@ -447,7 +447,7 @@ void DHWorkspace::addSystematic(TString systematicForm) {
    TO AsymptoticCalculator::GenerateAsimovData...
    
    @param valPoI - The value of the parameter of interest.
-*/
+
 void DHWorkspace::createAsimovData(int valPoI) {
   printer(Form("DHWorkspace::createAsimovData(%d) in category %s", 
 	       valPoI, m_currCateName.Data()), false);
@@ -456,13 +456,7 @@ void DHWorkspace::createAsimovData(int valPoI) {
   double initialPoIVal = poi->getVal();
   poi->setVal(valPoI);
   poi->setConstant(true);  
-  /*
-  std::cout << "\tpoi= " << poi->GetName() << " " << poi->getVal() << std::endl;
-  std::cout << "\t\tNormalization of signal: " 
-	    << m_ws->function("n_SigBSM2H_bb")->getVal() << std::endl;
-  std::cout << "\t\tNormalization of non-H bkg: " 
-	    << m_ws->function("n_BkgNonHiggs_bb")->getVal() << std::endl;
-  */  
+  
   // Create the Asimov dataset using RooStats utility:
   TString asimovName = Form("asimovDataMu%d_%s", valPoI, m_currCateName.Data());
   RooDataSet *currAsimov = (RooDataSet*)AsymptoticCalculator::GenerateAsimovData(*m_ws->pdf(Form("model_%s",m_currCateName.Data())), *m_ws->set("observables"));
@@ -483,6 +477,7 @@ void DHWorkspace::createAsimovData(int valPoI) {
   poi->setVal(initialPoIVal);
   poi->setConstant(false);
 }
+*/
 
 /**
    -----------------------------------------------------------------------------
@@ -532,7 +527,9 @@ void DHWorkspace::createStupidAsimovData(int valPoI, int nBinsAsimov) {
   double width = ((originMax - originMin) / ((double)nBinsAsimov));
   
   // Get a PDF:
-  RooAbsPdf *currPdf = (RooAbsPdf*)(m_ws->pdf(Form("model_%s",m_currCateName.Data()))->Clone("newPDF"));
+  RooAbsPdf *currPdf
+    = (RooAbsPdf*)(m_ws->pdf(Form("model_%s",m_currCateName.Data()))
+		   ->Clone("newPDF"));
   
   // Loop over Asimov bins:
   for (int i_b = 0; i_b < nBinsAsimov; i_b++) {
@@ -604,8 +601,8 @@ void DHWorkspace::createNewWS() {
   // RooCategory and Simultaneous PDF:
   m_categories = new RooCategory("categories", "categories");
   m_combinedPdf = new RooSimultaneous("combinedPdfSB", "combinedPdfSB",
-				      *m_categories);
-
+  				      *m_categories);
+  
   // Instantiate parameter sets:
   m_nonSysParameters = new RooArgSet();
   m_nuisanceParameters = new RooArgSet();
@@ -661,10 +658,11 @@ void DHWorkspace::createNewWS() {
   m_ws->import(*m_categories);
   m_ws->import(*m_combinedPdf);
   
+  // Create PDF with constraints attached:
   if (m_useSystematics) {
     m_ws->factory("PROD::combinedPdf(combinedPdfSB,constraint)");
   }
-    
+  
   // Define the combined dataset:
   RooArgSet *dataArgs = new RooArgSet();
   dataArgs->add(*m_observables);
