@@ -61,6 +61,7 @@ class DHWorkspace {
   int m_currCateIndex;
   TString m_currCateName;
   RooArgSet *m_constraints;
+  //TString m_constraintList;
   
   // The Final RooWorkspace and ModelConfig and arg sets:
   RooWorkspace *m_ws;

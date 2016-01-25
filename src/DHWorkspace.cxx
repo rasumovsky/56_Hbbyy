@@ -94,7 +94,6 @@ void DHWorkspace::addCategory() {
   // Add systematic uncertainties first:
   // (constraint term, global observables, nuisance parameters, expectation)
   if (m_useSystematics && m_currCateIndex == 0) {
-    //m_constraints = new RooArgSet();
     if (m_config->isDefined("SysSources")) {
       std::vector<TString> systematics = m_config->getStrV("SysSources");
       for (int i_s = 0; i_s < (int)systematics.size(); i_s++) {
@@ -104,11 +103,8 @@ void DHWorkspace::addCategory() {
     }
     
     // Create RooProduct of constraints:
-    //RooProdPdf constraint("constraint", "constraint", *m_constraints);
-    //m_ws->import(constraint);
-    RooProdPdf *constraint 
-      = new RooProdPdf("constraint", "constraint", *m_constraints);
-    m_ws->import(*constraint);
+    RooProdPdf constraint("constraint", "constraint", *m_constraints);
+    m_ws->import(constraint);
     
     // Iterate over the expected sets and create products:
     for (std::map<TString,RooArgSet*>::iterator iterEx = m_expectedList.begin();
@@ -119,7 +115,7 @@ void DHWorkspace::addCategory() {
       m_ws->import(currExpectation);
     }
   }
-    
+  
   //--------------------------------------//
   // Add the observable:
   TString observable = m_config->getStr(Form("OBS_%s", m_currCateName.Data()));
@@ -180,18 +176,7 @@ void DHWorkspace::addCategory() {
     = m_config->getStr(Form("MODEL_%s", m_currCateName.Data()), false);
   TString modelName = nameOfFunc(modelForm);
   m_ws->factory(modelForm);
-  // Attach constraint term to the first category:
-  if (m_useSystematics && m_currCateIndex == 0) {
-    m_ws->factory(Form("PROD::model_%s(%s,constraint)",
-		       m_currCateName.Data(), modelName.Data()));
-  }
-  else {
-    m_ws->factory(Form("PROD::model_%s(%s)", 
-		       m_currCateName.Data(), modelName.Data()));
-  }
-  // Add model including constraint to combined PDF:
-  m_combinedPdf->addPdf(*m_ws->pdf(Form("model_%s", m_currCateName.Data())), 
-			m_currCateName);
+  m_combinedPdf->addPdf(*m_ws->pdf(modelName), m_currCateName);
   
   //--------------------------------------//
   // Import the observed data set:
@@ -363,6 +348,7 @@ void DHWorkspace::addSystematic(TString systematicForm) {
     // Add the new objects to the relevant sets:
     m_nuisanceParameters->add(*m_ws->var(systematicName));
     m_globalObservables->add(*m_ws->var(Form("RNDM_%s",systematicName.Data())));
+ 
     m_constraints->add(*m_ws->pdf(Form("constr_%s",systematicName.Data())));
   }
   
@@ -617,7 +603,7 @@ void DHWorkspace::createNewWS() {
   
   // RooCategory and Simultaneous PDF:
   m_categories = new RooCategory("categories", "categories");
-  m_combinedPdf = new RooSimultaneous("combinedPdf", "combinedPdf",
+  m_combinedPdf = new RooSimultaneous("combinedPdfSB", "combinedPdfSB",
 				      *m_categories);
 
   // Instantiate parameter sets:
@@ -675,6 +661,10 @@ void DHWorkspace::createNewWS() {
   m_ws->import(*m_categories);
   m_ws->import(*m_combinedPdf);
   
+  if (m_useSystematics) {
+    m_ws->factory("PROD::combinedPdf(combinedPdfSB,constraint)");
+  }
+    
   // Define the combined dataset:
   RooArgSet *dataArgs = new RooArgSet();
   dataArgs->add(*m_observables);

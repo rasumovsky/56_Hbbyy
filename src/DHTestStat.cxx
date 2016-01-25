@@ -250,7 +250,8 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   // Load the original parameters from profiling:
   m_workspace->loadSnapshot("paramsOrigin");
   
-  RooSimultaneous* combPdf = (RooSimultaneous*)m_mc->GetPdf();
+  //RooSimultaneous* combPdf = (RooSimultaneous*)m_mc->GetPdf();
+  RooAbsPdf* combPdf = (RooAbsPdf*)m_mc->GetPdf();
   RooArgSet* nuisanceParameters = (RooArgSet*)m_mc->GetNuisanceParameters();
   RooArgSet* globalObservables = (RooArgSet*)m_mc->GetGlobalObservables();
   RooArgSet* observables = (RooArgSet*)m_mc->GetObservables();
@@ -264,33 +265,27 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   statistics::constSet(nuisanceParameters, true);
   statistics::constSet(globalObservables, false);
   
+  // Store the toy dataset and number of events per dataset:
   map<string,RooDataSet*> toyDataMap; toyDataMap.clear();
-  RooCategory *categories = (RooCategory*)m_workspace->obj("categories");
-  TIterator *cateIter = combPdf->indexCat().typeIterator();
-  RooCatType *cateType = NULL;
-  //RooDataSet *dataTemp[20];
-  
-  // Loop over all channels:
-  int index = 0;
-  // Previously this was commented and similar line below was uncommented
+  m_numEventsPerCate.clear();
+    
+  // Randomize the global observables and set them constant for now:
   statistics::randomizeSet(combPdf, globalObservables, seed); 
   statistics::constSet(globalObservables, true);
   
   std::cout << "toy values AFTER randomization etc." << std::endl;
   printSet("nuisanceParameters", nuisanceParameters);
   printSet("globalObservables", globalObservables);
-
-  m_numEventsPerCate.clear();
   
   // Set the parameter of interest value and status:
   firstPoI->setVal(valPoI);
   firstPoI->setConstant(fixPoI);
-  
+    
   // Check if other parameter settings have been specified for toys:
   // WARNING! This overrides the randomization settings above!
   for (std::map<TString,double>::iterator iterParam = m_paramValToSet.begin();
        iterParam != m_paramValToSet.end(); iterParam++) {
-    // CHeck that workspace contains parameter:
+    // Check that workspace contains parameter:
     if (m_workspace->var(iterParam->first)) {
       m_workspace->var(iterParam->first)->setVal(iterParam->second);
       m_workspace->var(iterParam->first)
@@ -303,34 +298,37 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   }
   
   // Iterate over the categories:
+  RooSimultaneous *simPdf = (RooSimultaneous*)m_workspace->pdf("combinedPdfSB");
+  TIterator *cateIter = simPdf->indexCat().typeIterator();
+  RooCatType *cateType = NULL;
   while ((cateType = (RooCatType*)cateIter->Next())) {
-    RooAbsPdf *currPDF = combPdf->getPdf(cateType->GetName());
-    RooArgSet *currObs = currPDF->getObservables(observables);
-    RooArgSet *currGlobs = currPDF->getObservables(globalObservables);
-    RooRealVar *t = (RooRealVar*)currObs->first();
+    //RooAbsPdf *currPdf = combPdf->getPdf(cateType->GetName());
+    RooAbsPdf *currPdf = simPdf->getPdf(cateType->GetName());
+    RooArgSet *currObs = currPdf->getObservables(observables);
         
     // If you want to bin the pseudo-data (speeds up calculation):
     if (m_options.Contains("Binned")) {
-      currPDF->setAttribute("PleaseGenerateBinned");
+      currPdf->setAttribute("PleaseGenerateBinned");
       TIterator *iterObs = currObs->createIterator();
       RooRealVar *currObs = NULL;
       // Bin each of the observables:
       while ((currObs = (RooRealVar*)iterObs->Next())) currObs->setBins(120);
       toyDataMap[(std::string)cateType->GetName()]
-	= (RooDataSet*)currPDF->generate(*currObs, AutoBinned(true),
-					 Extended(currPDF->canBeExtended()),
+	= (RooDataSet*)currPdf->generate(*currObs, AutoBinned(true),
+					 Extended(currPdf->canBeExtended()),
 					 GenBinned("PleaseGenerateBinned"));
     }
     // Construct unbinned pseudo-data by default:
     else {
       toyDataMap[(std::string)cateType->GetName()]
-	= (RooDataSet*)currPDF->generate(*currObs,Extended(true));
+	= (RooDataSet*)currPdf->generate(*currObs,Extended(true));
     }
     double currEvt = toyDataMap[(std::string)cateType->GetName()]->sumEntries();
     m_numEventsPerCate.push_back(currEvt);
   }
   
   // Create the combined toy RooDataSet:
+  RooCategory *categories = (RooCategory*)m_workspace->obj("categories");
   RooDataSet* pseudoData = new RooDataSet("toyData", "toyData", *observables, 
 					  RooFit::Index(*categories),
 					  RooFit::Import(toyDataMap));
