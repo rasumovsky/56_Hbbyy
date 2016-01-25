@@ -211,7 +211,7 @@ void DHWorkspace::addCategory() {
   massInput.close();
   
   // Import RooDataSet into workspace, and add to dataset map (for combination):
-  printer(Form("DHWorkspace: Dataset in %s as %f entries",
+  printer(Form("DHWorkspace: Dataset in %s has %f entries",
 	       m_currCateName.Data(),obsData->sumEntries()), false);
   m_ws->import(*obsData);
   m_combData[(string)m_currCateName] = (RooDataSet*)m_ws->data(dataName);

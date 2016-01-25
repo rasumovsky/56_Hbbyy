@@ -351,7 +351,6 @@ void DHToyAnalysis::plotHist(TString paramName, int toyMu) {
   // Format histograms:
   double min = 0.0001;
   double max = 10;
-  histMu0->GetYaxis()->SetRangeUser(min,max);
   histMu0->Scale(1.0 / histMu0->Integral());
   histMu1->Scale(1.0 / histMu1->Integral());
   histMuFree->Scale(1.0 / histMuFree->Integral());
@@ -368,6 +367,7 @@ void DHToyAnalysis::plotHist(TString paramName, int toyMu) {
   // Format axis titles:
   histMu0->GetYaxis()->SetTitle("Fraction of toys");
   histMu0->GetXaxis()->SetTitle(paramName);
+  histMu0->GetYaxis()->SetRangeUser(min,max);
   
   // Draw histograms:
   histMu0->Draw("hist");
@@ -375,41 +375,15 @@ void DHToyAnalysis::plotHist(TString paramName, int toyMu) {
   histMuFree->Draw("histSAME");
   
   // Create a legend:
-  TLegend leg(0.2, 0.77, 0.42, 0.90);
+  TLegend leg(0.20, 0.80, 0.60, 0.92);
   leg.SetBorderSize(0);
-  leg.SetTextSize(0.04);
+  leg.SetTextSize(0.03);
   leg.SetFillColor(0);
-  leg.AddEntry(histMu0,"#mu=0 fixed","l");
-  leg.AddEntry(histMu1,"#mu=1 fixed","l");
-  leg.AddEntry(histMuFree,"#hat{#mu}","l");
+  leg.AddEntry(histMu0,Form("#mu=0 fixed, mean=%f",histMu0->GetMean()),"l");
+  leg.AddEntry(histMu1,Form("#mu=1 fixed, mean=%f",histMu1->GetMean()),"l");
+  leg.AddEntry(histMuFree,Form("#hat{#mu}, mean=%f",histMuFree->GetMean()),"l");
   leg.Draw("SAME");
-  
-  // Draw fancy lines at the sigma values for globs and nuis:
-  bool isNuisOrGlob = false;
-  for (int i_g = 0; i_g < (int)m_namesGlobs.size(); i_g++) {
-    if (paramName.EqualTo(m_namesGlobs[i_g])) {
-      isNuisOrGlob = true;
-      break;
-    }
-  }
-  for (int i_n = 0; i_n < (int)m_namesNuis.size(); i_n++) {
-    if (isNuisOrGlob || paramName.EqualTo(m_namesNuis[i_n])) {
-      isNuisOrGlob = true;
-      break;
-    }
-  }
-  if (isNuisOrGlob) {
-    TLine *line[5];
-    for (int i_l = 0; i_l < 5; i_l++) {
-      line[i_l] = new TLine();
-      line[i_l]->SetLineStyle(1); 
-      line[i_l]->SetLineWidth(1);
-      line[i_l]->SetLineColor(kBlack);
-      line[i_l]->DrawLine(i_l-2, histMu0->GetYaxis()->GetXmin(),
-			  i_l-2, histMu0->GetYaxis()->GetXmax());
-    }
-  }
-  
+
   // Print the canvas:
   can->Print(Form("%s/plot_%s_toy%i.eps", m_outputDir.Data(), paramName.Data(), 
 		  toyMu));
@@ -423,7 +397,7 @@ void DHToyAnalysis::plotHist(TString paramName, int toyMu) {
 */
 void DHToyAnalysis::plotProfiledMu() {
  
-  TCanvas *can = new TCanvas("can", "can",800, 800);
+  TCanvas *can = new TCanvas("can", "can", 800, 800);
   can->cd();
   
   TH1F *histMu0 = getMuHist(0);
@@ -434,6 +408,8 @@ void DHToyAnalysis::plotProfiledMu() {
   histMu1->SetLineWidth(2);
 
   gPad->SetLogy();
+  histMu0->GetXaxis()->SetTitle("#mu_{profiled}");
+  histMu0->GetYaxis()->SetTitle("Fraction of toys");
   histMu0->Draw("");
   histMu1->Draw("SAME");
   
