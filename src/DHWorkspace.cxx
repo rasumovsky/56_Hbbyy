@@ -299,10 +299,17 @@ void DHWorkspace::addSystematic(TString systematicForm) {
   
   // Check that all inputs have been provided:
   if ((centralValue.EqualTo("") || constraint.EqualTo("") || 
-       type.EqualTo("") || (int)components.size() == 0) ||
-      (constraint.EqualTo("asym") && (int)componentsLo.size() == 0)) {
+       type.EqualTo("") || (int)components.size() == 0)) {
     printer(Form("DHWorkspace: ERROR loading syst. %s", systematicForm.Data()),
 	    true);
+  }
+  
+  // Equate the downward variation of systematic if not provided for asym case:
+  if (constraint.EqualTo("asym") && (int)componentsLo.size() == 0) {
+    printer("DHWorkspace: Implementing an asymmetric uncertainty with only the"
+	    " one-sided fluctuation provided. Equating up and down variations.",
+	    false);
+    componentsLo = components;
   }
   
   // Print out a summary of the systematic:
