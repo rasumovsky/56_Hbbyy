@@ -4,7 +4,7 @@
 //                                                                            //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 07/08/2015                                                          //
+//  Date: 27/01/2016                                                          //
 //                                                                            //
 //  Performs a scan of the 95% CL for the non-resonant Di-Higgs analysis as a //
 //  function of signal cross-section.                                         //
@@ -17,36 +17,69 @@
 #include "DHTestStat.h"
 
 /**
+   -----------------------------------------------------------------------------
+   Get the intersection point for the graph.
+
+double getIntercept(TGraph *graph, double valueToIntercept) {
+  
+  double xLow = graph->GetMinimum();
+  double xHigh = graph->GetMaximum();
+  
+  // Check that it is possible to find the intercept:
+  if (valueToIntercept > xLow || valueToIntercept < xHigh) {
+    std::cout << "DHCLScan: ERROR! Intercept not in graph range." << std::cout;
+    exit(0);
+  }
+  
+  // Loop over points in the graph
+  for (int i_p = 0; i_p < graph->GetN(); i_p++) {
+    double xCurr; double yCurr;
+    graph->GetPoint(i_p, xCurr, yCurr);
+    
+    if (yCurr >= valueToIntercept && yCurr < graph->Eval(xHigh)) {
+      xHigh = xCurr;
+    }
+    else if (yCurr <= valueToIntercept && yCurr > graph->Eval(xLow)) {
+      xLow = xCurr;
+    }
+  }
+  
+  // Then use bisection method:
+  
+  
+}
+*/
+
+/**
+   -----------------------------------------------------------------------------
    The main method scans the 95% CL for various signal cross-sections.
    @param configFile - The analysis configuration file.
-   @param DHSignal - The signal model to scan.
    @param options - Job options.
 */
 int main(int argc, char **argv) {
   
   // Check that arguments are provided.
-  if (argc < 4) {
+  if (argc < 3) {
     std::cout << "\nUsage: " << argv[0]
-	      << " <configFile> <DHSignal> <options>" << std::endl;
+	      << " <configFile> <options>" << std::endl;
     exit(0);
   }
   
   TString configFile = argv[1];
-  TString DHSignal = argv[2];
   TString options = argv[3];
   
   // Load the analysis configuration file:
   Config *config = new Config(configFile);
-  TString jobName = config->getStr("jobName");
-  TString anaType = DHAnalysis::getAnalysisType(config, DHSignal);
+  TString jobName = config->getStr("JobName");
+  TString anaType = config->getStr("AnalysisType");
   TString outputDir = Form("%s/%s/DHCLScan", 
-			   (config->getStr("masterOutput")).Data(),
-			   (config->getStr("jobName")).Data());
+			   (config->getStr("MasterOutput")).Data(),
+			   (config->getStr("JobName")).Data());
   system(Form("mkdir -vp %s", outputDir.Data()));
   
   // Define the input file, then make a local copy (for remote jobs):
   TString originFile = Form("%s/%s/workspaces/rootfiles/workspaceDH_%s.root",
-			    (config->getStr("masterOutput")).Data(), 
+			    (config->getStr("MasterOutput")).Data(), 
 			    jobName.Data(), anaType.Data());
   
   CommonFunc::SetAtlasStyle();
@@ -55,25 +88,22 @@ int main(int argc, char **argv) {
   RooWorkspace *workspace = (RooWorkspace*)inputFile.Get("combinedWS");
   
   // Instantiate the test statistic class for calculations and plots:
-  DHTestStat *ts = new DHTestStat(configFile, DHSignal, "new", workspace);
+  DHTestStat *ts = new DHTestStat(configFile, "new", workspace);
   
-  
+  // Expected and observed results:
   TGraph *gCLExp = new TGraph();
   TGraph *gCLObs = new TGraph();
   
   // Loop over number of accepted events:
   int i_e = 0;
-  double xsMin = 0.0; 
-  double xsMax = 5.5;
-  for (double crossSection = xsMin; crossSection < xsMax; crossSection += 0.1) {
+  double xsMin = config->getNum("CLScanMin");
+  double xsMax = config->getNum("CLScanMax");
+  double step = config->getNum("CLScanStep");
+  for (double crossSection = xsMin; crossSection < xsMax; crossSection += step){
     
     // Set output directory for plots:
     ts->setPlotDirectory(outputDir.Data());
-    double currSigEvents = (config->getNum("analysisLuminosity") * 
-			    config->getNum("acceptanceXEfficiency") * 
-			    config->getNum("bbyyBranchingRatio") *
-			    crossSection);
-    ts->setParams("nDH_NonResSR", currSigEvents, true);
+    ts->setParam(config->getStr("CLScanVar"), crossSection, true);
     
     // Calculate the 95% CL value:
     ts->calculateNewCL();
@@ -82,7 +112,7 @@ int main(int argc, char **argv) {
     if (ts->fitsAllConverged()) {
       double currExpCL = ts->accessValue("CL", false, 0);
       double currObsCL = ts->accessValue("CL", true, 0);
-      // fill graphs
+      // fill graphs (converting fb to pb):
       gCLExp->SetPoint(i_e, crossSection, currExpCL);
       gCLObs->SetPoint(i_e, crossSection, currObsCL);
       i_e++;
@@ -92,8 +122,8 @@ int main(int argc, char **argv) {
   
   TCanvas *can = new TCanvas("can","can");
   can->cd();
-  gCLExp->GetXaxis()->SetTitle("#sigma_{BSM} [pb]");
-  gCLObs->GetXaxis()->SetTitle("#sigma_{BSM} [pb]");
+  gCLExp->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
+  gCLObs->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
   gCLExp->GetYaxis()->SetTitle("95% CL");
   gCLObs->GetYaxis()->SetTitle("95% CL");
   gCLExp->SetLineColor(kBlack);

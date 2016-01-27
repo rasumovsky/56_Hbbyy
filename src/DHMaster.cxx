@@ -227,18 +227,13 @@ int main (int argc, char **argv) {
     = Form("%s/%s", (m_config->getStr("PackageLocation")).Data(),
 	   configFileName.Data());
   
-  // Options for each step:
-  TString workspaceOptions = m_config->getStr("WorkspaceOptions");
-  TString pseudoExpOptions = m_config->getStr("PseudoExpOptions");
-  TString testStatOptions  = m_config->getStr("TestStatOptions");
-  TString muLimitOptions   = m_config->getStr("MuLimitOptions");
-  
   //--------------------------------------//
   // Step 4.1: Create the workspace for fitting:
   if (masterOption.Contains("Workspace") && 
       !masterOption.Contains("ResubmitWorkspace")) {
     std::cout << "DHMaster: Step 4.1 - Making the workspaces." << std::endl;
-    DHWorkspace *dhws = new DHWorkspace(configFileName, workspaceOptions);
+    DHWorkspace *dhws = new DHWorkspace(configFileName, 
+					m_config->getStr("WorkspaceOptions"));
     if (!dhws->fitsAllConverged()) {
       std::cout << "DHMaster: Problem with workspace fit!" << std::endl;
       exit(0);
@@ -258,7 +253,8 @@ int main (int argc, char **argv) {
     int highestSeed = toySeed + nToysTotal;
     
     for (int i_s = toySeed; i_s < highestSeed; i_s += increment) {
-      submitPEViaBsub(fullConfigPath, pseudoExpOptions, i_s, nToysPerJob);
+      submitPEViaBsub(fullConfigPath, m_config->getStr("PseudoExpOptions"),
+		      i_s, nToysPerJob);
       m_isFirstJob = false;
     }
     std::cout << "DHMaster: Submitted " << (int)(nToysTotal/nToysPerJob) 
@@ -286,13 +282,13 @@ int main (int argc, char **argv) {
       TString currSignal = sigDHModes[i_s];
       
       if (runInParallel) {
-	submitTSViaBsub(fullConfigPath, testStatOptions, currSignal);
+	submitTSViaBsub(fullConfigPath, m_config->getStr("TestStatOptions"), currSignal);
 	jobCounterTS++;
 	m_isFirstJob = false;
       }
       else {
 	DHTestStat *ts = new DHTestStat(configFileName, currSignal,
-					testStatOptions, NULL);
+					m_config->getStr("TestStatOptions"), NULL);
 	ts->calculateNewCL();
 	ts->calculateNewP0();
 	if (ts->fitsAllConverged()) jobCounterTS++;
@@ -323,13 +319,13 @@ int main (int argc, char **argv) {
       TString currSignal = resubmitSignals[i_s];
       
       if (runInParallel) {
-	submitTSViaBsub(fullConfigPath, testStatOptions, currSignal);
+	submitTSViaBsub(fullConfigPath, m_config->getStr("TestStatOptions"), currSignal);
       	jobCounterTS++;
 	m_isFirstJob = false;
       }
       else {
 	DHTestStat *dhts = new DHTestStat(configFileName, currSignal,
-					  testStatOptions, NULL);
+					  m_config->getStr("TestStatOptions"), NULL);
 	dhts->calculateNewCL();
 	dhts->calculateNewP0();
 	if (dhts->fitsAllConverged()) jobCounterTS++;
@@ -354,7 +350,7 @@ int main (int argc, char **argv) {
       TString currSignal = sigDHModes[i_s];
       
       if (runInParallel) {
-	submitMLViaBsub(fullConfigPath, muLimitOptions, currSignal);
+	submitMLViaBsub(fullConfigPath, m_config->getStr("MuLimitOptions"), currSignal);
 	m_isFirstJob = false;
       }
       else {
@@ -362,7 +358,7 @@ int main (int argc, char **argv) {
 				 (m_config->getStr("packageLocation")).Data(), 
 				 (m_config->getStr("exeMuLimit")).Data(),
 				 fullConfigPath.Data(), currSignal.Data(),
-				 muLimitOptions.Data());
+				 m_config->getStr("MuLimitOptions").Data());
 	std::cout << "Executing following system command: \n\t"
 		  << muCommand << std::endl;
 	system(muCommand);
@@ -390,7 +386,7 @@ int main (int argc, char **argv) {
       TString currSignal = resubmitSignals[i_s];
       
       if (runInParallel) {
-	submitMLViaBsub(fullConfigPath, muLimitOptions, currSignal);
+	submitMLViaBsub(fullConfigPath, m_config->getStr("MuLimitOptions"), currSignal);
 	m_isFirstJob = false;
       }
       else {
@@ -398,12 +394,40 @@ int main (int argc, char **argv) {
 		    (m_config->getStr("packageLocation")).Data(), 
 		    (m_config->getStr("exeMuLimit")).Data(),
 		    fullConfigPath.Data(), currSignal.Data(),
-		    muLimitOptions.Data()));
+		    m_config->getStr("MuLimitOptions").Data()));
       }
       jobCounterML++;
     }
     std::cout << "Resubmitted " << jobCounterML << " jobs" << std::endl;
   }
   */
+  
+  //--------------------------------------//
+  // Step 8: Do a CL scan to get the upper limit on cross-section:
+  if (masterOption.Contains("CLScanSubmitToys")) {
+    std::cout << "DHMaster: Step 5.1 - Create pseudoexperiments." << std::endl;
+    
+    int toySeed = m_config->getInt("toySeed");
+    int nToysTotal = m_config->getInt("nToysTotal");
+    int nToyJobs = ((m_config->getNum("CLScanMax") - 
+		     m_config->getNum("CLScanMin")) / 
+		    m_config->getNum("CLScanStep"));
+    for (int currIndex = 0; currIndex < nToyJobs; currIndex++) {
+      TString currOptions = m_config->getStr("CLScanToyOptions");
+      currOptions.Append(Form("%d",currIndex));
+      submitPEViaBsub(fullConfigPath, currOptions, toySeed, nToysTotal);
+      m_isFirstJob = false;
+      toySeed++;
+    }
+    std::cout << "DHMaster: Submitted " << nToyJobs
+	      << " total pseudo-experiments for CL scan." << std::endl;
+  }
+  
+  if (masterOption.Contains("CLScanAnalysis")) {
+    std::cout << "DHMaster: Step 8 - Get ." << std::endl;
+    system(Form("./bin/DHCLScan %s %s", fullConfigPath.Data(),
+		(m_config->getStr("CLScanOptions")).Data()));
+  }
+  
   return 0;
 }

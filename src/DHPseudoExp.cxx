@@ -15,7 +15,7 @@
 //  for some reason it is impossible to overwrite entries in a workspace.     //
 //                                                                            //
 //  options:                                                                  //
-//      Binned, FixMu                                                         //
+//      Binned, FixMu, CL%d                                                   //
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -79,8 +79,22 @@ int main(int argc, char **argv) {
   TString outputDir = Form("%s/%s/DHPseudoExp", 
 			   (config->getStr("MasterOutput")).Data(),
 			   (config->getStr("JobName")).Data());
+  if (options.Contains(config->getStr("CLScanToyOptions"))) {
+    outputDir = Form("%s/%s/DHPseudoExpForCLScan", 
+		     (config->getStr("MasterOutput")).Data(),
+		     (config->getStr("JobName")).Data());
+  }
+  
+  // Get the index of the job (for CL Scan only):
+  TString jobIndex = options;
+  jobIndex.ReplaceAll(config->getStr("CLScanToyOptions"),"");
+  
   TString tempOutputFileName = Form("%s/single_files/toy_mu%i_%i.root",
 				    outputDir.Data(), inputPoIVal, seed);
+  if (options.Contains(config->getStr("CLScanToyOptions"))) {
+    tempOutputFileName = Form("%s/single_files/toy_mu%i_%i.root",
+			      outputDir.Data(), inputPoIVal, jobIndex.Atoi());
+  }
   
   // Construct the output directories:
   system(Form("mkdir -vp %s/err", outputDir.Data()));
@@ -146,6 +160,12 @@ int main(int argc, char **argv) {
     RooWorkspace *workspace = (RooWorkspace*)inputFile.Get("combinedWS");    
      
     DHTestStat *dhts = new DHTestStat(configFile, "new", workspace);
+    
+    if (options.Contains(config->getStr("CLScanToyOptions"))) {
+      double crossSection = (config->getNum("CLScanMin") + 
+			     (jobIndex.Atoi() * config->getNum("CLScanStep")));
+      dhts->setParam(config->getStr("CLScanVar"), crossSection, true);
+    }
     
     RooDataSet *newToyData
       = dhts->createPseudoData(seed, inputPoIVal, options.Contains("FixMu"));
