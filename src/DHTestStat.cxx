@@ -122,12 +122,12 @@ void DHTestStat::calculateNewCL() {
   double expQMu = getQMuFromNLL(nllMu1Exp, nllMuHatExp, muHatExp, 1);
   
   // Calculate CL:
-  double expCLn2 = getCLFromQMu(expQMu, 0, -2);
-  double expCLn1 = getCLFromQMu(expQMu, 0, -1);
-  double expCLp1 = getCLFromQMu(expQMu, 0, 1);
-  double expCLp2 = getCLFromQMu(expQMu, 0, 2);
-  double expCL = getCLFromQMu(expQMu, 0, 0);
-  double obsCL = getCLFromQMu(obsQMu, 1, 0);
+  double expCLn2 = getCLFromQMu(expQMu, -2);
+  double expCLn1 = getCLFromQMu(expQMu, -1);
+  double expCLp1 = getCLFromQMu(expQMu, 1);
+  double expCLp2 = getCLFromQMu(expQMu, 2);
+  double expCL = getCLFromQMu(expQMu, 0);
+  double obsCL = getCLFromQMu(obsQMu, 0);
   
   // Write CL values to file:
   ofstream textCL;
@@ -418,12 +418,11 @@ double DHTestStat::getCLsFromCL(double CL) {
    -----------------------------------------------------------------------------
    Get the CL value using qMu and the type.
    @param qMu - The value of the test statistic.
-   @param observed - True of observed stat., false if expected result.
    @param N - The sigma value (-2,-1,0,1,2). Use 0 for median.
    @return - The CLs value.
 */
-double DHTestStat::getCLFromQMu(double qMu, bool observed, double N) {
-  double CL = getCLFromCLs(getCLsFromQMu(qMu, observed, N));
+double DHTestStat::getCLFromQMu(double qMu, double N) {
+  double CL = getCLFromCLs(getCLsFromQMu(qMu, N));
   return CL;
 }
 
@@ -431,11 +430,10 @@ double DHTestStat::getCLFromQMu(double qMu, bool observed, double N) {
    -----------------------------------------------------------------------------
    Get the CLs value using qMu and the type.
    @param qMu - The value of the test statistic.
-   @param observed - True of observed stat., false if expected result.
    @param N - The sigma value (-2,-1,0,1,2). Use 0 for median.
    @return - The CLs value.
 */
-double DHTestStat::getCLsFromQMu(double qMu, bool observed, double N) {
+double DHTestStat::getCLsFromQMu(double qMu, double N) {
   // N = 0 for exp and obs
   double pMu = getPMuFromQMu(qMu);
   double pB = getPbFromN(N);

@@ -1,16 +1,16 @@
 #!/bin/bash
 
-if [[ $# -lt 8 ]]; then
-    echo "USAGE: toy_jobfile.sh <jobname> <configfile> <input_file> <exe_name> <signal> <option> <seed> <toysperjob>"
+if [[ $# -lt 7 ]]; then
+    echo "USAGE: toy_jobfile.sh <jobname> <configfile> <input_file> <exe_name> <option> <seed> <toysperjob>"
     
 else
     jobname=$1
     configfile=$2
     input_file=$3
     exe_name=$4
-    option=$6
-    seed=$7
-    toysperjob=$8
+    option=$5
+    seed=$6
+    toysperjob=$7
     
     date
     echo

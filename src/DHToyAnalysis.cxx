@@ -18,8 +18,10 @@
 /**
    -----------------------------------------------------------------------------
    Constructor for the DHToyAnalysis class.
+   @param newConfigFile - The name of the analysis config file.
+   @param options - Options for the toy analysis.
 */
-DHToyAnalysis::DHToyAnalysis(TString newConfigFile) {
+DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString options) {
   
   // Load the config file:
   m_config = new Config(newConfigFile);
@@ -43,6 +45,8 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile) {
   m_nBins = 500;
   m_binMin = 0;
   m_binMax = 20;
+  
+  m_valuesQMu_Mu1.clear();
   
   // Set the fit types:
   m_fitTypes.clear();
@@ -122,6 +126,57 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile) {
 
 /**
    -----------------------------------------------------------------------------
+   Calculate the CLs limit from toys (bands with N=-2,-1,0,+1,+2)
+   @param qMu - The value of the test statistic.
+   @param N - The sigma value (-2,-1,0,1,2). Use 0 for median.
+   @return - The CLs value.
+*/
+double DHToyAnalysis::calculateCLsFromToy(double qMu, double N) {
+  double pMu = calculatePMuFromToy(qMu);
+  double pB = getPbFromN(N);
+  double CLs = pMu / (1.0 - pB);
+  return CLs;
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Calculate the CL from the toys.
+   @param qMu - The value of the test statistic.
+   @param N - The sigma value (-2,-1,0,1,2). Use 0 for median.
+   @return - The CL value.
+*/
+double DHToyAnalysis::calculateCLFromToy(double qMu, double N) {
+  return (1.0 - calculateCLsFromToy(qMu, N));
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Calculate the fractional number of toys in the mu=1 toy dataset that give a
+   value of QMu larger than that observed QMu in data.
+   @param qMu - The value of the test statistic.
+   @return - The value of pMu.
+*/
+double DHToyAnalysis::calculatePMuFromToy(double qMu) {
+  int totalEvents = m_valuesQMu_Mu1.size();
+  int passingEvents = 0;
+  for (int i_e = 0; i_e < totalEvents; i_e++) {
+    if (m_valuesQMu_Mu1[i_e] > qMu) passingEvents++;
+  }
+  return (((double)passingEvents) / ((double)totalEvents));
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Calculate pB based on the standard deviation.
+   @param N - The standard deviation.
+   @return - The value of pB.
+*/
+double DHToyAnalysis::getPbFromN(double N) {
+  return (1 - ROOT::Math::gaussian_cdf(N));
+}
+
+/**
+   -----------------------------------------------------------------------------
    Fill the histograms containing toy Data.
    @param muValue - the mu hypothesis under which the toys were generated.
    @param toyTree - the TTree containing the pseudo data.
@@ -142,7 +197,10 @@ void DHToyAnalysis::fillToyHistograms(int muValue, DHToyTree *toyTree) {
   m_namesGlobs.clear();
   m_namesNuis.clear();
   m_namesPars.clear();
-    
+  
+  // Clear the qMu storage for pMu calculation if looking at Mu1 toy:
+  if (muValue > 0) m_valuesQMu_Mu1.clear();
+  
   // Get names of NP (and Globs):
   RooArgSet *setNuis = (RooArgSet*)m_workspace->set("nuisanceParameters");
   RooRealVar *nuis = NULL;
@@ -199,6 +257,9 @@ void DHToyAnalysis::fillToyHistograms(int muValue, DHToyTree *toyTree) {
     m_hQMu[muValue]->Fill(valueQMu);
     m_hQ0[muValue]->Fill(valueQ0);
     m_hMuProfiled[muValue]->Fill(toyTree->profiledPOIVal);
+    
+    // Also fill the QMu vector for pMu calculation:
+    if (muValue > 0) m_valuesQMu_Mu1.push_back(valueQMu);
     
     // Loop over the nuis:
     for (int i_n = 0; i_n < (int)((*toyTree->namesNP).size()); i_n++) {

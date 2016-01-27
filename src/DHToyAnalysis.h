@@ -25,9 +25,14 @@ class DHToyAnalysis {
 
  public:
   
-  DHToyAnalysis(TString newConfigFile);
+  DHToyAnalysis(TString newConfigFile, TString options);
   virtual ~DHToyAnalysis() {};
   
+  double calculateCLsFromToy(double qMu, double N);
+  double calculateCLFromToy(double qMu, double N);
+  double calculatePMuFromToy(double qMu);
+  double getPbFromN(double N);
+
   void fillToyHistograms(int muValue, DHToyTree *toyTree);
   void getAsymptoticForm(TString statistic);
   TH1F* getAsymptoticHist();
@@ -60,6 +65,9 @@ class DHToyAnalysis {
   // Fit types:
   std::vector<TString> m_fitTypes;
   
+  // Storage of QMu for pMu calculation:
+  std::vector<double> m_valuesQMu_Mu1;
+
   // Histograms:
   TH1F *m_hAsymptotic;
   TH1F *m_hMuProfiled[2];

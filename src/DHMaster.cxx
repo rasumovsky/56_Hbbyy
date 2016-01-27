@@ -266,7 +266,7 @@ int main (int argc, char **argv) {
   if (masterOption.Contains("PlotPseudoExp")) {
     std::cout << "DHMaster: Step 5.2 - Plot pseudoexperiment results."
 	      << std::endl;
-    DHToyAnalysis *dhta = new DHToyAnalysis(configFileName);
+    DHToyAnalysis *dhta = new DHToyAnalysis(configFileName, "NONE");
   }
   
   //--------------------------------------//
@@ -403,7 +403,7 @@ int main (int argc, char **argv) {
   */
   
   //--------------------------------------//
-  // Step 8: Do a CL scan to get the upper limit on cross-section:
+  // Step 8.1: Toss toys for a CL scan:
   if (masterOption.Contains("CLScanSubmitToys")) {
     std::cout << "DHMaster: Step 5.1 - Create pseudoexperiments." << std::endl;
     
@@ -423,6 +423,8 @@ int main (int argc, char **argv) {
 	      << " total pseudo-experiments for CL scan." << std::endl;
   }
   
+  //--------------------------------------//
+  // Step 8.2: Create the CL scan plot:
   if (masterOption.Contains("CLScanAnalysis")) {
     std::cout << "DHMaster: Step 8 - Get ." << std::endl;
     system(Form("./bin/DHCLScan %s %s", fullConfigPath.Data(),

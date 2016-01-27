@@ -41,8 +41,8 @@ class DHTestStat {
   double functionQMuTilde(double x, double asimovTestStat);
   double getCLFromCLs(double CLs);
   double getCLsFromCL(double CL);
-  double getCLFromQMu(double qMu, bool observed, double N);
-  double getCLsFromQMu(double qMu, bool observed, double N);
+  double getCLFromQMu(double qMu, double N);
+  double getCLsFromQMu(double qMu, double N);
   double getFitNLL(TString datasetName, double muVal, bool fixMu,
 		   double &profiledMu, bool resetParams=true);
   std::map<std::string,double> getGlobalObservables();
