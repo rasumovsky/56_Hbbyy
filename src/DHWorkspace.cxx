@@ -195,8 +195,8 @@ void DHWorkspace::addCategory() {
 			      m_anaType.Data(), m_currCateName.Data());
   std::ifstream massInput(textFileName);
   if (massInput.is_open()) {
-    std::cout << "DHWorkspace: Loading data points from file " << textFileName
-	      << std::endl;
+    printer(Form("DHWorkspace: Loading data points from file %s",
+		 textFileName.Data()), false);
     double currMass; double currWeight;
     while (!massInput.eof()) {
       massInput >> currMass >> currWeight;
@@ -550,7 +550,6 @@ void DHWorkspace::createStupidAsimovData(int valPoI, int nBinsAsimov) {
     //RooAbsReal* currIntegral = (RooAbsReal*)m_ws->pdf(Form("model_%s",m_currCateName.Data()))->createIntegral(RooArgSet(*m_ws->var(nameObs)), RooFit::NormSet(*m_ws->var(nameObs)), RooFit::Range(Form("range%d",i_b)));
     RooAbsReal* currIntegral = (RooAbsReal*)currPdf->createIntegral(RooArgSet(*m_ws->var(nameObs)), RooFit::NormSet(*m_ws->var(nameObs)), RooFit::Range(Form("range%d",i_b)));
     double currWeight = currIntegral->getVal() * totalEvents;
-    
     m_ws->var(nameObs)->setVal(currMass);
     m_ws->var("wt")->setVal(currWeight);
     currAsimov->add(RooArgSet(*m_ws->var(nameObs),m_ws->var("wt")), currWeight);
@@ -642,8 +641,8 @@ void DHWorkspace::createNewWS() {
   
   //--------------------------------------//
   // Loop over channels, create model for each:
-  std::cout << "DHWorkspace: Looping over categories to define workspace."
-	    << std::endl;
+  printer("DHWorkspace: Looping over categories to define workspace.", false);
+  
   for (m_currCateIndex = 0; m_currCateIndex < m_nCategories; m_currCateIndex++){
     m_currCateName = cateNames[m_currCateIndex];
     // Create the workspace for a single category:
@@ -652,7 +651,7 @@ void DHWorkspace::createNewWS() {
   
   //--------------------------------------//
   // Finished category loop, now building combined model:
-  std::cout << "DHWorkspace: Beginning to combine all categories." << std::endl;
+  printer("DHWorkspace: Beginning to combine all categories.", false);
   
   // Import variable sets:  
   m_ws->defineSet("nonSysParameters", *m_nonSysParameters);
@@ -736,8 +735,8 @@ void DHWorkspace::createNewWS() {
   m_ws->saveSnapshot("paramsOrigin", *allParams);
   
   // Print the workspace before saving:
-  std::cout << "DHWorkspace: Printing the workspace to be saved." << std::endl;
-  m_ws->Print("v");
+  printer("DHWorkspace: Printing the workspace to be saved.", false);
+  if (m_config->getBool("Verbose")) m_ws->Print("v");
   
   // Write workspace to file:
   m_ws->importClassCode();
@@ -751,15 +750,17 @@ void DHWorkspace::createNewWS() {
   DHTestStat *dhts = new DHTestStat(m_configFile, "new", m_ws);
   dhts->saveSnapshots(true);
   dhts->setPlotDirectory(Form("%s/Plots/", m_outputDir.Data()));
-  dhts->setPlotAxis(true, 0.005, 50);
+  dhts->setPlotAxis(true, 0.02, 100.0, 1.0);
   
   double profiledPOIVal = -999.0;
   // Mu = 0 fits:
   double nllMu0 = dhts->getFitNLL(m_dataToPlot, 0, true, profiledPOIVal);
   if (!dhts->fitsAllConverged()) m_allGoodFits = false;
+
   // Mu = 1 fits:
   double nllMu1 = dhts->getFitNLL(m_dataToPlot, 1, true, profiledPOIVal);
   if (!dhts->fitsAllConverged()) m_allGoodFits = false;
+ 
   // Mu free fits:
   double nllMuFree = dhts->getFitNLL(m_dataToPlot, 1, false, profiledPOIVal);
   if (!dhts->fitsAllConverged()) m_allGoodFits = false;
@@ -829,14 +830,13 @@ void DHWorkspace::loadWSFromFile() {
   TFile inputFile(Form("%s/rootfiles/workspaceDH_%s.root", 
 		       m_outputDir.Data(), m_anaType.Data()), "read");
   if (inputFile.IsOpen()) {
-    std::cout << "DHWorkspace: Loading workspace from file..." << std::endl;
+    printer("DHWorkspace: Loading workspace from file...", false);
     // Load the single workspace file:
     m_ws = (RooWorkspace*)inputFile.Get("combinedWS");
     m_modelConfig = (ModelConfig*)m_ws->obj("modelConfig");
   }
   else {
-    std::cout << "DHWorkspace: WARNING! Cannot locate requested workspace!" 
-	      << std::endl;
+    printer("DHWorkspace: WARNING! Cannot locate workspace, make new!", false);
     createNewWS();
   }
 }

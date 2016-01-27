@@ -49,12 +49,11 @@ DHTestStat::DHTestStat(TString newConfigFile, TString newOptions,
 		       (m_config->getStr("MasterOutput")).Data(),
 		       m_jobName.Data(), m_anaType.Data()), "read");
     if (inputFile->IsOpen()) {
-      std::cout << "DHTestStat: Loading workspace." << std::endl;
+      printer("DHTestStat: Loading workspace.", false);
       m_workspace = (RooWorkspace*)inputFile->Get("combinedWS");
     }
     else {
-      std::cout << "DHTestStat: Error loading file, accessing with WS tool."
-		<< std::endl;
+      printer("DHTestStat: Error loading file, accessing with WS tool.", false);
       // Load the workspace from the nominal location.
       DHWorkspace *m_dhws = new DHWorkspace(newConfigFile, "FromFile");
       m_workspace = m_dhws->getCombinedWorkspace();
@@ -70,7 +69,7 @@ DHTestStat::DHTestStat(TString newConfigFile, TString newOptions,
   m_calculatedValues.clear();
   
   // Use linear plot y-axis by default:
-  setPlotAxis(false, 0.0, 100.0);
+  setPlotAxis(false, 0.0, 100.0, 1.0);
 
   // Create output directories:
   m_outputDir = Form("%s/%s/DHTestStat", 
@@ -108,7 +107,7 @@ double DHTestStat::accessValue(TString testStat, bool observed, int N) {
    Calculate the CL and CLs values using model fits.
 */
 void DHTestStat::calculateNewCL() {
-  std::cout << "DHTestStat: Calculating CLs" << std::endl;
+  printer("DHTestStat::calculateNewCL()", false);
   
   // Calculate observed qmu: 
   double muHatObs = 0.0;
@@ -173,7 +172,7 @@ void DHTestStat::calculateNewCL() {
    Calculate the p0 value using model fits.
 */
 void DHTestStat::calculateNewP0() {
-  std::cout << "DHTestStat: calculating p0." << std::endl;
+  printer("DHTestStat::calculateNewP0()", false);
   
   // Calculate observed q0: 
   double muHatObs = 0.0;
@@ -222,7 +221,6 @@ void DHTestStat::clearData() {
   m_doSaveSnapshot = false;
   m_doPlot = false;
   m_plotDir = "";
-  
   clearFitParamSettings();
 }
 
@@ -257,9 +255,9 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   RooArgSet* observables = (RooArgSet*)m_mc->GetObservables();
   RooRealVar* firstPoI = (RooRealVar*)m_mc->GetParametersOfInterest()->first();
   
-  std::cout << "toy values BEFORE randomization etc." << std::endl;
-  printSet("nuisanceParameters", nuisanceParameters);
-  printSet("globalObservables", globalObservables);
+  //std::cout << "toy values BEFORE randomization etc." << std::endl;
+  //printSet("nuisanceParameters", nuisanceParameters);
+  //printSet("globalObservables", globalObservables);
   
   RooRandom::randomGenerator()->SetSeed(seed);
   statistics::constSet(nuisanceParameters, true);
@@ -273,9 +271,9 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   statistics::randomizeSet(combPdf, globalObservables, seed); 
   statistics::constSet(globalObservables, true);
   
-  std::cout << "toy values AFTER randomization etc." << std::endl;
-  printSet("nuisanceParameters", nuisanceParameters);
-  printSet("globalObservables", globalObservables);
+  //std::cout << "toy values AFTER randomization etc." << std::endl;
+  //printSet("nuisanceParameters", nuisanceParameters);
+  //printSet("globalObservables", globalObservables);
   
   // Set the parameter of interest value and status:
   firstPoI->setVal(valPoI);
@@ -342,10 +340,10 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   //m_workspace->loadSnapshot("paramsOrigin");
   statistics::constSet(nuisanceParameters, false);
   statistics::constSet(globalObservables, true);
-
-  std::cout << "toy values FINAL reloading." << std::endl;
-  printSet("nuisanceParameters", nuisanceParameters);
-  printSet("globalObservables", globalObservables);
+  
+  //std::cout << "toy values FINAL reloading." << std::endl;
+  //printSet("nuisanceParameters", nuisanceParameters);
+  //printSet("globalObservables", globalObservables);
 
   // Import into the workspace then return:
   m_workspace->import(*pseudoData);
@@ -473,9 +471,8 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   
   // Look for dataset. Create if non-existent & Asimov or requires binning.
   if (!m_workspace->data(datasetName)) {
-    std::cout << "DHTestStat: Error! Requested data not available: " 
-	      << datasetName << std::endl;
-    exit(0);
+    printer(Form("DHTestStat: Error! Requested data not available: %s",
+		 datasetName.Data()), true);
   }
   
   // release nuisance parameters before fit and set to the default values
@@ -483,9 +480,9 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   // the global observables should be fixed to the nominal values...
   statistics::constSet(globalObservables, true);
   
-  std::cout << "Pre-fit parameter values" << std::endl;
-  printSet("nuisanceParameters", nuisanceParameters);
-  printSet("globalObservables", globalObservables);
+  //std::cout << "Pre-fit parameter values" << std::endl;
+  //printSet("nuisanceParameters", nuisanceParameters);
+  //printSet("globalObservables", globalObservables);
   
   firstPoI->setVal(valPoI);
   firstPoI->setConstant(fixPoI);
@@ -518,23 +515,10 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   RooFitResult *fitResult = statistics::minimize(varNLL, "", NULL, true);
   if (!fitResult || fitResult->status() != 0) m_allGoodFits = false;
   
-  std::cout << "Post-fit parameter values" << std::endl;
-  printSet("nuisanceParameters", nuisanceParameters);
-  printSet("globalObservables", globalObservables);
-  /*
-  m_workspace->var("lumi")->setVal(0);
-  m_workspace->var("RNDM_lumi")->setVal(0);
-  cout << "NLLVAL1 = " << varNLL->getVal() << std::endl;
-  m_workspace->var("lumi")->setVal(2);
-  m_workspace->var("RNDM_lumi")->setVal(0);
-  cout << "NLLVAL2 = " << varNLL->getVal() << std::endl;
-  m_workspace->var("lumi")->setVal(0);
-  m_workspace->var("RNDM_lumi")->setVal(2);
-  cout << "NLLVAL3 = " << varNLL->getVal() << std::endl;
-  m_workspace->var("lumi")->setVal(2);
-  m_workspace->var("RNDM_lumi")->setVal(2);
-  cout << "NLLVAL4 = " << varNLL->getVal() << std::endl;
-  */    
+  //std::cout << "Post-fit parameter values" << std::endl;
+  //printSet("nuisanceParameters", nuisanceParameters);
+  //printSet("globalObservables", globalObservables);
+  
   // Save a snapshot if requested:
   if (m_doSaveSnapshot) {
     TString muDHValue = fixPoI ? (Form("%d",(int)valPoI)) : "Free";
@@ -562,7 +546,7 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   statistics::constSet(nuisanceParameters, false, origValNP);
   
   // Finish up, return NLL value.
-  std::cout << "DHTestStat: Fit has completed. Returning NLL." << std::endl;
+  printer("DHTestStat: Fit has completed. Returning NLL.", false);
   return nllValue;
 }
 
@@ -793,14 +777,17 @@ TString DHTestStat::nameOfVar(TString varForm) {
 TGraphErrors* DHTestStat::plotDivision(TString dataName, TString pdfName, 
 				       TString obsName, double xMin, 
 				       double xMax, double xBins){
+  printer(Form("DHTestStat::plotDivision(%s, %s, %s, %f, %f, %f)",
+	       dataName.Data(),pdfName.Data(),obsName.Data(),xMin,xMax,xBins),
+	  false);
+  
   RooRealVar *observable = m_workspace->var(obsName);
   RooAbsData *data = m_workspace->data(dataName);
   RooAbsPdf *pdf = m_workspace->pdf(pdfName); 
-  
   double minOrigin = observable->getMin();
   double maxOrigin = observable->getMax();
   double nEvents = data->sumEntries();
-  
+    
   observable->setRange("fullRange", xMin, xMax);
   TH1F *originHist
     = (TH1F*)data->createHistogram("dataSub", *observable,
@@ -845,12 +832,13 @@ TGraphErrors* DHTestStat::plotDivision(TString dataName, TString pdfName,
 /**
    -----------------------------------------------------------------------------
    Plot the fits produced by the specified model.
-   @param combWS - The combined workspace.
    @param fitType - The type of fit.
+   @param datasetName - The name of the dataset to be plotted. 
 */
 void DHTestStat::plotFits(TString fitType, TString datasetName) {
-  std::cout << "DHTestStat: Plot fit " << fitType << ", " << datasetName 
-	    << std::endl;
+  printer(Form("DHTestStat:plotFits(%s, %s)",fitType.Data(),datasetName.Data()),
+	  false);
+  
   TCanvas *can = new TCanvas("can", "can", 800, 800);
   can->cd();
   TPad *pad1 = new TPad( "pad1", "pad1", 0.00, 0.33, 1.00, 1.00 );
@@ -873,12 +861,11 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     
     TString obsName = m_config->getStr(Form("OBS_%s",cateNames[i_c].Data()));
     obsName = nameOfVar(obsName);
+    double obsMin = (*m_workspace->var(obsName)).getMin();
+    double obsMax = (*m_workspace->var(obsName)).getMax();
     
     // Set the resonant analysis plot binning and axis scale to paper settings:
-    int nGeVPerBin = 50;  m_yMin = 0.002;  m_yMax = 40;
-    int nBinsForPlot = (int)(((*m_workspace->var(obsName)).getMax() - 
-			      (*m_workspace->var(obsName)).getMin()) /
-			     nGeVPerBin);
+    int nBinsForPlot = (int)((obsMax - obsMin) / m_geVPerBin);
     
     // Plot everything on RooPlot:
     RooPlot* frame = (*m_workspace->var(obsName)).frame(nBinsForPlot);
@@ -897,7 +884,7 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     }
     TString xTitle =m_config->getStr(Form("OBSPrint_%s",cateNames[i_c].Data()));
     frame->SetXTitle(xTitle);
-    frame->SetYTitle(Form("Events / %d GeV", nGeVPerBin));
+    frame->SetYTitle(Form("Events / %2.1f GeV", m_geVPerBin));
     frame->Draw();
     
     if (m_useLogScale) {
@@ -943,32 +930,41 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     pad2->cd();
     pad2->Clear();
     
-    double obsMin = (*m_workspace->var(obsName)).getMin();
-    double obsMax = (*m_workspace->var(obsName)).getMax();
+    double ratioMin = 0.0;//-0.2
+    double ratioMax = 2.0;//2.2
+    TH1F *medianHist = new TH1F("median","median",nBinsForPlot,obsMin,obsMax);
+    for (int i_b = 1; i_b <= nBinsForPlot; i_b++) {
+      medianHist->SetBinContent(i_b, 1.0);
+    }
+    medianHist->SetLineColor(kRed);
+    medianHist->SetLineWidth(2);
+    medianHist->GetXaxis()->SetTitle(xTitle);
+    medianHist->GetYaxis()->SetTitle("Data / Fit");
+    medianHist->GetXaxis()->SetTitleOffset(0.95);
+    medianHist->GetYaxis()->SetTitleOffset(0.7);
+    medianHist->GetXaxis()->SetTitleSize(0.1);
+    medianHist->GetYaxis()->SetTitleSize(0.1);
+    medianHist->GetXaxis()->SetLabelSize(0.1);
+    medianHist->GetYaxis()->SetLabelSize(0.1);
+    medianHist->GetYaxis()->SetRangeUser(ratioMin, ratioMax);
+    //medianHist->GetYaxis()->SetNdivisions(5);
+    medianHist->GetYaxis()->SetNdivisions(4);
+    medianHist->Draw();
     
-    double ratioMin = 0.0; double ratioMax = 2.0;
+    
+    //medianHist->GetXaxis()->SetRangeUser(obsMin, obsMax);
+    
     TGraphErrors* subData
       = plotDivision(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()),
 		     Form("model_%s", cateNames[i_c].Data()), obsName, obsMin,
 		     obsMax, nBinsForPlot);
-    subData->GetYaxis()->SetTitle("Data / Fit");
-    subData->GetXaxis()->SetTitle(xTitle);
-    subData->GetYaxis()->SetRangeUser(ratioMin, ratioMax);
-    subData->GetXaxis()->SetTitleOffset(0.95);
-    subData->GetYaxis()->SetTitleOffset(0.7);
-    subData->GetXaxis()->SetTitleSize(0.1);
-    subData->GetYaxis()->SetTitleSize(0.1);
-    subData->GetXaxis()->SetLabelSize(0.1);
-    subData->GetYaxis()->SetLabelSize(0.1);
-    subData->GetYaxis()->SetNdivisions(4);
-    subData->GetXaxis()->SetRangeUser(obsMin, obsMax);
-    subData->Draw("AEP");
+    subData->Draw("EPSAME");
     
     TLine *line = new TLine();
     line->SetLineStyle(1);
     line->SetLineWidth(2);
     line->SetLineColor(kBlack);
-    line->DrawLine(obsMin, 1.0, obsMax, 1.0); 
+    //line->DrawLine(obsMin, 1.0, obsMax, 1.0); 
     line->SetLineWidth(1);
     line->SetLineStyle(2);
     line->DrawLine(obsMin, ((1.0+ratioMin)/2.0), obsMax, ((1.0+ratioMin)/2.0));
@@ -1047,10 +1043,12 @@ void DHTestStat::saveSnapshots(bool doSaveSnapshot) {
    -----------------------------------------------------------------------------
    Set axis options for plots:
 */
-void DHTestStat::setPlotAxis(bool useLogScale, double yMin, double yMax) {
+void DHTestStat::setPlotAxis(bool useLogScale, double yMin, double yMax,
+			     double GeVPerBin) {
   m_useLogScale = useLogScale;
   m_yMin = yMin;
   m_yMax = yMax;
+  m_geVPerBin = GeVPerBin;
 }
 
 /**

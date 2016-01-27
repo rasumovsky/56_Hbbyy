@@ -60,7 +60,8 @@ class DHTestStat {
 			    double muHat, double muTest);
   void loadStatsFromFile();
   void saveSnapshots(bool doSaveSnapshot);
-  void setPlotAxis(bool useLogScale, double yMin, double yMax);
+  void setPlotAxis(bool useLogScale, double yMin, double yMax, 
+		   double GeVPerBin);
   void setPlotDirectory(TString directory);
   void setParam(TString paramName, double paramVal, bool doSetConstant);
       
@@ -124,6 +125,7 @@ class DHTestStat {
   bool m_useLogScale;
   double m_yMin;
   double m_yMax;
+  double m_geVPerBin;
   
 };
 
