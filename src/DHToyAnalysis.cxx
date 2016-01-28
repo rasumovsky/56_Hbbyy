@@ -95,38 +95,47 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString options) {
   TChain* chainMu1 = CommonFunc::MakeChain("toy", listMu1, "badfile");
   DHToyTree *treeMu0 = new DHToyTree(chainMu0);
   DHToyTree *treeMu1 = new DHToyTree(chainMu1);
-    
+  
+  if (!(treeMu0->fChain->GetEntries() > 0) ||
+      !(treeMu1->fChain->GetEntries() > 0)) {
+    m_filesLoaded = false;
+  }
+  else m_filesLoaded = true;
+  
   // Get the Asimov form of the test statistic:
   TFile workspaceFile(wsFileName, "read");
   m_workspace = (RooWorkspace*)workspaceFile.Get("combinedWS");
   m_dhts = new DHTestStat(newConfigFile, "new", m_workspace);
+  if (!m_workspace) m_filesLoaded = false;
   
   // Store the toy data:
   fillToyHistograms(0, treeMu0);
   fillToyHistograms(1, treeMu1);
-
-  // Get the asymptotic test statistic distribution:
-  getAsymptoticForm("QMu");// THIS SHOULD BE GENERALIZED!!!
   
-  // Plot the results:
-  plotProfiledMu();
-  plotTestStat("QMu");
-  plotTestStat("Q0");
-  plotTestStatComparison("QMu");
-  plotTestStatComparison("Q0");
-  
-  // Then plot the nuis, globs, and other parameters:
-  for (int i_g = 0; i_g < (int)m_namesGlobs.size(); i_g++) {
-    plotHist(m_namesGlobs[i_g], 0);
-    plotHist(m_namesGlobs[i_g], 1);
-  }
-  for (int i_n = 0; i_n < (int)m_namesNuis.size(); i_n++) {
-    plotHist(m_namesNuis[i_n], 0);
-    plotHist(m_namesNuis[i_n], 1);
-  }
-  for (int i_p = 0; i_p < (int)m_namesPars.size(); i_p++) {
-    plotHist(m_namesPars[i_p], 0);
-    plotHist(m_namesPars[i_p], 1);
+  if (!options.Contains("CLScan")) {
+    // Get the asymptotic test statistic distribution:
+    getAsymptoticForm("QMu");// THIS SHOULD BE GENERALIZED!!!
+    
+    // Plot the results:
+    plotProfiledMu();
+    plotTestStat("QMu");
+    plotTestStat("Q0");
+    plotTestStatComparison("QMu");
+    plotTestStatComparison("Q0");
+    
+    // Then plot the nuis, globs, and other parameters:
+    for (int i_g = 0; i_g < (int)m_namesGlobs.size(); i_g++) {
+      plotHist(m_namesGlobs[i_g], 0);
+      plotHist(m_namesGlobs[i_g], 1);
+    }
+    for (int i_n = 0; i_n < (int)m_namesNuis.size(); i_n++) {
+      plotHist(m_namesNuis[i_n], 0);
+      plotHist(m_namesNuis[i_n], 1);
+    }
+    for (int i_p = 0; i_p < (int)m_namesPars.size(); i_p++) {
+      plotHist(m_namesPars[i_p], 0);
+      plotHist(m_namesPars[i_p], 1);
+    }
   }
   
   // Remove the temporary file lists:
@@ -138,6 +147,15 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString options) {
 	    << " mu=0 pseudo experiments were analyzed" << std::endl;
   std::cout << "\t" << treeMu1->fChain->GetEntries()
 	    << " mu=1 pseudo experiments were analyzed" << std::endl;
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Check whether the input TTrees were successfully loaded.
+   @return - True iff. all input files are OK.
+*/
+bool DHToyAnalysis::areInputFilesOK() {
+  return m_filesLoaded;
 }
 
 /**
@@ -173,12 +191,14 @@ double DHToyAnalysis::calculateCLFromToy(double qMu, double N) {
    @return - The value of pMu.
 */
 double DHToyAnalysis::calculatePMuFromToy(double qMu) {
-  int totalEvents = m_valuesQMu_Mu1.size();
+  int totalEvents = (int)m_valuesQMu_Mu1.size();
   int passingEvents = 0;
   for (int i_e = 0; i_e < totalEvents; i_e++) {
-    if (m_valuesQMu_Mu1[i_e] > qMu) passingEvents++;
+    if (m_valuesQMu_Mu1[i_e] >= qMu) passingEvents++;
   }
-  return (((double)passingEvents) / ((double)totalEvents));
+  double probability = (totalEvents > 0) ?
+    (((double)passingEvents) / ((double)totalEvents)) : 0.0;
+  return probability;
 }
 
 /**

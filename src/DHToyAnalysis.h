@@ -28,6 +28,7 @@ class DHToyAnalysis {
   DHToyAnalysis(TString newConfigFile, TString options);
   virtual ~DHToyAnalysis() {};
   
+  bool areInputFilesOK();
   double calculateCLsFromToy(double qMu, double N);
   double calculateCLFromToy(double qMu, double N);
   double calculatePMuFromToy(double qMu);
@@ -52,7 +53,8 @@ class DHToyAnalysis {
   // Private member variables:
   TString m_outputDir;
   Config *m_config;
-  
+  bool m_filesLoaded;
+
   // Classes for statistics access:
   DHTestStat *m_dhts;
   RooWorkspace *m_workspace;

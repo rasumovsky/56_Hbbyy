@@ -85,27 +85,31 @@ int main(int argc, char **argv) {
   
   CommonFunc::SetAtlasStyle();
   
+  // Open the workspace:
   TFile wsFile(originFile, "read");
   RooWorkspace *workspace = (RooWorkspace*)wsFile.Get("combinedWS");
   
   // Instantiate the test statistic class for calculations and plots:
-  DHTestStat *ts = new DHTestStat(configFile, "new", workspace);
+  DHTestStat *dhts = new DHTestStat(configFile, "new", workspace);
     
   // Arrays to store band information:
-  double varValues_asym[100];
-  double CLObs_asym[100];
-  double CLExp_asym_p2[100];
-  double CLExp_asym_p1[100];
-  double CLExp_asym[100];
-  double CLExp_asym_n1[100];
-  double CLExp_asym_n2[100];
-  double varValues_toy[100];  
-  double CLObs_toy[100];
-  double CLExp_toy_p2[100];  
-  double CLExp_toy_p1[100];
-  double CLExp_toy[100];
-  double CLExp_toy_n1[100];
-  double CLExp_toy_n2[100];
+  double varValues_asym[100] = {0};
+  double CLObs_asym[100] = {0};
+  double CLExp_asym_p2[100] = {0};
+  double CLExp_asym_p1[100] = {0};
+  double CLExp_asym[100] = {0};
+  double CLExp_asym_n1[100] = {0};
+  double CLExp_asym_n2[100] = {0};
+  double varValues_toy[100] = {0};  
+  double CLObs_toy[100] = {0};
+  double CLExp_toy_p2[100] = {0};  
+  double CLExp_toy_p1[100] = {0};
+  double CLExp_toy[100] = {0};
+  double CLExp_toy_n1[100] = {0};
+  double CLExp_toy_n2[100] = {0};
+  
+  double qMuObs_toy[100] = {0.0};
+  double qMuExp_toy[100] = {0.0};
   
   int n_asym = 0;
   int n_toy = 0;
@@ -168,27 +172,29 @@ int main(int argc, char **argv) {
     // Loop over number of accepted events:
     for (double crossSection = xsMin; crossSection < xsMax;
 	 crossSection += step) {
+      std::cout << "DHCLScan: cross-section = " << crossSection << std::endl;
       
       // Set output directory for plots:
-      ts->setPlotDirectory(outputDir.Data());
+      //dhts->setPlotDirectory(outputDir.Data());
       // Set the value of the variable to scan:
-      ts->setParam(config->getStr("CLScanVar"), crossSection, true);
+      dhts->setParam(config->getStr("CLScanVar"), crossSection, true);
       
       // Asymptotic calculation of CL:
       if (options.Contains("asymptotic") || options.Contains("both")) {
+	std::cout << "DHCLScan: calculating asymptotic CL" << std::endl;
 	
 	// Calculate the 95% CL value:
-	ts->calculateNewCL();
+	dhts->calculateNewCL();
 	
 	// Check that the fit converges:
-	if (ts->fitsAllConverged()) {
+	if (dhts->fitsAllConverged()) {
 	  varValues_asym[n_asym] = crossSection;
-	  CLObs_asym[n_asym] = ts->accessValue("CL", true, 0);
-	  CLExp_asym[n_asym] = ts->accessValue("CL", false, 0);
-	  CLExp_asym_p2[n_asym] = ts->accessValue("CL", false, 2);
-	  CLExp_asym_p1[n_asym] = ts->accessValue("CL", false, 1);
-	  CLExp_asym_n1[n_asym] = ts->accessValue("CL", false, -1);
-	  CLExp_asym_n2[n_asym] = ts->accessValue("CL", false, -2);
+	  CLObs_asym[n_asym] = dhts->accessValue("CL", true, 0);
+	  CLExp_asym[n_asym] = dhts->accessValue("CL", false, 0);
+	  CLExp_asym_p2[n_asym] = dhts->accessValue("CL", false, 2);
+	  CLExp_asym_p1[n_asym] = dhts->accessValue("CL", false, 1);
+	  CLExp_asym_n1[n_asym] = dhts->accessValue("CL", false, -1);
+	  CLExp_asym_n2[n_asym] = dhts->accessValue("CL", false, -2);
 	  
 	  outFile_asym << varValues_asym[n_asym] << " " 
 		       << CLObs_asym[n_asym] << " " 
@@ -199,44 +205,84 @@ int main(int argc, char **argv) {
 		       << CLExp_asym_n2[n_asym] << std::endl;
 	}
 	n_asym++;
-	ts->clearData();
+	dhts->clearData();
       }
       
       // Pseudo-experiment calculation of CL:
       if (options.Contains("toy") || options.Contains("both")) {
+	std::cout << "DHCLScan: calculating toy CL" << std::endl;
 	
 	// Calculate the observed qMu values:
 	double obsPoI = 0.0;
-	double nllObsMu1 = ts->getFitNLL("obsData", 1, true, obsPoI, false);
-	double nllObsMuFree = ts->getFitNLL("obsData", 1, false, obsPoI, false);
-	double qMuObs = ts->getQMuFromNLL(nllObsMu1, nllObsMuFree, obsPoI, 1);
+	double nllObsMu1
+	  = dhts->getFitNLL("obsData", 1, true, obsPoI, false);
+	double nllObsMuFree
+	  = dhts->getFitNLL("obsData", 1, false, obsPoI, false);
+	qMuObs_toy[n_toy] = dhts->getQMuFromNLL(nllObsMu1, nllObsMuFree,
+						obsPoI, 1);
 	
 	// Calculate the expected qMu values (see DHTestStat m_dataForExpQMu):
 	double expPoI = 0.0;
-	double nllExpMu1=ts->getFitNLL("asimovDataMu0",1,true,expPoI,false);
-	double nllExpMuFree=ts->getFitNLL("asimovDataMu0",1,false,expPoI,false);
-	double qMuExp = ts->getQMuFromNLL(nllExpMu1, nllExpMuFree, expPoI, 1);
+	double nllExpMu1
+	  = dhts->getFitNLL("asimovDataMu0", 1, true, expPoI, false);
+	double nllExpMuFree
+	  = dhts->getFitNLL("asimovDataMu0", 1, false, expPoI, false);
+	qMuExp_toy[n_toy] = dhts->getQMuFromNLL(nllExpMu1, nllExpMuFree, 
+						expPoI, 1);
 	
-	// Then specify file in DHToyAnalysis to load:
-	TString toyScanOption = Form("CLScan%d",n_toy);
-	DHToyAnalysis *dhta = new DHToyAnalysis(configFile, toyScanOption);
+	std::cout << "nllObsMu1=" << nllObsMu1 
+		  << ", nllObsMuFree=" << nllObsMuFree
+		  << ", qMuObs=" << qMuObs_toy[n_toy] << std::endl;
+	
+	std::cout << "nllExpMu1=" << nllExpMu1
+		  << ", nllExpMuFree=" << nllExpMuFree
+		  << ", qMuExp=" << qMuExp_toy[n_toy] << std::endl;
+	
 	
 	varValues_toy[n_toy] = crossSection;
-	CLObs_toy[n_toy] = dhta->calculateCLFromToy(qMuObs, 0);
-	CLExp_toy[n_toy] = dhta->calculateCLFromToy(qMuExp, 0);
-	CLExp_toy_p2[n_toy] = dhta->calculateCLFromToy(qMuExp, 2);
-	CLExp_toy_p1[n_toy] = dhta->calculateCLFromToy(qMuExp, 1);
-	CLExp_toy_n1[n_toy] = dhta->calculateCLFromToy(qMuExp, -1);
-	CLExp_toy_n2[n_toy] = dhta->calculateCLFromToy(qMuExp, -2);
-	
-	outFile_toy << varValues_toy[n_toy] << " " 
-		    << CLObs_toy[n_toy] << " " 
-		    << CLExp_toy[n_toy] << " "
-		    << CLExp_toy_p2[n_toy] << " " 
-		    << CLExp_toy_p1[n_toy] << " " 
-		    << CLExp_toy_n1[n_toy] << " " 
-		    << CLExp_toy_n2[n_toy] << std::endl;
 	n_toy++;
+      }
+    }
+    delete dhts;
+
+    
+    // Then specify file in DHToyAnalysis to load:
+    if (options.Contains("toy") || options.Contains("both")) {
+      for (int i_t = 0; i_t < n_toy; i_t++) {
+	
+	// Load the tool to analyze toys.
+	// NOTE: this was moved outside the loop above because of interference
+	// between the DHToyAnalysis class and DHTestStat, which is called
+	// in DHToyAnalysis...
+	TString toyScanOption = Form("CLScan%d",i_t);
+	DHToyAnalysis *dhta = new DHToyAnalysis(configFile, toyScanOption);
+	if (!(dhta->areInputFilesOK())) {
+	  std::cout << "DHCLScan: ERROR with toy scan option " << toyScanOption
+		    << std::endl;
+	  continue;
+	}
+	
+	std::cout << "\nObs: " << std::endl;
+	CLObs_toy[i_t] = dhta->calculateCLFromToy(qMuObs_toy[i_t], 0);
+	std::cout << "\nExp: " << std::endl;
+	CLExp_toy[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], 0);
+	std::cout << "\nExp_p2: " << std::endl;
+	CLExp_toy_p2[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], 2);
+	std::cout << "\nExp_p1: " << std::endl;
+	CLExp_toy_p1[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], 1);
+	std::cout << "\nExp_n1: " << std::endl;
+	CLExp_toy_n1[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], -1);
+	std::cout << "\nExp_n2: " << std::endl;
+	CLExp_toy_n2[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], -2);
+	
+	outFile_toy << varValues_toy[i_t] << " " 
+		    << CLObs_toy[i_t] << " " 
+		    << CLExp_toy[i_t] << " "
+		    << CLExp_toy_p2[i_t] << " " 
+		    << CLExp_toy_p1[i_t] << " " 
+		    << CLExp_toy_n1[i_t] << " " 
+		    << CLExp_toy_n2[i_t] << std::endl;
+	
 	delete dhta;
       }
     }
@@ -249,25 +295,50 @@ int main(int argc, char **argv) {
   //----------------------------------------//
   // Plot the results:
   
+  n_asym--;
+  n_toy--;
+  
+  double errExp_asym_p2[100] = {0};
+  double errExp_asym_p1[100] = {0};
+  double errExp_asym_n1[100] = {0};
+  double errExp_asym_n2[100] = {0};
+  for (int i_a = 0; i_a < n_asym; i_a++) {
+    errExp_asym_p2[i_a] = fabs(CLExp_asym_p2[i_a] - CLExp_asym[i_a]);
+    errExp_asym_p1[i_a] = fabs(CLExp_asym_p1[i_a] - CLExp_asym[i_a]);
+    errExp_asym_n1[i_a] = fabs(CLExp_asym_n1[i_a] - CLExp_asym[i_a]);
+    errExp_asym_n2[i_a] = fabs(CLExp_asym_n2[i_a] - CLExp_asym[i_a]);
+  }
+  
+  double errExp_toy_p2[100] = {0};  
+  double errExp_toy_p1[100] = {0};
+  double errExp_toy_n1[100] = {0};
+  double errExp_toy_n2[100] = {0};
+  for (int i_t = 0; i_t < n_toy; i_t++) {
+    errExp_toy_p2[i_t] = fabs(CLExp_toy_p2[i_t] - CLExp_toy[i_t]);
+    errExp_toy_p1[i_t] = fabs(CLExp_toy_p1[i_t] - CLExp_toy[i_t]);
+    errExp_toy_n1[i_t] = fabs(CLExp_toy_n1[i_t] - CLExp_toy[i_t]);
+    errExp_toy_n2[i_t] = fabs(CLExp_toy_n2[i_t] - CLExp_toy[i_t]);
+  }
+  
   // Median expected and observed results:
   TGraph *gCLExp_asym = new TGraph(n_asym, varValues_asym, CLExp_asym);
   TGraph *gCLObs_asym = new TGraph(n_asym, varValues_asym, CLObs_asym);
-  TGraph *gCLExp_toy  = new TGraph(n_toy, varValues_asym, CLExp_toy);
-  TGraph *gCLObs_toy  = new TGraph(n_toy, varValues_asym, CLObs_toy);
+  TGraph *gCLExp_toy = new TGraph(n_toy, varValues_toy, CLExp_toy);
+  TGraph *gCLObs_toy = new TGraph(n_toy, varValues_toy, CLObs_toy);
   
   // Also plot the bands:
   TGraphAsymmErrors *gCLExp_asym_2s 
     = new TGraphAsymmErrors(n_asym, varValues_asym, CLExp_asym, 0, 0, 
-			    CLExp_asym_n2, CLExp_asym_p2);
+			    errExp_asym_n2, errExp_asym_p2);
   TGraphAsymmErrors *gCLExp_asym_1s
     = new TGraphAsymmErrors(n_asym, varValues_asym, CLExp_asym, 0, 0, 
-			    CLExp_asym_n1, CLExp_asym_p1);
+			    errExp_asym_n1, errExp_asym_p1);
   TGraphAsymmErrors *gCLExp_toy_2s 
     = new TGraphAsymmErrors(n_toy, varValues_toy, CLExp_toy, 0, 0, 
-			    CLExp_toy_n2, CLExp_toy_p2);
+			    errExp_toy_n2, errExp_toy_p2);
   TGraphAsymmErrors *gCLExp_toy_1s
     = new TGraphAsymmErrors(n_toy, varValues_toy, CLExp_toy, 0, 0, 
-			    CLExp_toy_n1, CLExp_toy_p1);
+			    errExp_toy_n1, errExp_toy_p1);
   
   // Start plotting:
   TCanvas *can = new TCanvas("can","can");
@@ -284,7 +355,8 @@ int main(int argc, char **argv) {
   gCLObs_toy->SetLineStyle(1);
   gCLExp_toy->SetLineWidth(2);
   gCLObs_toy->SetLineWidth(2);
-  gCLObs_toy->GetXaxis()->SetRangeUser(xsMin, xsMax);
+  //gCLObs_toy->GetXaxis()->SetRangeUser(xsMin, xsMax);
+  gCLExp_toy->GetYaxis()->SetRangeUser(0.0, 1.0);
   gCLExp_toy_2s->SetFillColor(kYellow);
   gCLExp_toy_1s->SetFillColor(kGreen);
 
@@ -299,16 +371,17 @@ int main(int argc, char **argv) {
   gCLObs_asym->SetLineStyle(1);
   gCLExp_asym->SetLineWidth(2);
   gCLObs_asym->SetLineWidth(2);
-  gCLObs_asym->GetXaxis()->SetRangeUser(xsMin, xsMax);
+  //gCLObs_asym->GetXaxis()->SetRangeUser(xsMin, xsMax);
+  gCLExp_asym->GetYaxis()->SetRangeUser(0.0, 1.0);
   gCLExp_asym_2s->SetFillColor(kYellow);
   gCLExp_asym_1s->SetFillColor(kGreen);
   
   // Legend:
-  TLegend leg(0.56,0.18,0.88,0.34);
+  TLegend leg(0.53,0.19,0.88,0.37);
   leg.SetBorderSize(0);
   leg.SetFillColor(0);
-  leg.SetTextSize(0.05);
-  leg.AddEntry(gCLObs_toy,"Obs. Limit","l");
+  leg.SetTextSize(0.04);
+  if (!config->getBool("DoBlind")) leg.AddEntry(gCLObs_toy,"Obs. Limit","l");
   leg.AddEntry(gCLExp_toy,"Exp. Limit","l");
   leg.AddEntry(gCLExp_toy_1s,"Exp. Limit #pm1#sigma_{exp}","F");
   leg.AddEntry(gCLExp_toy_2s,"Exp. Limit #pm2#sigma_{exp}","F");
@@ -319,41 +392,60 @@ int main(int argc, char **argv) {
     gCLExp_toy_2s->Draw("3same");
     gCLExp_toy_1s->Draw("3same");
     gCLExp_toy->Draw("LSAME");
-    gCLObs_toy->Draw("LSAME");
+    if (!config->getBool("DoBlind")) gCLObs_toy->Draw("LSAME");
   }
   else if (options.Contains("asymptotic")) {
     gCLExp_asym->Draw("AL");
     gCLExp_asym_2s->Draw("3same");
     gCLExp_asym_1s->Draw("3same");
     gCLExp_asym->Draw("LSAME");
-    gCLObs_asym->Draw("LSAME");
+    if (!config->getBool("DoBlind")) gCLObs_asym->Draw("LSAME");
   }
   else if (options.Contains("both")) {
     gCLExp_toy->Draw("AL");
     gCLExp_toy_2s->Draw("3same");
     gCLExp_toy_1s->Draw("3same");
     gCLExp_toy->Draw("LSAME");
-    gCLObs_toy->Draw("LSAME");
+    if (!config->getBool("DoBlind")) gCLObs_toy->Draw("LSAME");
     
-    gCLExp_asym->SetLineColor(kBlue+2);
-    gCLObs_asym->SetLineColor(kBlue+2);
+    gCLExp_asym->SetLineColor(kRed+1);
+    gCLObs_asym->SetLineColor(kRed+1);
     gCLExp_asym->SetLineStyle(2);
     gCLObs_asym->SetLineStyle(2);
     
     gCLExp_asym->Draw("LSAME");
-    gCLObs_asym->Draw("LSAME");
-    leg.AddEntry(gCLObs_asym,"Obs. Limit (asymptotic)","l");
+    if (!config->getBool("DoBlind")) {
+      gCLObs_asym->Draw("LSAME");
+      leg.AddEntry(gCLObs_asym,"Obs. Limit (asymptotic)","l");
+    }
     leg.AddEntry(gCLExp_asym,"Exp. Limit (asymptotic)","l");
   }
+  gPad->RedrawAxis();
   leg.Draw("SAME");
   
   // 95% CL Line
   TLine *line = new TLine();
-  line->SetLineStyle(2);
-  line->SetLineWidth(1);
+  line->SetLineStyle(1);
+  line->SetLineWidth(2);
   line->SetLineColor(kRed);
-  line->DrawLine(xsMin, 0.95, xsMax, 0.95);
-  can->Print(Form("%s/scan95CL.eps",outputDir.Data()));
+  if (options.Contains("toy") || options.Contains("both")) {
+    line->DrawLine(gCLExp_toy->GetXaxis()->GetXmin(), 0.95,
+		   gCLExp_toy->GetXaxis()->GetXmax(), 0.95);
+  }
+  else {
+    line->DrawLine(gCLExp_asym->GetXaxis()->GetXmin(), 0.95,
+		   gCLExp_asym->GetXaxis()->GetXmax(), 0.95);
+  }
+  
+  if (options.Contains("asymptotic")) {
+    can->Print(Form("%s/scan95CL_asymptotic.eps",outputDir.Data()));
+  }
+  else if (options.Contains("toy")) {
+    can->Print(Form("%s/scan95CL_toy.eps",outputDir.Data()));
+  }
+  else {
+    can->Print(Form("%s/scan95CL_comparison.eps",outputDir.Data()));
+  }
   
   // Delete pointers, close files, return:
   std::cout << "DHCLScan: Finished!" << std::endl;
@@ -367,7 +459,6 @@ int main(int argc, char **argv) {
   delete gCLExp_asym_1s;
   delete gCLExp_toy_2s;
   delete gCLExp_toy_1s;
-  delete ts;
   delete workspace;
   delete config;
   wsFile.Close();

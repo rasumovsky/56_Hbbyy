@@ -506,6 +506,7 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
     ->createNLL(*m_workspace->data(datasetName), Constrain(*nuisanceParameters),
 		Extended(combPdf->canBeExtended()));
   */  
+  
   RooNLLVar* varNLL
     = (RooNLLVar*)combPdf->createNLL(*m_workspace->data(datasetName),
 				     Extended(combPdf->canBeExtended()));
