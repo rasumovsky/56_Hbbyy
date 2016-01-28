@@ -21,6 +21,8 @@
 //    - TestStat                                                              //
 //    - ResubmitTestStat                                                      //
 //    - MuLimit                                                               //
+//    - CLScanAnalysis                                                        //
+//    - CLScanSubmitToys                                                      //
 //                                                                            //
 //  Need to rethink the SigParam handling of the RooDataSet. Maybe we         //
 //  should just hand it a RooDataSet?                                         //

@@ -37,6 +37,11 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString options) {
   TString toyDir = Form("%s/%s/DHPseudoExp", 
 			(m_config->getStr("MasterOutput")).Data(), 
 			jobName.Data());
+  if (options.Contains("CLScan")) {
+    toyDir = Form("%s/%s/DHPseudoExpForCLScan", 
+		  (m_config->getStr("MasterOutput")).Data(), jobName.Data());
+  }
+  
   TString wsFileName = Form("%s/%s/DHWorkspace/rootfiles/workspaceDH_%s.root",
 			    (m_config->getStr("MasterOutput")).Data(),
 			    jobName.Data(), anaType.Data());
@@ -63,10 +68,21 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString options) {
   // Add all of the individual pseudoexperiment files together:
   TString toyFileMu0 = Form("%s/toy_mu0.root", toyDir.Data());
   TString toyFileMu1 = Form("%s/toy_mu1.root", toyDir.Data());
-  system(Form("hadd -f %s %s/single_files/toy_mu0*",
-	      toyFileMu0.Data(), toyDir.Data()));
-  system(Form("hadd -f %s %s/single_files/toy_mu1*", 
-	      toyFileMu1.Data(), toyDir.Data()));
+  if (options.Contains("CLScan")) {
+    // Get the integer number from the option:
+    TString jobIndex = options;
+    jobIndex.ReplaceAll("CLScan","");
+    toyFileMu0 = Form("%s/single_files/toy_mu0_%d.root",
+		      toyDir.Data(), jobIndex.Atoi());
+    toyFileMu1 = Form("%s/single_files/toy_mu1_%d.root",
+		      toyDir.Data(), jobIndex.Atoi());
+  }
+  else {
+    system(Form("hadd -f %s %s/single_files/toy_mu0*",
+		toyFileMu0.Data(), toyDir.Data()));
+    system(Form("hadd -f %s %s/single_files/toy_mu1*", 
+		toyFileMu1.Data(), toyDir.Data()));
+  }
   
   // Create temporary file lists:
   TString listMu0 = "temp_list_mu0.txt";
