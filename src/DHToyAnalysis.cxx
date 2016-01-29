@@ -9,9 +9,9 @@
 //  This program compares test statistic values from pseudo-experiment        //
 //  ensembles and asymptotic formulae.                                        //
 //                                                                            //
+//  Options: ForcePlot, CLScan                                                //
+//                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
-
-// statistic == "QMu", "QMuTilde" 
 
 #include "DHToyAnalysis.h"
 
@@ -19,7 +19,7 @@
    -----------------------------------------------------------------------------
    Constructor for the DHToyAnalysis class.
    @param newConfigFile - The name of the analysis config file.
-   @param options - Options for the toy analysis.
+   @param options - Options for the toy analysis: ForcePlot, CLScan
 */
 DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString options) {
   
@@ -72,6 +72,7 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString options) {
     // Get the integer number from the option:
     TString jobIndex = options;
     jobIndex.ReplaceAll("CLScan","");
+    jobIndex.ReplaceAll("ForcePlot","");
     toyFileMu0 = Form("%s/single_files/toy_mu0_%d.root",
 		      toyDir.Data(), jobIndex.Atoi());
     toyFileMu1 = Form("%s/single_files/toy_mu1_%d.root",
@@ -112,7 +113,7 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString options) {
   fillToyHistograms(0, treeMu0);
   fillToyHistograms(1, treeMu1);
   
-  if (!options.Contains("CLScan")) {
+  if (options.Contains("ForcePlot") || !options.Contains("CLScan")) {
     // Get the asymptotic test statistic distribution:
     getAsymptoticForm("QMu");// THIS SHOULD BE GENERALIZED!!!
     

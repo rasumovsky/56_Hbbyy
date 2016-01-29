@@ -269,6 +269,7 @@ int main (int argc, char **argv) {
     std::cout << "DHMaster: Step 5.2 - Plot pseudoexperiment results."
 	      << std::endl;
     DHToyAnalysis *dhta = new DHToyAnalysis(configFileName, "NONE");
+    //DHToyAnalysis *dhta = new DHToyAnalysis(configFileName, "ForcePlotCLScan3");
   }
   
   //--------------------------------------//

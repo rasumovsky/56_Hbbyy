@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
   
   int n_asym = 0;
   int n_toy = 0;
-
+  
   // Scan information:
   double xsMin = config->getNum("CLScanMin");
   double xsMax = config->getNum("CLScanMax");
