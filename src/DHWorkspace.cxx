@@ -668,7 +668,10 @@ void DHWorkspace::createNewWS() {
   if (m_useSystematics) {
     m_ws->factory("PROD::combinedPdf(combinedPdfSB,constraint)");
   }
-  
+  else {
+    m_ws->factory("PROD::combinedPdf(combinedPdfSB)");
+  }
+
   // Define the combined dataset:
   RooArgSet *dataArgs = new RooArgSet();
   dataArgs->add(*m_observables);

@@ -4,7 +4,7 @@
 //                                                                            //
 //  Created: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 10/08/2015                                                          //
+//  Date: 01/01/2016                                                          //
 //                                                                            //
 //  This program is useful as an interface to the di-Higgs (bb+yy) analysis   //
 //  tools. It centralizes the commands for creating inputs, plots, workspaces,//
@@ -13,8 +13,7 @@
 //  system commands to submit jobs to various clusters.                       //
 //                                                                            //
 //  MasterOption - Note: Each can be followed by the suffix "New"             //
-//    - MassPoints                                                            //
-//    - SigParam                                                              //
+//    - Systematics                                                           //
 //    - Workspace                                                             //
 //    - TossPseudoExp                                                         //
 //    - PlotPseudoExp                                                         //
@@ -228,6 +227,24 @@ int main (int argc, char **argv) {
   TString fullConfigPath
     = Form("%s/%s", (m_config->getStr("PackageLocation")).Data(),
 	   configFileName.Data());
+  
+  //--------------------------------------//
+  // Step 3: Calculate systematic uncertainties and output a file for .cfg
+  if (masterOption.Contains("Systematics")) {
+    DHSystematics *sys = new DHSystematics(configFileName, "");
+    sys->addCategoryNames(m_config->getStrV("CateNames"));
+    std::vector<TString> sysComponents = m_config->getStrV("SysComponents");
+    for (int i_s = 0; i_s < (int)sysComponents.size(); i_s++) {
+      TString fileName = Form("%s/%s_allSys.txt",
+			      (m_config->getStr("SysDirectory")).Data(),
+			      (sysComponents[i_s]).Data());
+      sys->loadSystematicsFile(fileName, sysComponents[i_s]);
+    }
+    sys->setSysToDefaults();
+    //sys->setConstrCenterTypeIncl();
+    sys->printWorkspaceInput();
+    delete sys;
+  }
   
   //--------------------------------------//
   // Step 4.1: Create the workspace for fitting:
