@@ -39,6 +39,7 @@ DHSystematics::DHSystematics(TString newConfigFile, TString options) {
   m_outputDir = Form("%s/%s/DHSystematics",
 		     (m_config->getStr("MasterOutput")).Data(),
 		     jobName.Data());
+  system(Form("mkdir -vp %s", m_outputDir.Data()));
   
   // Clear the sys values and names storage:
   m_maxCategories = 0;
@@ -76,16 +77,24 @@ void DHSystematics::addCategoryNames(std::vector<TString> cateNames) {
 void DHSystematics::addSystematic(TString sample, TString systematic,
 				  int category, TString up_down, 
 				  double systematicValue) {
+  //printer(Form("DHSystematics::addSystematic(%s, %s, %d, %s, %f)",
+  //	       sample.Data(), systematic.Data(), category, up_down.Data(),
+  //	       systematicValue), false);
+  
+  // Store systematic value:
   m_sysValues[mKey(sample, systematic, category, up_down)] = systematicValue;
+  
+  // Increase the total number of categories if necessary:
   if (category >= m_maxCategories) m_maxCategories = category + 1;
+  
+  // Add the name to the list of unique systematics (if not already done):
+  addSystematicName(systematic);
 }
 
 /**
    -----------------------------------------------------------------------------
    Add a systematic uncertainty name to the class data, avoids duplicates.
-   @param sample - The name of the sample.
    @param systematic - The name of the systematic variation.
-  
 */
 void DHSystematics::addSystematicName(TString systematic) {
   bool matched = false;
@@ -152,7 +161,7 @@ double DHSystematics::getSymmetricSystematic(TString sample,
   if (m_missingSys) nMissing++;
   double valueSymmetric;
   if (nMissing == 0) valueSymmetric = ((fabs(valueUp) + fabs(valueDown)) / 2.0);
-  else if (nMissing == 0) valueSymmetric = (fabs(valueUp) + fabs(valueDown));
+  else if (nMissing == 1) valueSymmetric = (fabs(valueUp) + fabs(valueDown));
   else valueSymmetric = 0;
   return valueSymmetric;
 }
@@ -169,12 +178,103 @@ double DHSystematics::getSymmetricSystematic(TString sample,
 double DHSystematics::getSystematic(TString sample, TString systematic ,
 				    int category, TString up_down) {
   m_missingSys = false;
+  double systematicValue = 0.0;
+  TString other = (up_down == "up") ? "down" : "up";
   if (m_sysValues.count(mKey(sample, systematic, category, up_down)) > 0) {
-    return m_sysValues[mKey(sample, systematic, category, up_down)];
+    systematicValue = m_sysValues[mKey(sample, systematic, category, up_down)];
   }
+  //else if (m_sysValues.count(mKey(sample, systematic, category, other)) > 0) {
+  //systematicValue = m_sysValues[mKey(sample, systematic, category, other)];
+  //systematicValue *= -1.0;
+  //}
   else {
     m_missingSys = true;
-    return 0.0;
+    systematicValue = 0.0;
+    
+    //std::cout << "ERROR! Exiting after call to:" << std::endl;
+    //printer(Form("DHSystematics::getSystematic(%s, %s, %d, %s) = %f",
+    //		 sample.Data(), systematic.Data(), category, up_down.Data(),
+    //		 systematicValue), true);
+  }
+
+  return systematicValue;
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Groups several systematic uncertainties together for a given sample. 
+   WARNING! The systematics are all assumed to be of the same constraint type,
+   with the same systematic type and central value and categorization.
+   @param sample - The name of the sample.
+   @param groupName - The name of the combined systematic uncertainty.
+   @param sysComponents - The component systematic uncertainties that will be 
+   added together in quadrature. 
+*/
+void DHSystematics::groupSyst(TString sample, TString groupName,
+			      std::vector<TString> sysComponents) {
+  
+  // Variables to store information about the grouped systematic:
+  TString constraintType = "asym";
+  double centralValue = 1.0;
+  TString sysType = "yield";
+  bool inclusive = false;
+  
+  // Store the sum of squares systematics values:
+  std::map<int,double> sumSqrValsUp; sumSqrValsUp.clear();
+  std::map<int,double> sumSqrValsDown; sumSqrValsDown.clear();
+  for (int i_c = 0; i_c < m_maxCategories; i_c++) {
+    sumSqrValsUp[i_c] = 0.0;
+    sumSqrValsDown[i_c] = 0.0;
+  }
+  
+  // Loop over the systematic uncertainties:
+  for (int i_s = 0; i_s < (int)sysComponents.size(); i_s++) {
+    
+    // Grab the systematic data from the first entry into the group:
+    if (i_s == 0) {
+      constraintType = m_constraintType[sysComponents[i_s]];
+      centralValue = m_centralValue[sysComponents[i_s]];
+      sysType = m_sysType[sysComponents[i_s]];
+      inclusive = m_inclusive[sysComponents[i_s]];
+    }
+    
+    // Loop over categories:
+    for (int i_c = 0; i_c < m_maxCategories; i_c++) {
+      double currValueUp
+	= getSystematic(sample, sysComponents[i_s], i_c, "up");
+      double currValueDown
+	= getSystematic(sample, sysComponents[i_s], i_c, "down");
+      sumSqrValsUp[i_c] += (currValueUp * currValueUp);
+      sumSqrValsDown[i_c] += (currValueDown * currValueDown);
+    }
+  }
+  
+  // Then at the end, get square root of systematics and add to class data:
+  for (int i_c = 0; i_c < m_maxCategories; i_c++) {
+    sumSqrValsUp[i_c] = sqrt(sumSqrValsUp[i_c]);
+    sumSqrValsDown[i_c] = sqrt(sumSqrValsDown[i_c]);
+    addSystematic(sample, groupName, i_c, "up", sumSqrValsUp[i_c]);
+    addSystematic(sample, groupName, i_c, "down", sumSqrValsDown[i_c]);
+  }
+  
+  // Save the settings for the grouped systematic:
+  setConstrCenterTypeIncl(groupName, constraintType, centralValue, sysType,
+			  inclusive);
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Groups several systematic uncertainties together for all samples. 
+   WARNING! The systematics are all assumed to be of the same constraint type,
+   with the same systematic type and central value and categorization.
+   @param groupName - The name of the combined systematic uncertainty.
+   @param sysComponents - The component systematic uncertainties that will be 
+   added together in quadrature. 
+*/
+void DHSystematics::groupSystAllSamples(TString groupName,
+					std::vector<TString> sysComponents) {
+  for (int i_s = 0; i_s < (int)m_sampleNames.size(); i_s++) {
+    groupSyst(m_sampleNames[i_s], groupName, sysComponents);
   }
 }
 
@@ -219,12 +319,12 @@ void DHSystematics::loadSystematicsFile(TString fileName, TString sample) {
       if (lineIndex < 4) continue;
 
       TString systematicName = "";
+      TString up_down = "";
       TObjArray *array = ((TString)line).Tokenize(",");
       for (int i_t = 0; i_t < array->GetEntries(); i_t++) {
 	TString currElement = ((TObjString*)array->At(i_t))->GetString();
 	
 	// First element in the string is the syst. name:
-	TString up_down = "";
 	if (i_t == 0) {
 	  systematicName = currElement;
 	  if (systematicName.Contains("__1up")) {
@@ -291,22 +391,14 @@ void DHSystematics::printWorkspaceInput() {
   ofstream outputFile(fileName);
   
   // First list the nuisance parameters:
-  std::cout << "SysSources:		";
   outputFile << "SysSources:		";
   for (int i_n = 0; i_n < (int)m_sysNames.size(); i_n++) {
-    std::cout << m_sysNames[i_n] << " ";
     outputFile << m_sysNames[i_n] << " ";
   }
-  std::cout << "\n" << std::endl;
   outputFile << "\n" << std::endl;
   
   // Then go over the nuisance parameters:
   for (int i_n = 0; i_n < (int)m_sysNames.size(); i_n++) {
-    std::cout << "SysForm_" << m_sysNames[i_n] << ": " << m_sysNames[i_n] 
-	      << "[constr=" << m_constraintType[m_sysNames[i_n]] 
-	      << ",center=" << m_centralValue[m_sysNames[i_n]] 
-	      << ",type=" << m_sysType[m_sysNames[i_n]]
-	      << ",";
     outputFile << "SysForm_" << m_sysNames[i_n] << ": " << m_sysNames[i_n] 
 	       << "[constr=" << m_constraintType[m_sysNames[i_n]] 
 	       << ",center=" << m_centralValue[m_sysNames[i_n]] 
@@ -316,11 +408,8 @@ void DHSystematics::printWorkspaceInput() {
     // Then loop over the samples:
     for (int i_s = 0; i_s < (int)m_sampleNames.size(); i_s++) {
       
-      if (i_s != 0) {
-	std::cout << ",";
-	outputFile<< ",";
-      }
-
+      if (i_s != 0)outputFile<< ",";
+      
       // For inclusive case, do one overall value (not per category):
       if (m_inclusive[m_sysNames[i_n]]) {
 	if ((m_constraintType[m_sysNames[i_n]]).Contains("asym")) {
@@ -328,15 +417,12 @@ void DHSystematics::printWorkspaceInput() {
 					     m_sysNames[i_n], "up");
 	  double valueDown = getInclSystematic(m_sampleNames[i_s], 
 					       m_sysNames[i_n], "down");
-	  std::cout << "comp=" << m_sampleNames[i_s] << "~" << valueUp << "," 
-		    << "compLo=" << m_sampleNames[i_s] << "~" << valueDown;
 	  outputFile << "comp=" << m_sampleNames[i_s] << "~" << valueUp << "," 
 		     << "compLo=" << m_sampleNames[i_s] << "~" << valueDown;
 	}
 	else {
 	  double value
 	    = getInclSymmetricSystematic(m_sampleNames[i_s], m_sysNames[i_n]);
-	  std::cout << "comp=" << m_sampleNames[i_s] << "~" << value;
 	  outputFile << "comp=" << m_sampleNames[i_s] << "~" << value;
 	}
       }
@@ -345,37 +431,27 @@ void DHSystematics::printWorkspaceInput() {
       else {
 	// Loop over the categories:
 	for (int i_c = 0; i_c < m_maxCategories; i_c++) {
-	  if (i_c != 0) {
-	    std::cout << ",";
-	    outputFile << ",";
-	  }
+	  if (i_c != 0) outputFile << ",";
 	  if ((m_constraintType[m_sysNames[i_n]]).Contains("asym")) {
 	    double valueUp = getSystematic(m_sampleNames[i_s],
 					   m_sysNames[i_n], i_c, "up");
 	    double valueDown = getSystematic(m_sampleNames[i_s], 
 					     m_sysNames[i_n], i_c, "down");
-	    std::cout << "comp=" << m_sampleNames[i_s] << m_cateNames[i_c] 
-		      << "~" << valueUp << "," 
-		      << "compLo=" << m_sampleNames[i_s] << m_cateNames[i_c]
-		      << "~" << valueDown;
-	    outputFile << "comp=" << m_sampleNames[i_s] << m_cateNames[i_c] 
-		       << "~" << valueUp << "," 
-		       << "compLo=" << m_sampleNames[i_s] << m_cateNames[i_c]
-		       << "~" << valueDown;
+	    outputFile << "comp=" << m_sampleNames[i_s] << "_" 
+		       << m_cateNames[i_c] << "~" << valueUp << "," 
+		       << "compLo=" << m_sampleNames[i_s] << "_" 
+		       << m_cateNames[i_c] << "~" << valueDown;
 	  }
 	  
 	  else {
-	    double value 
-	      = getInclSystematic(m_sampleNames[i_s], m_sysNames[i_n], i_c);
-	    std::cout << "comp=" << m_sampleNames[i_s] << m_cateNames[i_c] 
-		      << "~" << value;
-	    outputFile << "comp=" << m_sampleNames[i_s] << m_cateNames[i_c] 
-		       << "~" << value;
+	    double value = getSymmetricSystematic(m_sampleNames[i_s],
+						  m_sysNames[i_n], i_c);
+	    outputFile << "comp=" << m_sampleNames[i_s] << "_"
+		       << m_cateNames[i_c] << "~" << value;
 	  }
 	}
       }
     }
-    std::cout << "]" << std::endl;
     outputFile << "]" << std::endl;
   }
   outputFile.close();

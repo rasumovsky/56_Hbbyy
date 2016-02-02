@@ -40,8 +40,11 @@ class DHSystematics {
   void addSystematic(TString sample, TString systematic, int category, 
 		     TString up_down, double systematicValue);
   void addSystematicName(TString systematic);
+  void groupSyst(TString sample, TString groupName,
+		 std::vector<TString> sysComponents);
+  void groupSystAllSamples(TString groupName, 
+			   std::vector<TString> sysComponents);
   void loadSystematicsFile(TString fileName, TString sample);
-  void makeCombinedSystematic(TString sysName, std::vector<TString> components);
   void setSysToDefaults();
   void setConstrCenterTypeIncl(TString systematic, TString constraintType,
 			       double centralValue, TString systematicType,

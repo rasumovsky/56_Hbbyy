@@ -241,7 +241,72 @@ int main (int argc, char **argv) {
       sys->loadSystematicsFile(fileName, sysComponents[i_s]);
     }
     sys->setSysToDefaults();
-    //sys->setConstrCenterTypeIncl();
+    
+    // B flavor grouping:
+    std::vector<TString> vec_FT_EFF_Eigen_B; vec_FT_EFF_Eigen_B.clear(); 
+    vec_FT_EFF_Eigen_B.push_back("FT_EFF_Eigen_B_0");
+    vec_FT_EFF_Eigen_B.push_back("FT_EFF_Eigen_B_1");
+    vec_FT_EFF_Eigen_B.push_back("FT_EFF_Eigen_B_2");
+    vec_FT_EFF_Eigen_B.push_back("FT_EFF_Eigen_B_3");
+    vec_FT_EFF_Eigen_B.push_back("FT_EFF_Eigen_B_4");
+    vec_FT_EFF_Eigen_B.push_back("FT_EFF_Eigen_B_5");
+    sys->groupSystAllSamples("FT_EFF_Eigen_B", vec_FT_EFF_Eigen_B);
+    
+    // C flavor grouping:
+    std::vector<TString> vec_FT_EFF_Eigen_C; vec_FT_EFF_Eigen_C.clear(); 
+    vec_FT_EFF_Eigen_C.push_back("FT_EFF_Eigen_C_0");
+    vec_FT_EFF_Eigen_C.push_back("FT_EFF_Eigen_C_1");
+    vec_FT_EFF_Eigen_C.push_back("FT_EFF_Eigen_C_2");
+    vec_FT_EFF_Eigen_C.push_back("FT_EFF_Eigen_C_3");
+    sys->groupSystAllSamples("FT_EFF_Eigen_C", vec_FT_EFF_Eigen_C);
+    
+    // Light flavor grouping:
+    std::vector<TString> vec_FT_EFF_Eigen_Light;
+    vec_FT_EFF_Eigen_Light.clear(); 
+    vec_FT_EFF_Eigen_Light.push_back("FT_EFF_Eigen_Light_0");
+    vec_FT_EFF_Eigen_Light.push_back("FT_EFF_Eigen_Light_1");
+    vec_FT_EFF_Eigen_Light.push_back("FT_EFF_Eigen_Light_2");
+    vec_FT_EFF_Eigen_Light.push_back("FT_EFF_Eigen_Light_3");
+    vec_FT_EFF_Eigen_Light.push_back("FT_EFF_Eigen_Light_4");
+    vec_FT_EFF_Eigen_Light.push_back("FT_EFF_Eigen_Light_5");
+    vec_FT_EFF_Eigen_Light.push_back("FT_EFF_Eigen_Light_6");
+    vec_FT_EFF_Eigen_Light.push_back("FT_EFF_Eigen_Light_7");
+    vec_FT_EFF_Eigen_Light.push_back("FT_EFF_Eigen_Light_8");
+    vec_FT_EFF_Eigen_Light.push_back("FT_EFF_Eigen_Light_9");
+    vec_FT_EFF_Eigen_Light.push_back("FT_EFF_Eigen_Light_10");
+    vec_FT_EFF_Eigen_Light.push_back("FT_EFF_Eigen_Light_11");
+    sys->groupSystAllSamples("FT_EFF_Eigen_Light", vec_FT_EFF_Eigen_Light);
+    
+    // JET uncertainty group:
+    std::vector<TString> vec_JET_GroupedNP; vec_JET_GroupedNP.clear(); 
+    vec_JET_GroupedNP.push_back("JET_GroupedNP_1");
+    vec_JET_GroupedNP.push_back("JET_GroupedNP_2");
+    vec_JET_GroupedNP.push_back("JET_GroupedNP_3");
+    sys->groupSystAllSamples("JET_GroupedNP", vec_JET_GroupedNP);
+    
+    // Set the types for the nuisance parameters:
+    sys->setConstrCenterTypeIncl("FT_EFF_extrapolation_from_charm",
+				 "gaus", 1.0, "yield", false);
+    sys->setConstrCenterTypeIncl("FT_EFF_extrapolation",
+				 "gaus", 1.0, "yield", false);
+    sys->setConstrCenterTypeIncl("JET_JER_SINGLE_NP",
+				 "gaus", 1.0, "yield", false);
+    sys->setConstrCenterTypeIncl("PH_EFF_ID_Uncertainty",
+				 "gaus", 1.0, "yield", true);
+    sys->setConstrCenterTypeIncl("PH_EFF_TRKISO_Uncertainty",
+				 "gaus", 1.0, "yield", true);
+    sys->setConstrCenterTypeIncl("PRW_DATASF",
+				 "gaus", 1.0, "yield", false);
+    sys->setConstrCenterTypeIncl("FT_EFF_Eigen_B",
+				 "gaus", 1.0, "yield", false);
+    sys->setConstrCenterTypeIncl("FT_EFF_Eigen_C",
+				 "gaus", 1.0, "yield", false);
+    sys->setConstrCenterTypeIncl("FT_EFF_Eigen_Light",
+				 "asym", 1.0, "yield", false);
+    sys->setConstrCenterTypeIncl("JET_GroupedNP",
+				 "asym", 1.0, "yield", false);
+    
+    // Print the systematic uncertainty input:
     sys->printWorkspaceInput();
     delete sys;
   }
