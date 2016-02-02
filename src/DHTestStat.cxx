@@ -518,6 +518,72 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   //printSet("nuisanceParameters", nuisanceParameters);
   //printSet("globalObservables", globalObservables);
   
+
+
+  
+  // Print the values of normalizations:
+  if (m_config->getBool("Verbose")) {
+    
+    // JJ
+    std::cout << "DHTestStat: post-fit printing of normalizations" << std::endl;
+    std::cout << "Category = jj" << std::endl;
+    std::cout << "\tBkgNonHiggs = " 
+	      << m_workspace->var("n_BkgNonHiggs_jj")->getVal() << std::endl;
+    
+    double sumSM_jj = (m_workspace->function("n_SigSMggH_jj")->getVal() + 
+		       m_workspace->function("n_SigSMVBF_jj")->getVal() + 
+		       m_workspace->function("n_SigSMWH_jj")->getVal() + 
+		       m_workspace->function("n_SigSMZH_jj")->getVal() +
+		       m_workspace->function("n_SigSMttH_jj")->getVal() + 
+		       m_workspace->function("n_SigSMbbH_jj")->getVal());
+    std::cout << "\tBkg1Higgs = " << sumSM_jj << std::endl;
+    std::cout << "\tBias = " << m_workspace->function("n_Bias_jj")->getVal()
+	      << std::endl;
+    
+
+    // BJ
+    std::cout << "DHTestStat: post-fit printing of normalizations" << std::endl;
+    std::cout << "Category = bj" << std::endl;
+    std::cout << "\tBkgNonHiggs = " 
+	      << m_workspace->var("n_BkgNonHiggs_bj")->getVal() << std::endl;
+    
+    double sumSM_bj = (m_workspace->function("n_SigSMggH_bj")->getVal() +
+		       m_workspace->function("n_SigSMVBF_bj")->getVal() + 
+		       m_workspace->function("n_SigSMWH_bj")->getVal() +
+		       m_workspace->function("n_SigSMZH_bj")->getVal() +
+		       m_workspace->function("n_SigSMttH_bj")->getVal() +
+		       m_workspace->function("n_SigSMbbH_bj")->getVal());
+    std::cout << "\tBkg1Higgs = " << sumSM_bj << std::endl;
+    std::cout << "\tSig 2H = " 
+	      << m_workspace->function("n_SigBSM2H_bj")->getVal() << std::endl;
+    std::cout << "\tBias = " << m_workspace->function("n_Bias_bj")->getVal()
+	      << std::endl;
+    
+
+    // BB
+    std::cout << "DHTestStat: post-fit printing of normalizations" << std::endl;
+    std::cout << "Category = bb" << std::endl;
+    std::cout << "\tBkgNonHiggs = " 
+	      << m_workspace->var("n_BkgNonHiggs_bb")->getVal() << std::endl;
+    
+    double sumSM_bb = (m_workspace->function("n_SigSMggH_bb")->getVal() + 
+		       m_workspace->function("n_SigSMVBF_bb")->getVal() + 
+		       m_workspace->function("n_SigSMWH_bb")->getVal() + 
+		       m_workspace->function("n_SigSMZH_bb")->getVal() +
+		       m_workspace->function("n_SigSMttH_bb")->getVal() + 
+		       m_workspace->function("n_SigSMbbH_bb")->getVal());
+    std::cout << "\tBkg1Higgs = " << sumSM_bb << std::endl;
+    std::cout << "\tSig 2H = " 
+	      << m_workspace->function("n_SigBSM2H_bb")->getVal() << std::endl;
+    std::cout << "\tBias = " << m_workspace->function("n_Bias_bb")->getVal()
+	      << std::endl;
+    
+    
+  }
+  
+
+  
+  
   // Save a snapshot if requested:
   if (m_doSaveSnapshot) {
     TString muDHValue = fixPoI ? (Form("%d",(int)valPoI)) : "Free";
