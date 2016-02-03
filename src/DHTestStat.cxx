@@ -520,7 +520,7 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   
 
 
-  
+  /*
   // Print the values of normalizations:
   if (m_config->getBool("Verbose")) {
     
@@ -580,7 +580,7 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
     
     
   }
-  
+  */
 
   
   

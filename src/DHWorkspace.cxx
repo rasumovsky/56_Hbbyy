@@ -671,7 +671,7 @@ void DHWorkspace::createNewWS() {
   else {
     m_ws->factory("PROD::combinedPdf(combinedPdfSB)");
   }
-
+  
   // Define the combined dataset:
   RooArgSet *dataArgs = new RooArgSet();
   dataArgs->add(*m_observables);
@@ -704,6 +704,79 @@ void DHWorkspace::createNewWS() {
   // Do a simple background only fit before asimov data creation:
   m_ws->pdf("combinedPdf")->fitTo(*m_ws->data("obsData"), SumW2Error(kTRUE));
   
+  // PRINT DATA:
+  /*
+  std::cout << "PRINT DATA: " << std::endl;
+  
+  std::cout << "\tn_BkgNonHiggs_bbMyyLo = " 
+	    << m_ws->var("n_BkgNonHiggs_bbMyyLo")->getVal() 
+	    << std::endl;
+  std::cout << "\tn_BkgNonHiggs_bbMyyHi = " 
+	    << m_ws->var("n_BkgNonHiggs_bbMyyHi")->getVal()
+	    << std::endl;
+  std::cout << "\tn_BkgNonHiggs_jj = " 
+	    << m_ws->var("n_BkgNonHiggs_jj")->getVal()
+	    << std::endl;
+  std::cout << "\tn_BkgNonHiggs_bj = " 
+	    << m_ws->var("n_BkgNonHiggs_bj")->getVal()
+	    << std::endl;
+  
+  std::cout << "\tmyyWindowFrac    = " 
+	    << m_ws->function("myyWindowFrac")->getVal()
+	    << std::endl;
+  std::cout << "\tmyyWindowNorm    = " 
+	    << m_ws->function("normFromMyyWindow")->getVal()
+	    << std::endl;
+  std::cout << "\tn_BkgNonHiggs_bb = " 
+	    << m_ws->function("n_BkgNonHiggs_bb")->getVal()
+	    << std::endl;  
+  std::cout << "\n" << std::endl;
+  
+  // Also print efficiencies etc for signal:
+  std::cout << "\tn_SigBSM2H_bj = " 
+	    << m_ws->function("n_SigBSM2H_bj")->getVal()
+	    << std::endl;  
+  
+  std::cout << "\teff_myy_SigBSM2H_bj = " 
+	    << m_ws->function("eff_myy_SigBSM2H_bj")->getVal()
+	    << std::endl;  
+  
+  std::cout << "\tnPerFb_SigBSM2H_bj = " 
+	    << m_ws->function("nPerFb_SigBSM2H_bj")->getVal()
+	    << std::endl;  
+  
+  
+  std::cout << "\texpectationCommon = " 
+	    << m_ws->function("expectationCommon")->getVal()
+	    << std::endl;
+  
+  std::cout << "\texpectation_SigBSM2H = " 
+	    << m_ws->function("expectation_SigBSM2H")->getVal()
+	    << std::endl;
+  
+  std::cout << "\texpectation_yield_SigBSM2H_bj = " 
+	    << m_ws->function("expectation_yield_SigBSM2H_bj")->getVal()
+	    << std::endl;
+  
+  std::cout << "\tmu_SigBSM2H = " 
+	    << m_ws->function("mu_SigBSM2H")->getVal()
+	    << std::endl;
+
+  std::cout << "\texpectation_yield_SigBSM2H = " 
+	    << m_ws->function("expectation_yield_SigBSM2H")->getVal()
+	    << std::endl;
+  
+  
+  std::cout << "\taccXeff_SigBSM2H_bj = " 
+	    << m_ws->function("accXeff_SigBSM2H_bj")->getVal()
+	    << std::endl;
+
+  exit(0);
+  
+  //prod::nPerFb_SigBSM2H_bj(two,xsec_SigBSM2H,BR_yy,BR_bb,accXeff_SigBSM2H_bj)
+  */
+
+
   // Loop over categories for Asimov data following background-only fit:
   for (m_currCateIndex = 0; m_currCateIndex < m_nCategories; m_currCateIndex++){
     m_currCateName = cateNames[m_currCateIndex];
@@ -753,7 +826,10 @@ void DHWorkspace::createNewWS() {
   DHTestStat *dhts = new DHTestStat(m_configFile, "new", m_ws);
   dhts->saveSnapshots(true);
   dhts->setPlotDirectory(Form("%s/Plots/", m_outputDir.Data()));
-  dhts->setPlotAxis(true, 0.02, 100.0, 1.0);
+  //dhts->setPlotAxis(true, 0.02, 100.0, 1.0);
+  dhts->setPlotAxis(true, m_config->getNum("FitPlotYMin"),
+		    m_config->getNum("FitPlotYMax"),
+		    m_config->getNum("FitPlotGeVPerBin"));
   
   double profiledPOIVal = -999.0;
   // Mu = 0 fits:
