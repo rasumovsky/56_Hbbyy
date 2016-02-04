@@ -119,6 +119,11 @@ int main(int argc, char **argv) {
   double xsMax = config->getNum("CLScanMax");
   double step = config->getNum("CLScanStep");
   
+  int resonanceMass = 0;
+  if ((config->getStr("AnalysisType")).EqualTo("Resonant")) {
+    resonanceMass = config->getInt("CLScanMassValue");
+  }
+  
   //----------------------------------------//
   // Open CL values from file:
   if (options.Contains("FromFile")) {
@@ -169,7 +174,7 @@ int main(int argc, char **argv) {
       outFile_toy.open(Form("%s/scan_CLvalues_toy.txt", outputDir.Data()));
     }
     
-    // Loop over number of accepted events:
+    // Loop over cross-section:
     for (double crossSection = xsMin; crossSection < xsMax;
 	 crossSection += step) {
       std::cout << "DHCLScan: cross-section = " << crossSection << std::endl;
@@ -178,6 +183,11 @@ int main(int argc, char **argv) {
       //dhts->setPlotDirectory(outputDir.Data());
       // Set the value of the variable to scan:
       dhts->setParam(config->getStr("CLScanVar"), crossSection, true);
+      
+      // If doing the resonant analysis, also set the res mass value:
+      if ((config->getStr("AnalysisType")).EqualTo("Resonant")) {
+	dhts->setParam(config->getStr("CLScanMassVar"), resonanceMass, true);
+      }
       
       // Asymptotic calculation of CL:
       if (options.Contains("asymptotic") || options.Contains("both")) {
@@ -437,14 +447,21 @@ int main(int argc, char **argv) {
 		   gCLExp_asym->GetXaxis()->GetXmax(), 0.95);
   }
   
+  TString tag = "NonResonant";
+  if ((config->getStr("AnalysisType")).EqualTo("Resonant")) {
+    tag = Form("ResonantMX%d", resonanceMass);
+  }
+  
   if (options.Contains("asymptotic")) {
-    can->Print(Form("%s/scan95CL_asymptotic.eps",outputDir.Data()));
+    can->Print(Form("%s/scan95CL_asymptotic_%s.eps",
+		    outputDir.Data(), tag.Data()));
   }
   else if (options.Contains("toy")) {
-    can->Print(Form("%s/scan95CL_toy.eps",outputDir.Data()));
+    can->Print(Form("%s/scan95CL_toy_%s.eps",outputDir.Data(), tag.Data()));
   }
   else {
-    can->Print(Form("%s/scan95CL_comparison.eps",outputDir.Data()));
+    can->Print(Form("%s/scan95CL_comparison_%s.eps",
+		    outputDir.Data(), tag.Data()));
   }
   
   // Delete pointers, close files, return:
