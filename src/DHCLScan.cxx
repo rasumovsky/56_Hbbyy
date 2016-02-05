@@ -51,8 +51,7 @@ double getIntercept(TGraph *graph, double valueToIntercept) {
 }
 */
 
-/**
-   -----------------------------------------------------------------------------
+/**   -----------------------------------------------------------------------------
    The main method scans the 95% CL for various signal cross-sections.
    @param configFile - The analysis configuration file.
    @param options - Job options.
@@ -83,6 +82,17 @@ int main(int argc, char **argv) {
 			    (config->getStr("MasterOutput")).Data(), 
 			    jobName.Data(), anaType.Data());
   
+  // Load the resonance mass (if doing resonant analysis):
+  int resonanceMass = 0;
+  if (anaType.EqualTo("Resonant")) {
+    resonanceMass = config->getInt("CLScanMassValue");
+  }
+  
+  // Create a nametag for results:
+  TString tag = (anaType.EqualTo("Resonant")) ? 
+    Form("ResonantMX%d", resonanceMass) : "NonResonant";
+  
+  // Set the plot Style to ATLAS defaults:
   CommonFunc::SetAtlasStyle();
   
   // Open the workspace:
@@ -119,19 +129,14 @@ int main(int argc, char **argv) {
   double xsMax = config->getNum("CLScanMax");
   double step = config->getNum("CLScanStep");
   
-  int resonanceMass = 0;
-  if ((config->getStr("AnalysisType")).EqualTo("Resonant")) {
-    resonanceMass = config->getInt("CLScanMassValue");
-  }
-  
   //----------------------------------------//
   // Open CL values from file:
   if (options.Contains("FromFile")) {
     
     // Open the saved CL values from asymptotics:
     if (options.Contains("asymptotic") || options.Contains("both")) {
-      ifstream inputFile_asym(Form("%s/scan_CLvalues_asym.txt",
-				   outputDir.Data()));
+      ifstream inputFile_asym(Form("%s/scan_CLvalues_asym_%s.txt",
+				   outputDir.Data(), tag.Data()));
       if (inputFile_asym.is_open()) {
 	while (!inputFile_asym.eof()) {
 	  inputFile_asym >> varValues_asym[n_asym] >> CLObs_asym[n_asym] 
@@ -146,8 +151,8 @@ int main(int argc, char **argv) {
     
     // Open the saved CL values from toys:
     if (options.Contains("toy") || options.Contains("both")) {
-      ifstream inputFile_toy(Form("%s/scan_CLvalues_toy.txt",
-				  outputDir.Data()));
+      ifstream inputFile_toy(Form("%s/scan_CLvalues_toy_%s.txt",
+				  outputDir.Data(), tag.Data()));
       if (inputFile_toy.is_open()) {
 	while (!inputFile_toy.eof()) {
 	  inputFile_toy >> varValues_toy[n_toy] >> CLObs_toy[n_toy] 
@@ -168,10 +173,12 @@ int main(int argc, char **argv) {
     ofstream outFile_asym;
     ofstream outFile_toy;
     if (options.Contains("asymptotic") || options.Contains("both")) {
-      outFile_asym.open(Form("%s/scan_CLvalues_asym.txt", outputDir.Data()));
+      outFile_asym.open(Form("%s/scan_CLvalues_asym_%s.txt", 
+			     outputDir.Data(), tag.Data()));
     }
     if (options.Contains("toy") || options.Contains("both")) {
-      outFile_toy.open(Form("%s/scan_CLvalues_toy.txt", outputDir.Data()));
+      outFile_toy.open(Form("%s/scan_CLvalues_toy_%s.txt",
+			    outputDir.Data(), tag.Data()));
     }
     
     // Loop over cross-section:
@@ -179,13 +186,11 @@ int main(int argc, char **argv) {
 	 crossSection += step) {
       std::cout << "DHCLScan: cross-section = " << crossSection << std::endl;
       
-      // Set output directory for plots:
-      //dhts->setPlotDirectory(outputDir.Data());
       // Set the value of the variable to scan:
       dhts->setParam(config->getStr("CLScanVar"), crossSection, true);
       
       // If doing the resonant analysis, also set the res mass value:
-      if ((config->getStr("AnalysisType")).EqualTo("Resonant")) {
+      if (anaType.EqualTo("Resonant")) {
 	dhts->setParam(config->getStr("CLScanMassVar"), resonanceMass, true);
       }
       
@@ -206,6 +211,7 @@ int main(int argc, char **argv) {
 	  CLExp_asym_n1[n_asym] = dhts->accessValue("CL", false, -1);
 	  CLExp_asym_n2[n_asym] = dhts->accessValue("CL", false, -2);
 	  
+	  // Write CL values to file:
 	  outFile_asym << varValues_asym[n_asym] << " " 
 		       << CLObs_asym[n_asym] << " " 
 		       << CLExp_asym[n_asym] << " " 
@@ -228,8 +234,8 @@ int main(int argc, char **argv) {
 	  = dhts->getFitNLL("obsData", 1, true, obsPoI, false);
 	double nllObsMuFree
 	  = dhts->getFitNLL("obsData", 1, false, obsPoI, false);
-	qMuObs_toy[n_toy] = dhts->getQMuFromNLL(nllObsMu1, nllObsMuFree,
-						obsPoI, 1);
+	qMuObs_toy[n_toy]
+	  = dhts->getQMuFromNLL(nllObsMu1, nllObsMuFree, obsPoI, 1);
 	
 	// Calculate the expected qMu values (see DHTestStat m_dataForExpQMu):
 	double expPoI = 0.0;
@@ -237,8 +243,8 @@ int main(int argc, char **argv) {
 	  = dhts->getFitNLL("asimovDataMu0", 1, true, expPoI, false);
 	double nllExpMuFree
 	  = dhts->getFitNLL("asimovDataMu0", 1, false, expPoI, false);
-	qMuExp_toy[n_toy] = dhts->getQMuFromNLL(nllExpMu1, nllExpMuFree, 
-						expPoI, 1);
+	qMuExp_toy[n_toy]
+	  = dhts->getQMuFromNLL(nllExpMu1, nllExpMuFree, expPoI, 1);
 	
 	std::cout << "nllObsMu1=" << nllObsMu1 
 		  << ", nllObsMuFree=" << nllObsMuFree
@@ -247,7 +253,6 @@ int main(int argc, char **argv) {
 	std::cout << "nllExpMu1=" << nllExpMu1
 		  << ", nllExpMuFree=" << nllExpMuFree
 		  << ", qMuExp=" << qMuExp_toy[n_toy] << std::endl;
-	
 	
 	varValues_toy[n_toy] = crossSection;
 	n_toy++;
@@ -265,6 +270,7 @@ int main(int argc, char **argv) {
 	// between the DHToyAnalysis class and DHTestStat, which is called
 	// in DHToyAnalysis...
 	TString toyScanOption = Form("CLScan%d",i_t);
+	if (i_t == 8) toyScanOption.Append("_ForcePlot");
 	DHToyAnalysis *dhta = new DHToyAnalysis(configFile, toyScanOption);
 	if (!(dhta->areInputFilesOK())) {
 	  std::cout << "DHCLScan: ERROR with toy scan option " << toyScanOption
@@ -272,19 +278,14 @@ int main(int argc, char **argv) {
 	  continue;
 	}
 	
-	std::cout << "\nObs: " << std::endl;
 	CLObs_toy[i_t] = dhta->calculateCLFromToy(qMuObs_toy[i_t], 0);
-	std::cout << "\nExp: " << std::endl;
 	CLExp_toy[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], 0);
-	std::cout << "\nExp_p2: " << std::endl;
 	CLExp_toy_p2[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], 2);
-	std::cout << "\nExp_p1: " << std::endl;
 	CLExp_toy_p1[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], 1);
-	std::cout << "\nExp_n1: " << std::endl;
 	CLExp_toy_n1[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], -1);
-	std::cout << "\nExp_n2: " << std::endl;
 	CLExp_toy_n2[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], -2);
-	
+
+	// Write CL values to file:
 	outFile_toy << varValues_toy[i_t] << " " 
 		    << CLObs_toy[i_t] << " " 
 		    << CLExp_toy[i_t] << " "
@@ -305,8 +306,8 @@ int main(int argc, char **argv) {
   //----------------------------------------//
   // Plot the results:
   
-  n_asym--;
-  n_toy--;
+  //n_asym--;
+  //n_toy--;
   
   double errExp_asym_p2[100] = {0};
   double errExp_asym_p1[100] = {0};
@@ -333,8 +334,8 @@ int main(int argc, char **argv) {
   // Median expected and observed results:
   TGraph *gCLExp_asym = new TGraph(n_asym, varValues_asym, CLExp_asym);
   TGraph *gCLObs_asym = new TGraph(n_asym, varValues_asym, CLObs_asym);
-  TGraph *gCLExp_toy = new TGraph(n_toy, varValues_toy, CLExp_toy);
-  TGraph *gCLObs_toy = new TGraph(n_toy, varValues_toy, CLObs_toy);
+  TGraph *gCLExp_toy  = new TGraph(n_toy,  varValues_toy,  CLExp_toy);
+  TGraph *gCLObs_toy  = new TGraph(n_toy,  varValues_toy,  CLObs_toy);
   
   // Also plot the bands:
   TGraphAsymmErrors *gCLExp_asym_2s 
@@ -447,11 +448,7 @@ int main(int argc, char **argv) {
 		   gCLExp_asym->GetXaxis()->GetXmax(), 0.95);
   }
   
-  TString tag = "NonResonant";
-  if ((config->getStr("AnalysisType")).EqualTo("Resonant")) {
-    tag = Form("ResonantMX%d", resonanceMass);
-  }
-  
+  // Print the canvas:
   if (options.Contains("asymptotic")) {
     can->Print(Form("%s/scan95CL_asymptotic_%s.eps",
 		    outputDir.Data(), tag.Data()));
