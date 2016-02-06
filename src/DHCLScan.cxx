@@ -270,7 +270,7 @@ int main(int argc, char **argv) {
 	// between the DHToyAnalysis class and DHTestStat, which is called
 	// in DHToyAnalysis...
 	TString toyScanOption = Form("CLScan%d",i_t);
-	if (i_t == 8) toyScanOption.Append("_ForcePlot");
+	if (i_t == 5) toyScanOption.Append("_ForcePlot");
 	DHToyAnalysis *dhta = new DHToyAnalysis(configFile, toyScanOption);
 	if (!(dhta->areInputFilesOK())) {
 	  std::cout << "DHCLScan: ERROR with toy scan option " << toyScanOption
