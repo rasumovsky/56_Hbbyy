@@ -18,6 +18,7 @@
 #include "DHTestStat.h"
 #include "RooFitHead.h"
 #include "RooStatsHead.h"
+#include "FlexibleInterpVarMkII.h"
 
 class DHWorkspace {
 

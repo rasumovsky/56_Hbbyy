@@ -14,7 +14,6 @@
 #include "DHSystematics.h"
 #include "DHTestStat.h"
 #include "DHToyAnalysis.h"
-//#include "SigParamInterface.h"
 
 bool m_isFirstJob;
 

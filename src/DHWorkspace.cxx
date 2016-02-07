@@ -258,8 +258,10 @@ void DHWorkspace::addSystematic(TString systematicForm) {
   TString centralValue = "";
   TString constraint = "";
   TString type = "";
-  std::map<TString,double> componentsLo; componentsLo.clear();
-  std::map<TString,double> components; components.clear();
+  //std::map<TString,double> componentsLo; componentsLo.clear();
+  //std::map<TString,double> components; components.clear();
+  std::map<TString,TString> componentsLo; componentsLo.clear();
+  std::map<TString,TString> components; components.clear();
   
   // First split up the systematic form into components:
   TObjArray *array = systematicForm.Tokenize(",");
@@ -284,7 +286,15 @@ void DHWorkspace::addSystematic(TString systematicForm) {
       currComponentName.Remove(currComponentName.First("~"));
       TString currComponentVal = currComponentInfo;
       currComponentVal.Remove(0,currComponentVal.First("~")+1);
-      componentsLo[currComponentName] = currComponentVal.Atof();
+      //componentsLo[currComponentName] = currComponentVal.Atof();
+      
+      // Check if size of uncertainty should be parameterized:
+      if (currComponentVal.Contains("expr")) {
+	componentsLo[currComponentName]
+	  = m_config->getStr(Form("SysMagLo_%s_%s", systematicName.Data(),
+				  currComponentName.Data()));
+      }
+      else componentsLo[currComponentName] = currComponentVal;
     }
     else if (currElement.Contains("comp=")) {
       TString currComponentInfo = currElement;
@@ -293,7 +303,15 @@ void DHWorkspace::addSystematic(TString systematicForm) {
       currComponentName.Remove(currComponentName.First("~"));
       TString currComponentVal = currComponentInfo;
       currComponentVal.Remove(0,currComponentVal.First("~")+1);
-      components[currComponentName] = currComponentVal.Atof();
+      //components[currComponentName] = currComponentVal.Atof();
+      
+      // Check if size of uncertainty should be parameterized:
+      if (currComponentVal.Contains("expr")) {
+	components[currComponentName]
+	  = m_config->getStr(Form("SysMag_%s_%s", systematicName.Data(),
+				  currComponentName.Data()));
+      }
+      else components[currComponentName] = currComponentVal;
     }
   }
   
@@ -308,8 +326,10 @@ void DHWorkspace::addSystematic(TString systematicForm) {
   if (constraint.EqualTo("asym") && (int)componentsLo.size() == 0) {
     printer("DHWorkspace: Implementing an asymmetric uncertainty with only the"
 	    " one-sided fluctuation provided. Equating up and down variations.",
-	    false);
+	    true);
     componentsLo = components;
+    // THIS SHOULD BE MADE NEGATIVE!!!!
+    // Exits for now, until solution can be thought through...
   }
   
   // Print out a summary of the systematic:
@@ -321,7 +341,7 @@ void DHWorkspace::addSystematic(TString systematicForm) {
     std::cout << "\ttype         = " << type << std::endl;
     std::cout << "\tcomponents   = ";
     
-    for (std::map<TString,double>::iterator compIter = components.begin();
+    for (std::map<TString,TString>::iterator compIter = components.begin();
 	 compIter != components.end(); compIter++) {
       std::cout << "[" << compIter->first << ", " << compIter->second
 		<< "] ";
@@ -329,7 +349,7 @@ void DHWorkspace::addSystematic(TString systematicForm) {
     std::cout << "\n";
     if (constraint.EqualTo("asym")) {
       std::cout << "\tcomponentsLo = ";
-      for (std::map<TString,double>::iterator compLoIter = componentsLo.begin();
+      for (std::map<TString,TString>::iterator compLoIter =componentsLo.begin();
 	   compLoIter != componentsLo.end(); compLoIter++) {
      	std::cout << "[" << compLoIter->first << ", " << compLoIter->second
 		  << "] ";
@@ -361,15 +381,18 @@ void DHWorkspace::addSystematic(TString systematicForm) {
   
   //----------------------------------------//
   // Loop over components for this systematic and create expectation terms:
-  for (std::map<TString,double>::iterator iterComponent = components.begin();
+  for (std::map<TString,TString>::iterator iterComponent = components.begin();
        iterComponent != components.end(); iterComponent++) {
     
     // Get the component name and magnitude:
     TString componentName = iterComponent->first;
-    double magnitude = iterComponent->second;
-    double magnitudeLo = (componentsLo.count(componentName) > 0) ?
-      componentsLo[componentName] : 0.0;
-    
+    //double magnitude = iterComponent->second;
+    //double magnitudeLo = (componentsLo.count(componentName) > 0) ?
+    //componentsLo[componentName] : 0.0;
+    TString magnitude = iterComponent->second;
+    TString magnitudeLo = (componentsLo.count(componentName) > 0) ?
+      componentsLo[componentName] : "0.0";
+        
     // Define the variable name and expected name:
     TString varName = Form("%s_%s",systematicName.Data(),componentName.Data());
     TString expName = Form("expected_%s", varName.Data());
@@ -384,26 +407,66 @@ void DHWorkspace::addSystematic(TString systematicForm) {
     m_ws->factory(Form("prod::%s_times_beta(%s, beta_%s)",varName.Data(),
 		       systematicName.Data(), varName.Data()));
     
+    // Nominal expression:
+    m_ws->factory(Form("nominal_%s[%f]",varName.Data(),centralValue.Atof()));
+    
     //---------- Asymmetric constraint ----------//
     if (constraint.EqualTo("asym")) {
       printer(Form("DHWorkspace: %s asym constraint",systematicName.Data()),
 	      false);
       // Prepare variables for the FlexibleInterpVar:
       vector<int> code; code.clear(); code.push_back(4);
-      vector<double> magHi; magHi.clear(); magHi.push_back(1+magnitude);
-      vector<double> magLo; magLo.clear(); magLo.push_back(1-magnitudeLo);
-      RooArgList nuisList(*m_ws->factory(Form("%s_times_beta",varName.Data())));
-      RooStats::HistFactory::FlexibleInterpVar expVar(expName, expName, 
-						      nuisList,
-						      centralValue.Atof(), 
-						      magLo, magHi, code);
-      m_ws->import(expVar);
+      RooArgList nuisList(*m_ws->factory(Form("%s_times_beta", 
+					      varName.Data())));
+      
+      // Uncertainty is parameterized:
+      if (magnitude.Contains("expr")) {
+	
+	// Add into workspace:
+	m_ws->factory(magnitudeLo);
+	m_ws->factory(magnitude);
+	
+	// Get the name of the expression:
+	TString variationNameLo
+	  = Form("%s_plusNom",(nameOfFunc(magnitudeLo)).Data());
+	TString variationNameHi
+	  = Form("%s_plusNom",(nameOfFunc(magnitude)).Data());
+	
+	// Create expression plus nominal:
+	m_ws->factory(Form("sum::%s(%s,nominal_%s)", variationNameLo.Data(),
+			   (nameOfFunc(magnitudeLo)).Data(), varName.Data()));
+	m_ws->factory(Form("sum::%s(%s,nominal_%s)", variationNameHi.Data(),
+			   (nameOfFunc(magnitude)).Data(), varName.Data()));
+	
+	RooArgList sigmaExprHi, sigmaExprLo;
+	sigmaExprLo.add(*m_ws->arg(variationNameLo));
+	sigmaExprHi.add(*m_ws->arg(variationNameHi));
+	FlexibleInterpVarMkII expVar(expName, expName, nuisList,
+				     centralValue.Atof(), sigmaExprLo, 
+				     sigmaExprHi, code);
+	m_ws->import(expVar);
+      }
+      
+      // Uncertainty is not parameterized:
+      else {
+	//double centralValFloat = centralValue.Atof();
+	vector<double> magHi; magHi.clear(); 
+	magHi.push_back((centralValue.Atof())+(magnitude.Atof()));
+	vector<double> magLo; magLo.clear(); 
+	magLo.push_back((centralValue.Atof())-(magnitudeLo.Atof()));
+	RooArgList nuisList(*m_ws->factory(Form("%s_times_beta", 
+						varName.Data())));
+	RooStats::HistFactory::FlexibleInterpVar expVar(expName, expName, 
+							nuisList,
+							centralValue.Atof(), 
+							magLo, magHi, code);
+	m_ws->import(expVar);
+      }
     }
     else {
-      // Nominal expression:
-      m_ws->factory(Form("nominal_%s[%f]",varName.Data(),centralValue.Atof()));
       // Uncertainty magnitude expression:
-      m_ws->factory(Form("sigma_%s[%f]", varName.Data(), magnitude));
+      //m_ws->factory(Form("sigma_%s[%f]", varName.Data(), magnitude));
+      m_ws->factory(Form("sigma_%s[%s]", varName.Data(), magnitude.Data()));
       
       //---------- Gaussian constraint ----------//
       if (constraint.EqualTo("gaus")) {
