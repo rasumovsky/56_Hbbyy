@@ -95,8 +95,6 @@ using namespace std;
 using namespace RooFit;
 using namespace RooStats;
 
-TString inputDHSignal;
-
 //band configuration
 bool betterBands           = 1; // (recommendation = 1) improve bands by using a more appropriate asimov dataset for those points
 bool betterNegativeBands   = 0; // (recommendation = 0) improve also the negative bands
@@ -410,11 +408,10 @@ void runAsymptoticsCLs(const char* infile,
   cout << "Observed: " << obs_limit << endl;
   cout << endl;
   
-  TFile fout(Form("%s/file_CLs_%s.root",folder.c_str(),inputDHSignal.Data()),"recreate");
+  TFile fout(Form("%s/file_CLs.root",folder.c_str()),"recreate");
   
-  ofstream ftxt(Form("%s/text_CLs_%s.txt",folder.c_str(),inputDHSignal.Data()));
+  ofstream ftxt(Form("%s/text_CLs.txt",folder.c_str()));
   ftxt << "CLs"
-       << "\t" << inputDHSignal
        << "\t" << obs_limit
        << "\t" << med_limit
        << "\t" << mu_up_p2
@@ -1480,27 +1477,26 @@ RooDataSet* makeAsimovData(bool doConditional, RooNLLVar* conditioning_nll, doub
 ////////// main:
 
 int main(int argc, char* argv[]) {
-  if (argc < 4) {
-    cout << "Usage: " << argv[0] << " <jobName> <DHSignal> <option>" << endl;
+  if (argc < 3) {
+    cout << "Usage: " << argv[0] << " <jobName> <option>" << endl;
     return 0;
   }
   
   TString configFile = argv[1];
-  inputDHSignal = argv[2];
-  TString option = argv[3];// can be "highCL", "nosys"
+  TString option = argv[2];// can be "highCL", "nosys"
   
   // Load analysis settings from file:
   Config *config = new Config(configFile);
-  TString jobName = config->getStr("jobName");
-  TString currAna = DHAnalysis::getAnalysisType(config, inputDHSignal);
+  TString jobName = config->getStr("JobName");
+  TString currAna = config->getStr("AnalysisType");
   
   // Settings for the CLs calculation:
-  conditionalExpected = 1 && !config->getBool("doBlind");
-  doObs = 1 && !config->getBool("doBlind");
+  conditionalExpected = 1 && !config->getBool("DoBlind");
+  doObs = 1 && !config->getBool("DoBlind");
   
   // Assign input locations:
-  TString inputDir = Form("%s/%s", (config->getStr("masterOutput")).Data(),
-			  (config->getStr("jobName")).Data());
+  TString inputDir = Form("%s/%s", (config->getStr("MasterOutput")).Data(),
+			  (config->getStr("JobName")).Data());
   TString inputFileName = Form("%s/DHWorkspace/rootfiles/workspaceDH_%s.root",
 			       inputDir.Data(), currAna.Data());
   

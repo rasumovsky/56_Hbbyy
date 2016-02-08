@@ -422,37 +422,34 @@ int main (int argc, char **argv) {
     }
     std::cout << "Resubmitted " << jobCounterTS << " jobs" << std::endl;
   }
+  */
   
   //--------------------------------------//
   // Step 7.1: Calculate the limits on the dark matter signal strength.
   if (masterOption.Contains("MuLimit") &&
       !masterOption.Contains("ResubmitMuLimit")) {
-    std::cout << "DHMaster: Step 7.1 - Calculate 95%CL mu value." << std::endl;
+    std::cout << "DHMaster: Step 7.1 - Calculate 95% CL mu value." << std::endl;
 
-    int jobCounterML = 0;
-    std::vector<TString> sigDHModes = m_config->getStrV("sigDHModes");
-    for (int i_s = 0; i_s < (int)sigDHModes.size(); i_s++) {
-      TString currSignal = sigDHModes[i_s];
-      
-      if (runInParallel) {
-	submitMLViaBsub(fullConfigPath, m_config->getStr("MuLimitOptions"), currSignal);
-	m_isFirstJob = false;
-      }
-      else {
-	TString muCommand = Form(".%s/bin/%s %s %s %s", 
-				 (m_config->getStr("packageLocation")).Data(), 
-				 (m_config->getStr("exeMuLimit")).Data(),
-				 fullConfigPath.Data(), currSignal.Data(),
-				 m_config->getStr("MuLimitOptions").Data());
-	std::cout << "Executing following system command: \n\t"
-		  << muCommand << std::endl;
-	system(muCommand);
-      }
-      jobCounterML++;
-    }
-    std::cout << "Submitted/completed " << jobCounterML << " jobs" << std::endl;
+    //int jobCounterML = 0;
+    
+    //if (runInParallel) {
+    //submitMLViaBsub(fullConfigPath, m_config->getStr("MuLimitOptions"), currSignal);
+    //m_isFirstJob = false;
+    //}
+    //else {
+    TString muCommand 
+      = Form("./bin/%s %s %s", (m_config->getStr("exeMuLimit")).Data(),
+	     fullConfigPath.Data(), m_config->getStr("MuLimitOptions").Data());
+    std::cout << "Executing following system command: \n\t"
+	      << muCommand << std::endl;
+    system(muCommand);
+    //}
+    //jobCounterML++;
+    //}
+    //std::cout << "Submitted/completed " << jobCounterML << " jobs" << std::endl;
   }
   
+  /*
   //--------------------------------------//
   // Step 7.2: Resubmit any failed mu limit jobs:
   if (masterOption.Contains("ResubmitMuLimit")) {

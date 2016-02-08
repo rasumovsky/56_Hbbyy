@@ -366,6 +366,39 @@ TString DHSystematics::mKey(TString sample, TString systematic, int category,
 	      up_down.Data());
 }
 
+
+/**
+   -----------------------------------------------------------------------------
+   Parameterize a single systematic as a function of some variable. Different
+   samples that have been loaded correspond to different variable values. The
+   input map provides a mapping from sample name --> variable value.
+   @param sampleToVar - A map with keys as sample names and variable values as
+   map values.
+   @param systematic - The name of the systematic.
+
+void DHSystematics::parameterizeSingleSyst(std::map<TString,double> sampleToVar,
+					   TString systematic) {
+  // Do this for each category too! Or maybe that should be specified in the method? YES!!!
+  
+}
+
+
+   -----------------------------------------------------------------------------
+   Parameterize all the systematics as a function of some variable. Different
+   samples that have been loaded correspond to different variable values. The
+   input map provides a mapping from sample name --> variable value.
+   @param sampleToVar - A map with keys as sample names and variable values as
+   map values.
+
+void DHSystematics::parameterizeSyst(std::map<TString,double> sampleToVar) {
+  
+  // Loop over the systematics:
+  for (int i_s = 0; i_s < m_sysNames.size(); i_s++) {
+    parameterizeSingleSyst(sampleToVar, m_sysNames[i_s]);
+  }
+}
+*/
+
 /**
    -----------------------------------------------------------------------------
    Prints a statement (if verbose) and exits (if fatal).

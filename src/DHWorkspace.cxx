@@ -326,10 +326,18 @@ void DHWorkspace::addSystematic(TString systematicForm) {
   if (constraint.EqualTo("asym") && (int)componentsLo.size() == 0) {
     printer("DHWorkspace: Implementing an asymmetric uncertainty with only the"
 	    " one-sided fluctuation provided. Equating up and down variations.",
-	    true);
-    componentsLo = components;
-    // THIS SHOULD BE MADE NEGATIVE!!!!
-    // Exits for now, until solution can be thought through...
+	    false);
+    
+    // Loop through the map, turning values negative:
+    for (std::map<TString,TString>::iterator compIter = components.begin(); 
+	 compIter != components.end(); compIter++) {
+      TString name = compIter->first;
+      TString val = compIter->second;
+      if (val.Contains("-")) val.ReplaceAll("-","");
+      else val.Prepend("-");
+      componentsLo[name] = val;
+    }
+    
   }
   
   // Print out a summary of the systematic:
@@ -453,7 +461,8 @@ void DHWorkspace::addSystematic(TString systematicForm) {
 	vector<double> magHi; magHi.clear(); 
 	magHi.push_back((centralValue.Atof())+(magnitude.Atof()));
 	vector<double> magLo; magLo.clear(); 
-	magLo.push_back((centralValue.Atof())-(magnitudeLo.Atof()));
+	//magLo.push_back((centralValue.Atof())-(magnitudeLo.Atof()));
+	magLo.push_back((centralValue.Atof())+(magnitudeLo.Atof()));
 	RooArgList nuisList(*m_ws->factory(Form("%s_times_beta", 
 						varName.Data())));
 	RooStats::HistFactory::FlexibleInterpVar expVar(expName, expName, 

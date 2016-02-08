@@ -45,6 +45,7 @@ class DHSystematics {
   void groupSystAllSamples(TString groupName, 
 			   std::vector<TString> sysComponents);
   void loadSystematicsFile(TString fileName, TString sample);
+  //void parameterizeSyst(std::map<TString,double> sampleToVar);
   void setSysToDefaults();
   void setConstrCenterTypeIncl(TString systematic, TString constraintType,
 			       double centralValue, TString systematicType,
