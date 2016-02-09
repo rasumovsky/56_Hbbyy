@@ -55,18 +55,20 @@ double getIntercept(TGraph *graph, double valueToIntercept) {
    The main method scans the 95% CL for various signal cross-sections.
    @param configFile - The analysis configuration file.
    @param options - Job options.
+   @param resMass - The resonance mass.
 */
 int main(int argc, char **argv) {
   
   // Check that arguments are provided.
-  if (argc < 3) {
+  if (argc < 4) {
     std::cout << "\nUsage: " << argv[0]
-	      << " <configFile> <options>" << std::endl;
+	      << " <configFile> <options> <resMass>" << std::endl;
     exit(0);
   }
   
   TString configFile = argv[1];
   TString options = argv[2];
+  int resonanceMass = atoi(argv[3]);
   
   // Load the analysis configuration file:
   Config *config = new Config(configFile);
@@ -81,12 +83,6 @@ int main(int argc, char **argv) {
   TString originFile = Form("%s/%s/DHWorkspace/rootfiles/workspaceDH_%s.root",
 			    (config->getStr("MasterOutput")).Data(), 
 			    jobName.Data(), anaType.Data());
-  
-  // Load the resonance mass (if doing resonant analysis):
-  int resonanceMass = 0;
-  if (anaType.EqualTo("Resonant")) {
-    resonanceMass = config->getInt("CLScanMassValue");
-  }
   
   // Create a nametag for results:
   TString tag = (anaType.EqualTo("Resonant")) ? 
@@ -271,7 +267,8 @@ int main(int argc, char **argv) {
 	// in DHToyAnalysis...
 	TString toyScanOption = Form("CLScan%d",i_t);
 	if (i_t == 5) toyScanOption.Append("_ForcePlot");
-	DHToyAnalysis *dhta = new DHToyAnalysis(configFile, toyScanOption);
+	DHToyAnalysis *dhta
+	  = new DHToyAnalysis(configFile, toyScanOption, resonanceMass);
 	if (!(dhta->areInputFilesOK())) {
 	  std::cout << "DHCLScan: ERROR with toy scan option " << toyScanOption
 		    << std::endl;

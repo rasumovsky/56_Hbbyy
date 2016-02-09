@@ -19,9 +19,9 @@ The analysis requires text files with the mass points from data (or a suitable M
 
 The configuration files for the analysis are included in the data directory. Currently, the di-Higgs analyses use the files below:
 
-- settingsDH_nonresonant.cfg (for the non-resonant analysis),
-- settingsDH_resonant.cfg (for the fit-based resonant analysis),
-- settingsDH_countresonant.cfg (for the counting resonant analysis).
+- settingsDH_nonresonant_no1b.cfg (for the non-resonant analysis),
+- settingsDH_fitresonant.cfg (for the fit-based resonant analysis),
+- settingsDH_countresonant_no1b.cfg (for the counting resonant analysis).
 
 The config files allow the user to specify everything from the luminosity, to the blinding status, to the systematic uncertainty sizes, without need to recompile or edit C++ code.
 

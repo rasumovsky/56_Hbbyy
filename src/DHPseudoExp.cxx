@@ -29,6 +29,14 @@
 #include "RooStatsHead.h"
 #include "statistics.h"
 
+/**
+   -----------------------------------------------------------------------------
+   Convert key and value in a map to two separate vectors that are passed by 
+   reference. Stupid, yeah...
+   @param map - The input map with keys and values to be split.
+   @names - A vector of names.
+   @values - A vector of values.
+*/
 void mapToVectors(std::map<std::string,double> map, 
 		  std::vector<std::string>& names, std::vector<double>& values){
   names.clear(); 
@@ -42,12 +50,13 @@ void mapToVectors(std::map<std::string,double> map,
 
 /**
    -----------------------------------------------------------------------------
-   The main method. 
-   @param configFile - the name of the analysis config file.
-   @param options - the options (see header note).
-   @param seed - the random seed for pseudoexperiment creation.
-   @param toysPerJob - the number of pseudoexperiments to create per job.
-   @param poiVal - the value of the parameter of interest to use.
+   The main method tosses toys and saves data in a TTree.
+   @param configFile - The name of the analysis config file.
+   @param options - The options (see header note).
+   @param seed - The random seed for pseudoexperiment creation.
+   @param toysPerJob - The number of pseudoexperiments to create per job.
+   @param poiVal - The value of the parameter of interest to use.
+   @param resonanceMass - The mass of the resonance (resonant analysis only)
 */
 int main(int argc, char **argv) {
   if (argc < 6) {
@@ -63,6 +72,7 @@ int main(int argc, char **argv) {
   int seed = atoi(argv[3]);
   int nToysPerJob = atoi(argv[4]);
   int inputPoIVal = atoi(argv[5]);
+  int resonanceMass = atoi(argv[6]);
   
   // Load the analysis configurations from file:
   Config *config = new Config(configFile);
@@ -79,10 +89,18 @@ int main(int argc, char **argv) {
   TString outputDir = Form("%s/%s/DHPseudoExp", 
 			   (config->getStr("MasterOutput")).Data(),
 			   (config->getStr("JobName")).Data());
+  
   if (options.Contains(config->getStr("CLScanToyOptions"))) {
-    outputDir = Form("%s/%s/DHPseudoExpForCLScan", 
-		     (config->getStr("MasterOutput")).Data(),
-		     (config->getStr("JobName")).Data());
+    if (anaType.EqualTo("Resonant")) {
+      outputDir = Form("%s/%s/DHPseudoExpForCLScan/MX%d", 
+		       (config->getStr("MasterOutput")).Data(),
+		       (config->getStr("JobName")).Data(), resonanceMass);
+    }
+    else{
+      outputDir = Form("%s/%s/DHPseudoExpForCLScan", 
+		       (config->getStr("MasterOutput")).Data(),
+		       (config->getStr("JobName")).Data());
+    }
   }
   
   // Get the index of the job (for CL Scan only):
@@ -92,8 +110,6 @@ int main(int argc, char **argv) {
   TString tempOutputFileName = Form("%s/single_files/toy_mu%i_%i.root",
 				    outputDir.Data(), inputPoIVal, seed);
   if (options.Contains(config->getStr("CLScanToyOptions"))) {
-    //tempOutputFileName = Form("%s/single_files/toy_mu%i_%i.root",
-    //			      outputDir.Data(), inputPoIVal, jobIndex.Atoi());
     tempOutputFileName = Form("%s/single_files/toy_mu%i_%i_%i.root",
 			      outputDir.Data(), inputPoIVal, jobIndex.Atoi(),
 			      seed);

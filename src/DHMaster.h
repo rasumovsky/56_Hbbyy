@@ -26,4 +26,4 @@ void submitMLViaBsub(TString exeConfigFile, TString exeOption,
 		     TString exeSignal);
 
 void submitPEViaBsub(TString exeConfigFile, TString exeOption,
-		     int exeSeed, int exeToysPerJob);
+		     int exeSeed, int exeToysPerJob, int resonanceMass);

@@ -91,32 +91,6 @@ void DHWorkspace::addCategory() {
   m_categories->defineType(m_currCateName);
   
   //--------------------------------------//
-  // Add systematic uncertainties first:
-  // (constraint term, global observables, nuisance parameters, expectation)
-  if (m_useSystematics && m_currCateIndex == 0) {
-    if (m_config->isDefined("SysSources")) {
-      std::vector<TString> systematics = m_config->getStrV("SysSources");
-      for (int i_s = 0; i_s < (int)systematics.size(); i_s++) {
-	addSystematic(m_config->getStr(Form("SysForm_%s",
-					    (systematics[i_s]).Data())));
-      }
-    }
-    
-    // Create RooProduct of constraints:
-    RooProdPdf constraint("constraint", "constraint", *m_constraints);
-    m_ws->import(constraint);
-    
-    // Iterate over the expected sets and create products:
-    for (std::map<TString,RooArgSet*>::iterator iterEx = m_expectedList.begin();
-	 iterEx != m_expectedList.end(); iterEx++) {
-      TString currExpName = iterEx->first;
-      RooArgSet *currExp = iterEx->second;
-      RooProduct currExpectation(currExpName, currExpName, *currExp);
-      m_ws->import(currExpectation);
-    }
-  }
-  
-  //--------------------------------------//
   // Add the observable:
   TString observable = m_config->getStr(Form("OBS_%s", m_currCateName.Data()));
   TString observableName = nameOfVar(observable);
@@ -140,6 +114,32 @@ void DHWorkspace::addCategory() {
     }
   }
   
+  //--------------------------------------//
+  // Add systematic uncertainties:
+  // (constraint term, global observables, nuisance parameters, expectation)
+  if (m_useSystematics && m_currCateIndex == 0) {
+    if (m_config->isDefined("SysSources")) {
+      std::vector<TString> systematics = m_config->getStrV("SysSources");
+      for (int i_s = 0; i_s < (int)systematics.size(); i_s++) {
+	addSystematic(m_config->getStr(Form("SysForm_%s",
+					    (systematics[i_s]).Data())));
+      }
+    }
+    
+    // Create RooProduct of constraints:
+    RooProdPdf constraint("constraint", "constraint", *m_constraints);
+    m_ws->import(constraint);
+    
+    // Iterate over the expected sets and create products:
+    for (std::map<TString,RooArgSet*>::iterator iterEx = m_expectedList.begin();
+	 iterEx != m_expectedList.end(); iterEx++) {
+      TString currExpName = iterEx->first;
+      RooArgSet *currExp = iterEx->second;
+      RooProduct currExpectation(currExpName, currExpName, *currExp);
+      m_ws->import(currExpectation);
+    }
+  }
+    
   //--------------------------------------//
   // Add expressions:
   printer("DHWorkspace::addCategory(): Adding expressions...", false);
@@ -292,7 +292,7 @@ void DHWorkspace::addSystematic(TString systematicForm) {
       if (currComponentVal.Contains("expr")) {
 	componentsLo[currComponentName]
 	  = m_config->getStr(Form("SysMagLo_%s_%s", systematicName.Data(),
-				  currComponentName.Data()));
+				  currComponentName.Data()), false);
       }
       else componentsLo[currComponentName] = currComponentVal;
     }
@@ -309,7 +309,7 @@ void DHWorkspace::addSystematic(TString systematicForm) {
       if (currComponentVal.Contains("expr")) {
 	components[currComponentName]
 	  = m_config->getStr(Form("SysMag_%s_%s", systematicName.Data(),
-				  currComponentName.Data()));
+				  currComponentName.Data()), false);
       }
       else components[currComponentName] = currComponentVal;
     }
@@ -776,79 +776,6 @@ void DHWorkspace::createNewWS() {
   // Do a simple background only fit before asimov data creation:
   m_ws->pdf("combinedPdf")->fitTo(*m_ws->data("obsData"), SumW2Error(kTRUE));
   
-  // PRINT DATA:
-  /*
-  std::cout << "PRINT DATA: " << std::endl;
-  
-  std::cout << "\tn_BkgNonHiggs_bbMyyLo = " 
-	    << m_ws->var("n_BkgNonHiggs_bbMyyLo")->getVal() 
-	    << std::endl;
-  std::cout << "\tn_BkgNonHiggs_bbMyyHi = " 
-	    << m_ws->var("n_BkgNonHiggs_bbMyyHi")->getVal()
-	    << std::endl;
-  std::cout << "\tn_BkgNonHiggs_jj = " 
-	    << m_ws->var("n_BkgNonHiggs_jj")->getVal()
-	    << std::endl;
-  std::cout << "\tn_BkgNonHiggs_bj = " 
-	    << m_ws->var("n_BkgNonHiggs_bj")->getVal()
-	    << std::endl;
-  
-  std::cout << "\tmyyWindowFrac    = " 
-	    << m_ws->function("myyWindowFrac")->getVal()
-	    << std::endl;
-  std::cout << "\tmyyWindowNorm    = " 
-	    << m_ws->function("normFromMyyWindow")->getVal()
-	    << std::endl;
-  std::cout << "\tn_BkgNonHiggs_bb = " 
-	    << m_ws->function("n_BkgNonHiggs_bb")->getVal()
-	    << std::endl;  
-  std::cout << "\n" << std::endl;
-  
-  // Also print efficiencies etc for signal:
-  std::cout << "\tn_SigBSM2H_bj = " 
-	    << m_ws->function("n_SigBSM2H_bj")->getVal()
-	    << std::endl;  
-  
-  std::cout << "\teff_myy_SigBSM2H_bj = " 
-	    << m_ws->function("eff_myy_SigBSM2H_bj")->getVal()
-	    << std::endl;  
-  
-  std::cout << "\tnPerFb_SigBSM2H_bj = " 
-	    << m_ws->function("nPerFb_SigBSM2H_bj")->getVal()
-	    << std::endl;  
-  
-  
-  std::cout << "\texpectationCommon = " 
-	    << m_ws->function("expectationCommon")->getVal()
-	    << std::endl;
-  
-  std::cout << "\texpectation_SigBSM2H = " 
-	    << m_ws->function("expectation_SigBSM2H")->getVal()
-	    << std::endl;
-  
-  std::cout << "\texpectation_yield_SigBSM2H_bj = " 
-	    << m_ws->function("expectation_yield_SigBSM2H_bj")->getVal()
-	    << std::endl;
-  
-  std::cout << "\tmu_SigBSM2H = " 
-	    << m_ws->function("mu_SigBSM2H")->getVal()
-	    << std::endl;
-
-  std::cout << "\texpectation_yield_SigBSM2H = " 
-	    << m_ws->function("expectation_yield_SigBSM2H")->getVal()
-	    << std::endl;
-  
-  
-  std::cout << "\taccXeff_SigBSM2H_bj = " 
-	    << m_ws->function("accXeff_SigBSM2H_bj")->getVal()
-	    << std::endl;
-
-  exit(0);
-  
-  //prod::nPerFb_SigBSM2H_bj(two,xsec_SigBSM2H,BR_yy,BR_bb,accXeff_SigBSM2H_bj)
-  */
-
-
   // Loop over categories for Asimov data following background-only fit:
   for (m_currCateIndex = 0; m_currCateIndex < m_nCategories; m_currCateIndex++){
     m_currCateName = cateNames[m_currCateIndex];
@@ -882,15 +809,10 @@ void DHWorkspace::createNewWS() {
   allParams->add(*m_modelConfig->GetParametersOfInterest());
   m_ws->saveSnapshot("paramsOrigin", *allParams);
   
-  // Print the workspace before saving:
+  // Print the workspace before fitting and saving:
   printer("DHWorkspace: Printing the workspace to be saved.", false);
   if (m_config->getBool("Verbose")) m_ws->Print("v");
-  
-  // Write workspace to file:
-  m_ws->importClassCode();
-  m_ws->writeToFile(Form("%s/rootfiles/workspaceDH_%s.root",
-			 m_outputDir.Data(), m_anaType.Data()));
-  
+
   //----------------------------------------//
   // Start profiling the data (must do after writing workspace for some reason):
   printer("DHWorkspace: Start profiling data", false);
@@ -935,6 +857,11 @@ void DHWorkspace::createNewWS() {
   filePoI.open(Form("%s/PoI/poi_%s.txt", m_outputDir.Data(), m_anaType.Data()));
   filePoI << profiledPOIVal << std::endl;
   filePoI.close();
+  
+  // Write workspace to file:
+  m_ws->importClassCode();
+  m_ws->writeToFile(Form("%s/rootfiles/workspaceDH_%s.root",
+			 m_outputDir.Data(), m_anaType.Data()));
   
   delete dhts;
 }

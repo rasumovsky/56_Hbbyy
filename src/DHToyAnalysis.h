@@ -25,7 +25,7 @@ class DHToyAnalysis {
 
  public:
   
-  DHToyAnalysis(TString newConfigFile, TString options);
+  DHToyAnalysis(TString newConfigFile, TString options, int resonanceMass);
   virtual ~DHToyAnalysis() {};
   
   bool areInputFilesOK();
@@ -54,6 +54,7 @@ class DHToyAnalysis {
   TString m_outputDir;
   Config *m_config;
   bool m_filesLoaded;
+  int m_resonanceMass;
 
   // Classes for statistics access:
   DHTestStat *m_dhts;

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [[ $# -lt 7 ]]; then
-    echo "USAGE: toy_jobfile.sh <jobname> <configfile> <input_file> <exe_name> <option> <seed> <toysperjob>"
+if [[ $# -lt 8 ]]; then
+    echo "USAGE: toy_jobfile.sh <jobname> <configfile> <input_file> <exe_name> <option> <seed> <toysperjob> <resonanceMass>"
     
 else
     jobname=$1
@@ -11,11 +11,12 @@ else
     option=$5
     seed=$6
     toysperjob=$7
-    
+    resonanceMass=$8
+
     date
     echo
     
-    echo $jobname $configfile $input_file $exe_name $option $seed $toysperjob
+    echo $jobname $configfile $input_file $exe_name $option $seed $toysperjob $resonanceMass
     
     out="${jobname}_${seed}"
     output_dir="/afs/cern.ch/user/a/ahard/work_directory/files_Hbbgg/FullAnalysis/${jobname}/DHPseudoExp"
@@ -46,8 +47,8 @@ else
     echo "Printing directory contents before running."
     ls
     
-    ./bin/${exe_name} ${configfile} ${option} ${seed} ${toysperjob} 0 1> ${out}_mu0.log 2>${out}_mu0.err;
-    ./bin/${exe_name} ${configfile} ${option} ${seed} ${toysperjob} 1 1> ${out}_mu1.log 2>${out}_mu1.err;
+    ./bin/${exe_name} ${configfile} ${option} ${seed} ${toysperjob} 0 ${resonanceMass} 1> ${out}_mu0.log 2>${out}_mu0.err;
+    ./bin/${exe_name} ${configfile} ${option} ${seed} ${toysperjob} 1 ${resonanceMass} 1> ${out}_mu1.log 2>${out}_mu1.err;
     
     mv *.log ${output_dir}/log/
     mv *.err ${output_dir}/err/

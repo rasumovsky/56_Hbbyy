@@ -20,26 +20,43 @@
    Constructor for the DHToyAnalysis class.
    @param newConfigFile - The name of the analysis config file.
    @param options - Options for the toy analysis: ForcePlot, CLScan
+   @param resonanceMass - The resonance mass (resonant analysis only).
 */
-DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString options) {
+DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString options, int resonanceMass) {
   
   // Load the config file:
   m_config = new Config(newConfigFile);
   TString jobName = m_config->getStr("JobName");
   TString anaType = m_config->getStr("AnalysisType");
-  
+  m_resonanceMass = resonanceMass;
+
   printer(Form("DHToyAnalysis::DHToyAnalysis(%s)",newConfigFile.Data()),false);
 
   // set input and output directories:
-  m_outputDir = Form("%s/%s/DHToyAnalysis",
-		     (m_config->getStr("MasterOutput")).Data(),
-		     jobName.Data());
+  if (anaType.EqualTo("Resonant")) {
+    m_outputDir = Form("%s/%s/DHToyAnalysis/MX%d",
+		       (m_config->getStr("MasterOutput")).Data(),
+		       jobName.Data(), m_resonanceMass);
+  }
+  else {
+    m_outputDir = Form("%s/%s/DHToyAnalysis",
+		       (m_config->getStr("MasterOutput")).Data(),
+		       jobName.Data());
+  }
+
   TString toyDir = Form("%s/%s/DHPseudoExp", 
 			(m_config->getStr("MasterOutput")).Data(), 
 			jobName.Data());
   if (options.Contains("CLScan")) {
-    toyDir = Form("%s/%s/DHPseudoExpForCLScan", 
-		  (m_config->getStr("MasterOutput")).Data(), jobName.Data());
+    if (anaType.EqualTo("Resonant")) {
+      toyDir = Form("%s/%s/DHPseudoExpForCLScan/MX%d", 
+		    (m_config->getStr("MasterOutput")).Data(), jobName.Data(),
+		    m_resonanceMass);
+    }
+    else {
+      toyDir = Form("%s/%s/DHPseudoExpForCLScan", 
+		    (m_config->getStr("MasterOutput")).Data(), jobName.Data());
+    }
   }
   
   TString wsFileName = Form("%s/%s/DHWorkspace/rootfiles/workspaceDH_%s.root",

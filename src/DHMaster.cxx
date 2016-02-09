@@ -17,9 +17,6 @@
 //    - Workspace                                                             //
 //    - TossPseudoExp                                                         //
 //    - PlotPseudoExp                                                         //
-//    - TestStat                                                              //
-//    - ResubmitTestStat                                                      //
-//    - MuLimit                                                               //
 //    - CLScanAnalysis                                                        //
 //    - CLScanSubmitToys                                                      //
 //                                                                            //
@@ -50,7 +47,7 @@ void submitTSViaBsub(TString exeConfigFile, TString exeOption,
   system(Form("mkdir -vp %s", err.Data()));
   system(Form("mkdir -vp %s", exe.Data()));
   
-  TString exeAna = DHAnalysis::getAnalysisType(m_config, exeSignal);
+  TString exeAna = m_config->getStr("AnalysisType");
   
   // create .tar file with everything:
   if (m_isFirstJob) {
@@ -107,7 +104,7 @@ void SubmitMuLimitViaBsub(TString exeConfigFile, TString exeOption,
   system(Form("mkdir -vp %s", err.Data()));
   system(Form("mkdir -vp %s", exe.Data()));
   
-  TString exeAna = DHAnalysis::getAnalysisType(m_config, exeSignal);
+  TString exeAna = m_config->getStr("AnalysisType");
   
   // create .tar file with everything:
   if (m_isFirstJob) {
@@ -148,11 +145,12 @@ void SubmitMuLimitViaBsub(TString exeConfigFile, TString exeOption,
    Submits the mu limit jobs to the lxbatch server. 
    @param exeConfigFile - the config file.
    @param exeOption - the job options for the executable.
-   @param int exeSeed - the seed for the randomized dataset generation.
-   @param int exeToysPerJob - the number of toy datasets to create per job.
+   @param exeSeed - the seed for the randomized dataset generation.
+   @param exeToysPerJob - the number of toy datasets to create per job.
+   @param resonanceMass - The mass of the resonance (resonant analysis only)
 */
 void submitPEViaBsub(TString exeConfigFile, TString exeOption, int exeSeed, 
-		     int exeToysPerJob) {
+		     int exeToysPerJob, int resonanceMass) {
   //@param exeSignal - the signal to process in the executable.
 
   // Make directories for job info:
@@ -190,11 +188,12 @@ void submitPEViaBsub(TString exeConfigFile, TString exeOption, int exeSeed,
 			     (m_config->getStr("JobName")).Data(), exeSeed);
   
   // Here you define the arguments for the job script:
-  TString nameJScript = Form("%s/jobFilePseudoExp.sh %s %s %s %s %s %d %d", 
+  TString nameJScript = Form("%s/jobFilePseudoExp.sh %s %s %s %s %s %d %d %d", 
 			     exe.Data(), (m_config->getStr("JobName")).Data(),
 			     exeConfigFile.Data(), inputFile.Data(),
 			     (m_config->getStr("exePseudoExp")).Data(),
-			     exeOption.Data(), exeSeed, exeToysPerJob);
+			     exeOption.Data(), exeSeed, exeToysPerJob,
+			     resonanceMass);
   
   // submit the job:
   system(Form("bsub -q wisc -o %s -e %s %s", nameOutFile.Data(), 
@@ -203,7 +202,9 @@ void submitPEViaBsub(TString exeConfigFile, TString exeOption, int exeSeed,
 
 /**
    -----------------------------------------------------------------------------
-   This is the main DHMaster method:
+   This is the main DHMaster method. Runs every analysis component.
+   @param masterOption - The task to run (see document header or README).
+   @param configFileName - The name of the config file. 
 */
 int main (int argc, char **argv) {
   // Check arguments:
@@ -338,8 +339,6 @@ int main (int argc, char **argv) {
     sysToIgnore.push_back("FT_EFF_Eigen_Light_9");
     sysToIgnore.push_back("FT_EFF_Eigen_Light_10");
     sysToIgnore.push_back("FT_EFF_Eigen_Light_11");
-    sysToIgnore.push_back("FT_EFF_extrapolation_from_charm");
-    sysToIgnore.push_back("FT_EFF_extrapolation");
     sysToIgnore.push_back("JET_GroupedNP_1");
     sysToIgnore.push_back("JET_GroupedNP_2");
     sysToIgnore.push_back("JET_GroupedNP_3");
@@ -390,7 +389,7 @@ int main (int argc, char **argv) {
     
     for (int i_s = toySeed; i_s < highestSeed; i_s += increment) {
       submitPEViaBsub(fullConfigPath, m_config->getStr("PseudoExpOptions"),
-		      i_s, nToysPerJob);
+		      i_s, nToysPerJob, 0);
       m_isFirstJob = false;
     }
     std::cout << "DHMaster: Submitted " << (int)(nToysTotal/nToysPerJob) 
@@ -402,144 +401,15 @@ int main (int argc, char **argv) {
   if (masterOption.Contains("PlotPseudoExp")) {
     std::cout << "DHMaster: Step 5.2 - Plot pseudoexperiment results."
 	      << std::endl;
-    DHToyAnalysis *dhta = new DHToyAnalysis(configFileName, "NONE");
-    //DHToyAnalysis *dhta = new DHToyAnalysis(configFileName, "ForcePlotCLScan3");
+    DHToyAnalysis *dhta
+      = new DHToyAnalysis(configFileName,"NONE", m_config->getInt("MXScanMin"));
+    //DHToyAnalysis *dhta = new DHToyAnalysis(configFileName, "ForcePlotCLScan3", m_config->getInt("MXScanMin"));
   }
-  
-  //--------------------------------------//
-  // Step 6.1: Calculate the test statistics:
-  /*
-  if (masterOption.Contains("TestStat") && 
-      !masterOption.Contains("ResubmitTestStat")) {
-    std::cout << "DHMaster: Step 6.1 - Calculating CL and p0." << std::endl;
-
-    int jobCounterTS = 0;
-    std::vector<TString> sigDHModes = m_config->getStrV("sigDHModes");
-    for (int i_s = 0; i_s < (int)sigDHModes.size(); i_s++) {
-      TString currSignal = sigDHModes[i_s];
-      
-      if (runInParallel) {
-	submitTSViaBsub(fullConfigPath, m_config->getStr("TestStatOptions"), currSignal);
-	jobCounterTS++;
-	m_isFirstJob = false;
-      }
-      else {
-	DHTestStat *ts = new DHTestStat(configFileName, currSignal,
-					m_config->getStr("TestStatOptions"), NULL);
-	ts->calculateNewCL();
-	ts->calculateNewP0();
-	if (ts->fitsAllConverged()) jobCounterTS++;
-	else {
-	  std::cout << "DHMaster: Problem with test-stat fit!" << std::endl;
-	  exit(0);
-	}
-      }
-    }
-    std::cout << "Submitted/completed " << jobCounterTS << " jobs" << std::endl;
-  }
-  
-  //--------------------------------------//
-  // Step 6.2: Resubmit any failed test statistics jobs:
-  if (masterOption.Contains("ResubmitTestStat")) {
-    std::cout << "DHMaster: Step 6.2 - Resubmit failed test stat." << std::endl;
-    
-    int jobCounterTS = 0;
-    // Get the points to resubmit:
-    DHCheckJobs *dhc = new DHCheckJobs(configFileName);
-    vector<TString> resubmitSignals = dhc->getResubmitList("DHTestStat");
-    dhc->printResubmitList("DHTestStat");
-    
-    // Then resubmit as necessary:
-    std::cout << "Resubmitting " << (int)resubmitSignals.size()
-	      << " test statistic jobs." << std::endl;
-    for (int i_s = 0; i_s < (int)resubmitSignals.size(); i_s++) {
-      TString currSignal = resubmitSignals[i_s];
-      
-      if (runInParallel) {
-	submitTSViaBsub(fullConfigPath, m_config->getStr("TestStatOptions"), currSignal);
-      	jobCounterTS++;
-	m_isFirstJob = false;
-      }
-      else {
-	DHTestStat *dhts = new DHTestStat(configFileName, currSignal,
-					  m_config->getStr("TestStatOptions"), NULL);
-	dhts->calculateNewCL();
-	dhts->calculateNewP0();
-	if (dhts->fitsAllConverged()) jobCounterTS++;
-	else {
-	  std::cout << "DHMaster: Problem with test-stat fit!" << std::endl;
-	  exit(0);
-	}
-      }
-    }
-    std::cout << "Resubmitted " << jobCounterTS << " jobs" << std::endl;
-  }
-  */
-  
-  //--------------------------------------//
-  // Step 7.1: Calculate the limits on the di-Higgs signal strength:
-  if (masterOption.Contains("MuLimit") &&
-      !masterOption.Contains("ResubmitMuLimit")) {
-    std::cout << "DHMaster: Step 7.1 - Calculate 95% CL mu value." << std::endl;
-
-    //int jobCounterML = 0;
-    
-    //if (runInParallel) {
-    //submitMLViaBsub(fullConfigPath, m_config->getStr("MuLimitOptions"), currSignal);
-    //m_isFirstJob = false;
-    //}
-    //else {
-    TString muCommand 
-      = Form("./bin/%s %s %s", (m_config->getStr("exeMuLimit")).Data(),
-	     fullConfigPath.Data(), m_config->getStr("MuLimitOptions").Data());
-    std::cout << "Executing following system command: \n\t"
-	      << muCommand << std::endl;
-    system(muCommand);
-    //}
-    //jobCounterML++;
-    //}
-    //std::cout << "Submitted/completed " << jobCounterML << " jobs" << std::endl;
-  }
-  
-  /*
-  //--------------------------------------//
-  // Step 7.2: Resubmit any failed mu limit jobs:
-  if (masterOption.Contains("ResubmitMuLimit")) {
-    std::cout << "DHMaster: Step 7.2 - Resubmit failed mu limits." << std::endl;
-    
-    int jobCounterML = 0;
-    // Get the points to resubmit:
-    DHCheckJobs *dhc = new DHCheckJobs(configFileName);
-    vector<TString> resubmitSignals = dhc->getResubmitList("DHMuLimit");
-    dhc->printResubmitList("DHMuLimit");
-    
-    // Then resubmit as necessary:
-    std::cout << "Resubmitting " << (int)resubmitSignals.size()
-	      << " mu limit jobs." << std::endl;
-    for (int i_s = 0; i_s < (int)resubmitSignals.size(); i_s++) {
-      TString currSignal = resubmitSignals[i_s];
-      
-      if (runInParallel) {
-	submitMLViaBsub(fullConfigPath, m_config->getStr("MuLimitOptions"), currSignal);
-	m_isFirstJob = false;
-      }
-      else {
-	system(Form(".%s/bin/%s %s %s %s", 
-		    (m_config->getStr("packageLocation")).Data(), 
-		    (m_config->getStr("exeMuLimit")).Data(),
-		    fullConfigPath.Data(), currSignal.Data(),
-		    m_config->getStr("MuLimitOptions").Data()));
-      }
-      jobCounterML++;
-    }
-    std::cout << "Resubmitted " << jobCounterML << " jobs" << std::endl;
-  }
-  */
   
   //--------------------------------------//
   // Step 8.1: Toss toys for a CL scan:
   if (masterOption.Contains("CLScanSubmitToys")) {
-    std::cout << "DHMaster: Step 5.1 - Create pseudoexperiments." << std::endl;
+    std::cout << "DHMaster: Step 8.1 - Create toys for CL Scan." << std::endl;
     
     int toySeed = m_config->getInt("toySeed");
     int nToysTotal = m_config->getInt("nToysTotal");
@@ -556,7 +426,17 @@ int main (int argc, char **argv) {
       
       // Then split the toy jobs for each scan point:
       for (int i_s = toySeed; i_s < highestSeed; i_s += nToysPerJob) {
-	submitPEViaBsub(fullConfigPath, currOptions, i_s, nToysPerJob);
+	// Loop over resonance masses for resonant analysis:
+	if ((m_config->getStr("AnalysisType")).EqualTo("Resonant")) {
+	  for (int resMass = m_config->getInt("MXScanMin");
+	       resMass <= m_config->getInt("MXScanMax");
+	       resMass +=m_config->getInt("MXScanStep")) { 
+	    submitPEViaBsub(fullConfigPath,currOptions,i_s,nToysPerJob,resMass);
+	  }
+	}
+	else {
+	  submitPEViaBsub(fullConfigPath, currOptions, i_s, nToysPerJob, 0);
+	}
 	m_isFirstJob = false;
       }
     }
@@ -568,10 +448,29 @@ int main (int argc, char **argv) {
   //--------------------------------------//
   // Step 8.2: Create the CL scan plot:
   if (masterOption.Contains("CLScanAnalysis")) {
-    std::cout << "DHMaster: Step 8 - Get ." << std::endl;
-    system(Form("./bin/DHCLScan %s %s", fullConfigPath.Data(),
-		(m_config->getStr("CLScanOptions")).Data()));
+    std::cout << "DHMaster: Step 8.2 - Get CL Scan Plot" << std::endl;
+    
+    if ((m_config->getStr("AnalysisType")).EqualTo("Resonant")) {
+      for (int resMass = m_config->getInt("MXScanMin");
+	       resMass <= m_config->getInt("MXScanMax");
+	       resMass +=m_config->getInt("MXScanStep")) { 
+	system(Form("./bin/DHCLScan %s %s %d", fullConfigPath.Data(),
+		    (m_config->getStr("CLScanOptions")).Data(), resMass));
+      }
+    }
+    else {
+      system(Form("./bin/DHCLScan %s %s 0", fullConfigPath.Data(),
+		  (m_config->getStr("CLScanOptions")).Data()));
+    }
   }
   
+  //--------------------------------------//
+  // Step 8.2: Create the CL scan plot:
+  if (masterOption.Contains("PlotCLVsMX")) {
+    std::cout << "DHMaster: Step 8.2 - Get Plot of CL vs. MX" << std::endl;
+    
+    
+  }
+
   return 0;
 }
