@@ -469,8 +469,15 @@ int main (int argc, char **argv) {
   if (masterOption.Contains("PlotCLVsMX")) {
     std::cout << "DHMaster: Step 8.2 - Get Plot of CL vs. MX" << std::endl;
     
-    
+    if ((m_config->getStr("AnalysisType")).EqualTo("Resonant")) {
+      system(Form("./bin/DHPlotCLvsMX %s %s", fullConfigPath.Data(),
+		  (m_config->getStr("CLMXPlotOptions")).Data()));
+    }
+    else {
+      std::cout << "DHMaster: Cannot plot CL vs MX for nonresonant analysis!"
+		<< std::endl;
+    }
   }
-
+  
   return 0;
 }

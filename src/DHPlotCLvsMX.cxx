@@ -1,13 +1,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 //                                                                            //
-//  Name: DHCLScan.cxx                                                        //
+//  Name: DHPlotCLvsMX.cxx                                                    //
 //                                                                            //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 27/01/2016                                                          //
+//  Date: 09/02/2016                                                          //
 //                                                                            //
-//  Performs a scan of the 95% CL for the non-resonant Di-Higgs analysis as a //
-//  function of signal cross-section.                                         //
+//  Plots the resonant analysis limits as a function of MX.                   //
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -16,49 +15,6 @@
 #include "Config.h"
 #include "DHTestStat.h"
 #include "DHToyAnalysis.h"
-
-/**
-   -----------------------------------------------------------------------------
-   Get the intersection point for the graph.
-*/
-double getIntercept(TGraph *graph, double valueToIntercept) {
-  
-  // Loop over points in the graph to get search range:
-  double rangeMin = 0.0; double rangeMax = 0.0;
-  for (int i_p = 0; i_p < graph->GetN(); i_p++) {
-    double xCurr; double yCurr;
-    graph->GetPoint(i_p, xCurr, yCurr);
-    if (i_p == 0) rangeMin = xCurr;
-    if (i_p == (graph->GetN()-1)) rangeMax = xCurr;
-  }
-  
-  // Bisection method to search for intercept:
-  double precision = 0.0001;
-  int nIterations = 0;
-  int maxIterations = 30;
-  double stepSize = (rangeMax - rangeMin) / 2.0;
-  double currXValue = (rangeMax + rangeMin) / 2.0;
-  double currYValue = graph->Eval(currXValue);
-  while ((fabs(currYValue - valueToIntercept)/valueToIntercept) > precision && 
-	 nIterations <= maxIterations) {
-    
-    currYValue = graph->Eval(currXValue);
-    
-    nIterations++;
-    stepSize = 0.5 * stepSize;
-
-    if (currYValue > valueToIntercept) currXValue -= stepSize;
-    else currXValue += stepSize;
-  }
-  
-  // Print error message and return bad value if convergence not achieved:
-  if (nIterations == maxIterations) {
-    std::cout << "DHCLScan: ERROR! Intercept not found." << std::cout;
-    return -999;
-  }
-  
-  return currXValue;
-}
 
 
 /**
@@ -85,7 +41,7 @@ int main(int argc, char **argv) {
   Config *config = new Config(configFile);
   TString jobName = config->getStr("JobName");
   TString anaType = config->getStr("AnalysisType");
-  TString outputDir = Form("%s/%s/DHCLScan", 
+  TString outputDir = Form("%s/%s/DHPlotCLvsMX", 
 			   (config->getStr("MasterOutput")).Data(),
 			   (config->getStr("JobName")).Data());
   system(Form("mkdir -vp %s", outputDir.Data()));
@@ -191,7 +147,7 @@ int main(int argc, char **argv) {
     // Loop over cross-section:
     for (double crossSection = xsMin; crossSection < xsMax;
 	 crossSection += step) {
-      std::cout << "DHCLScan: cross-section = " << crossSection << std::endl;
+      std::cout << "DHPlotCLvsMX: cross-section = " << crossSection << std::endl;
       
       // Set the value of the variable to scan:
       dhts->setParam(config->getStr("CLScanVar"), crossSection, true);
@@ -203,7 +159,7 @@ int main(int argc, char **argv) {
       
       // Asymptotic calculation of CL:
       if (options.Contains("asymptotic") || options.Contains("both")) {
-	std::cout << "DHCLScan: calculating asymptotic CL" << std::endl;
+	std::cout << "DHPlotCLvsMX: calculating asymptotic CL" << std::endl;
 	
 	// Calculate the 95% CL value:
 	dhts->calculateNewCL();
@@ -233,7 +189,7 @@ int main(int argc, char **argv) {
       
       // Pseudo-experiment calculation of CL:
       if (options.Contains("toy") || options.Contains("both")) {
-	std::cout << "DHCLScan: calculating toy CL" << std::endl;
+	std::cout << "DHPlotCLvsMX: calculating toy CL" << std::endl;
 	
 	// Calculate the observed qMu values:
 	double obsPoI = 0.0;
@@ -281,7 +237,7 @@ int main(int argc, char **argv) {
 	DHToyAnalysis *dhta
 	  = new DHToyAnalysis(configFile, toyScanOption, resonanceMass);
 	if (!(dhta->areInputFilesOK())) {
-	  std::cout << "DHCLScan: ERROR with toy scan option " << toyScanOption
+	  std::cout << "DHPlotCLvsMX: ERROR with toy scan option " << toyScanOption
 		    << std::endl;
 	  continue;
 	}
@@ -314,6 +270,9 @@ int main(int argc, char **argv) {
   //----------------------------------------//
   // Plot the results:
   
+  //n_asym--;
+  //n_toy--;
+  
   double errExp_asym_p2[100] = {0};
   double errExp_asym_p1[100] = {0};
   double errExp_asym_n1[100] = {0};
@@ -337,19 +296,10 @@ int main(int argc, char **argv) {
   }
   
   // Median expected and observed results:
-  TGraph *gCLObs_asym = new TGraph(n_asym, varValues_asym, CLObs_asym);
   TGraph *gCLExp_asym = new TGraph(n_asym, varValues_asym, CLExp_asym);
-  TGraph *gCLExp_asym_p1 = new TGraph(n_asym, varValues_asym, CLExp_asym_p1);
-  TGraph *gCLExp_asym_p2 = new TGraph(n_asym, varValues_asym, CLExp_asym_p2);
-  TGraph *gCLExp_asym_n1 = new TGraph(n_asym, varValues_asym, CLExp_asym_n1);
-  TGraph *gCLExp_asym_n2 = new TGraph(n_asym, varValues_asym, CLExp_asym_n2);
-  
-  TGraph *gCLObs_toy = new TGraph(n_toy, varValues_toy, CLObs_toy);
-  TGraph *gCLExp_toy = new TGraph(n_toy, varValues_toy, CLExp_toy);
-  TGraph *gCLExp_toy_p1 = new TGraph(n_toy, varValues_toy, CLExp_toy_p1);
-  TGraph *gCLExp_toy_p2 = new TGraph(n_toy, varValues_toy, CLExp_toy_p2);
-  TGraph *gCLExp_toy_n1 = new TGraph(n_toy, varValues_toy, CLExp_toy_n1);
-  TGraph *gCLExp_toy_n2 = new TGraph(n_toy, varValues_toy, CLExp_toy_n2);
+  TGraph *gCLObs_asym = new TGraph(n_asym, varValues_asym, CLObs_asym);
+  TGraph *gCLExp_toy  = new TGraph(n_toy,  varValues_toy,  CLExp_toy);
+  TGraph *gCLObs_toy  = new TGraph(n_toy,  varValues_toy,  CLObs_toy);
   
   // Also plot the bands:
   TGraphAsymmErrors *gCLExp_asym_2s 
@@ -475,64 +425,8 @@ int main(int argc, char **argv) {
 		    outputDir.Data(), tag.Data()));
   }
   
-  // Then save the intercepts to file:
-  if (options.Contains("asymptotic")) {
-    std::ofstream limitOutput(Form("%s/limits_asymptotic_%s.txt",
-				   outputDir.Data(), tag.Data()));
-    // Get the actual limit values:
-    double observedCL_asym = getIntercept(gCLObs_asym, 0.95);
-    double expectedCL_asym = getIntercept(gCLExp_asym, 0.95);
-    double expectedCL_p1_asym = getIntercept(gCLExp_asym_p1, 0.95);
-    double expectedCL_p2_asym = getIntercept(gCLExp_asym_p2, 0.95);
-    double expectedCL_n1_asym = getIntercept(gCLExp_asym_n1, 0.95);
-    double expectedCL_n2_asym = getIntercept(gCLExp_asym_n2, 0.95);  
-    limitOutput << "observedCL " << observedCL_asym << std::endl;
-    limitOutput << "expectedCL " << expectedCL_asym << std::endl;
-    limitOutput << "expectedCL_p1 " << expectedCL_p1_asym << std::endl;
-    limitOutput << "expectedCL_p2 " << expectedCL_p2_asym << std::endl;
-    limitOutput << "expectedCL_n1 " << expectedCL_n1_asym << std::endl;
-    limitOutput << "expectedCL_n2 " << expectedCL_n2_asym << std::endl;
-    limitOutput.close();
-
-    // Then print to screen:
-    std::cout << "\nDHCLScan: Results" << std::endl;
-    std::cout << "observedCL " << observedCL_asym << std::endl;
-    std::cout << "expectedCL " << expectedCL_asym << std::endl;
-    std::cout << "expectedCL_p1 " << expectedCL_p1_asym << std::endl;
-    std::cout << "expectedCL_p2 " << expectedCL_p2_asym << std::endl;
-    std::cout << "expectedCL_n1 " << expectedCL_n1_asym << std::endl;
-    std::cout << "expectedCL_n2 " << expectedCL_n2_asym << std::endl;
-  }
-  else if (options.Contains("toy")) {
-    std::ofstream limitOutput(Form("%s/limits_toy_%s.txt",
-				   outputDir.Data(), tag.Data()));
-    // Get the actual limit values:
-    double observedCL_toy = getIntercept(gCLObs_toy, 0.95);
-    double expectedCL_toy = getIntercept(gCLExp_toy, 0.95);
-    double expectedCL_p1_toy = getIntercept(gCLExp_toy_p1, 0.95);
-    double expectedCL_p2_toy = getIntercept(gCLExp_toy_p2, 0.95);
-    double expectedCL_n1_toy = getIntercept(gCLExp_toy_n1, 0.95);
-    double expectedCL_n2_toy = getIntercept(gCLExp_toy_n2, 0.95);  
-    limitOutput << "observedCL " << observedCL_toy << std::endl;
-    limitOutput << "expectedCL " << expectedCL_toy << std::endl;
-    limitOutput << "expectedCL_p1 " << expectedCL_p1_toy << std::endl;
-    limitOutput << "expectedCL_p2 " << expectedCL_p2_toy << std::endl;
-    limitOutput << "expectedCL_n1 " << expectedCL_n1_toy << std::endl;
-    limitOutput << "expectedCL_n2 " << expectedCL_n2_toy << std::endl;
-    limitOutput.close();
-    
-    // Then print to screen:
-    std::cout << "\nDHCLScan: Results" << std::endl;
-    std::cout << "observedCL " << observedCL_toy << std::endl;
-    std::cout << "expectedCL " << expectedCL_toy << std::endl;
-    std::cout << "expectedCL_p1 " << expectedCL_p1_toy << std::endl;
-    std::cout << "expectedCL_p2 " << expectedCL_p2_toy << std::endl;
-    std::cout << "expectedCL_n1 " << expectedCL_n1_toy << std::endl;
-    std::cout << "expectedCL_n2 " << expectedCL_n2_toy << std::endl;
-  }
-  
   // Delete pointers, close files, return:
-  std::cout << "DHCLScan: Finished!" << std::endl;
+  std::cout << "DHPlotCLvsMX: Finished!" << std::endl;
   delete line;
   delete can;
   delete gCLObs_asym;
