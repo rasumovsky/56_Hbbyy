@@ -349,7 +349,7 @@ int main (int argc, char **argv) {
     // Then parameterize the resonant signal uncertainties:
     if (m_config->getStr("AnalysisType").EqualTo("Resonant")) {
       std::map<TString,double> sampleMap; sampleMap.clear();
-      sampleMap["X300-Window"] = 275.0;
+      sampleMap["X275-Window"] = 275.0;
       sampleMap["X300-Window"] = 300.0;
       sampleMap["X325-Window"] = 325.0;
       sampleMap["X350-Window"] = 350.0;

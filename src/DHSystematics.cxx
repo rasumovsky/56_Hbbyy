@@ -416,8 +416,13 @@ void DHSystematics::parameterizeSingleSyst(TString groupedSample,
   // Store the graph points:
   TGraph *gErrors = new TGraph();
   
-  // Loop over samples: 
-  int pointIndex = 0; double min = 0; double max = 0;
+  double min = 0; 
+  double max = 0;
+  double sysAverage = 0.0;
+  double sysExtremum = 0.0;
+  
+  // Loop over samples:
+  int pointIndex = 0;
   for (std::map<TString,double>::iterator sampleIter = sampleToVar.begin();
        sampleIter != sampleToVar.end(); sampleIter++) {
     
@@ -448,7 +453,11 @@ void DHSystematics::parameterizeSingleSyst(TString groupedSample,
       }
     }
     
+    // Set the graph point and incorporate in average calculation:
     gErrors->SetPoint(pointIndex, sampleIter->second, currSysValue);
+    sysAverage += fabs(currSysValue);
+    if (fabs(currSysValue) > fabs(sysExtremum)) sysExtremum = currSysValue;
+    
     if (pointIndex == 0) {
       max = sampleIter->second;
       min = sampleIter->second;
@@ -458,22 +467,34 @@ void DHSystematics::parameterizeSingleSyst(TString groupedSample,
     pointIndex++;
   }
   
+  // Complete averaging
+  sysAverage = (sysAverage / ((double)pointIndex));
+  
   // Graphs to store systematics:
   TF1 *currFunc = new TF1("currFunc", "pol1", min, max);
   gErrors->Fit(currFunc);
+  gErrors->GetXaxis()->SetTitle("M_{X}");
+  gErrors->GetYaxis()->SetTitle("#delta");
   gErrors->Draw("AP");
+  currFunc->SetLineColor(kRed+1);
   currFunc->Draw("LSAME");
   
   //currFunc->GetParameter(0)));
-  TString systExpression = currFunc->GetExpFormula("P");
+  //TString systExpression = currFunc->GetExpFormula("P");
+  
+  double p0 = currFunc->GetParameter(0);
+  double p1 = currFunc->GetParameter(1);
   
   // Write the text on the plot:
   TLatex text; text.SetNDC(); text.SetTextColor(1); text.SetTextSize(0.04);
-  text.DrawLatex(0.7, 0.85, systExpression);
+  text.DrawLatex(0.53, 0.87, Form("|#bar{#delta}| = %2.4f", sysAverage));
+  text.DrawLatex(0.53, 0.81, Form("extremum{#delta} = %2.4f", sysExtremum));
+  text.SetTextColor(kRed+1);
+  text.DrawLatex(0.53, 0.75, Form("#delta(M_{X}) = %f + %f#upointM_{X}", p0, p1));
   
   // Save the parameterization:
-  m_sysFormulas[mKey(groupedSample, systematic, category, up_down)]
-    = systExpression;
+  //m_sysFormulas[mKey(groupedSample, systematic, category, up_down)]
+    //  = Form("expr::value_%s_%sgroupedSample = %2.3f + %2.3f*M_{Resonance}", systematic.Data(), p0, p1));
   
   // Print the canvas:
   if (category == -1) {
