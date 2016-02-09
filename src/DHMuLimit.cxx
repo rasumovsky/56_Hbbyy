@@ -89,7 +89,7 @@ NOTE: The script runs significantly faster when compiled
 #include "RooFitHead.h"
 #include "RooStatsHead.h"
 #include "statistics.h"
-#include "DHAnalysis.h"
+//#include "DHAnalysis.h"
 
 using namespace std;
 using namespace RooFit;
@@ -1509,6 +1509,7 @@ int main(int argc, char* argv[]) {
   system(Form("cp %s %s", inputFileName.Data(), localInputFileName.Data()));
   
   TString wname = "combinedWS";
+  //TString aname = "asimovDataMu0";//keep blank so that program creates its own Asimov data.
   TString aname = "";//keep blank so that program creates its own Asimov data.
   
   // Model name and data name:

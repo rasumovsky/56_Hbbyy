@@ -4,7 +4,7 @@
 //                                                                            //
 //  Created: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 01/01/2016                                                          //
+//  Date: 08/02/2016                                                          //
 //                                                                            //
 //  This program is useful as an interface to the di-Higgs (bb+yy) analysis   //
 //  tools. It centralizes the commands for creating inputs, plots, workspaces,//
@@ -232,12 +232,20 @@ int main (int argc, char **argv) {
   // Step 3: Calculate systematic uncertainties and output a file for .cfg
   if (masterOption.Contains("Systematics")) {
     DHSystematics *sys = new DHSystematics(configFileName, "");
-    sys->addCategoryNames(m_config->getStrV("CateNames"));
+    sys->addCategoryNames(m_config->getStrV("SysCateNames"));
     std::vector<TString> sysComponents = m_config->getStrV("SysComponents");
     for (int i_s = 0; i_s < (int)sysComponents.size(); i_s++) {
-      TString fileName = Form("%s/%s_allSys.txt",
-			      (m_config->getStr("SysDirectory")).Data(),
-			      (sysComponents[i_s]).Data());
+      TString fileName = "";
+      if (m_config->getStr("AnalysisType").EqualTo("Resonant")) {
+	fileName = Form("%s/%s.txt", (m_config->getStr("SysDirectory")).Data(),
+			(sysComponents[i_s]).Data());
+      }
+      // Non-resonant files:
+      else {
+	fileName = Form("%s/%s_allSys.txt",
+			(m_config->getStr("SysDirectory")).Data(),
+			(sysComponents[i_s]).Data());
+      }
       sys->loadSystematicsFile(fileName, sysComponents[i_s]);
     }
     sys->setSysToDefaults();
@@ -305,6 +313,50 @@ int main (int argc, char **argv) {
 				 "asym", 1.0, "yield", false);
     sys->setConstrCenterTypeIncl("JET_GroupedNP",
 				 "asym", 1.0, "yield", false);
+    
+    // Also create a list of systematic uncertainties to ignore:
+    std::vector<TString> sysToIgnore; sysToIgnore.clear();
+    sysToIgnore.push_back("FT_EFF_Eigen_B_0");
+    sysToIgnore.push_back("FT_EFF_Eigen_B_1");
+    sysToIgnore.push_back("FT_EFF_Eigen_B_2");
+    sysToIgnore.push_back("FT_EFF_Eigen_B_3");
+    sysToIgnore.push_back("FT_EFF_Eigen_B_4");
+    sysToIgnore.push_back("FT_EFF_Eigen_B_5");
+    sysToIgnore.push_back("FT_EFF_Eigen_C_0");
+    sysToIgnore.push_back("FT_EFF_Eigen_C_1");
+    sysToIgnore.push_back("FT_EFF_Eigen_C_2");
+    sysToIgnore.push_back("FT_EFF_Eigen_C_3");
+    sysToIgnore.push_back("FT_EFF_Eigen_Light_0");
+    sysToIgnore.push_back("FT_EFF_Eigen_Light_1");
+    sysToIgnore.push_back("FT_EFF_Eigen_Light_2");
+    sysToIgnore.push_back("FT_EFF_Eigen_Light_3");
+    sysToIgnore.push_back("FT_EFF_Eigen_Light_4");
+    sysToIgnore.push_back("FT_EFF_Eigen_Light_5");
+    sysToIgnore.push_back("FT_EFF_Eigen_Light_6");
+    sysToIgnore.push_back("FT_EFF_Eigen_Light_7");
+    sysToIgnore.push_back("FT_EFF_Eigen_Light_8");
+    sysToIgnore.push_back("FT_EFF_Eigen_Light_9");
+    sysToIgnore.push_back("FT_EFF_Eigen_Light_10");
+    sysToIgnore.push_back("FT_EFF_Eigen_Light_11");
+    sysToIgnore.push_back("FT_EFF_extrapolation_from_charm");
+    sysToIgnore.push_back("FT_EFF_extrapolation");
+    sysToIgnore.push_back("JET_GroupedNP_1");
+    sysToIgnore.push_back("JET_GroupedNP_2");
+    sysToIgnore.push_back("JET_GroupedNP_3");
+    sysToIgnore.push_back("MUON");
+    sys->ignoreSystematics(sysToIgnore);
+
+    // Then parameterize the resonant signal uncertainties:
+    if (m_config->getStr("AnalysisType").EqualTo("Resonant")) {
+      std::map<TString,double> sampleMap; sampleMap.clear();
+      sampleMap["X300-Window"] = 275.0;
+      sampleMap["X300-Window"] = 300.0;
+      sampleMap["X325-Window"] = 325.0;
+      sampleMap["X350-Window"] = 350.0;
+      sampleMap["X400-Window"] = 400.0;
+      sys->parameterizeSyst("SigBSM2H", sampleMap);
+      sys->parameterizeSyst("SigSM", sampleMap);
+    }
     
     // Print the systematic uncertainty input:
     sys->printWorkspaceInput();
@@ -425,7 +477,7 @@ int main (int argc, char **argv) {
   */
   
   //--------------------------------------//
-  // Step 7.1: Calculate the limits on the dark matter signal strength.
+  // Step 7.1: Calculate the limits on the di-Higgs signal strength:
   if (masterOption.Contains("MuLimit") &&
       !masterOption.Contains("ResubmitMuLimit")) {
     std::cout << "DHMaster: Step 7.1 - Calculate 95% CL mu value." << std::endl;
@@ -491,17 +543,25 @@ int main (int argc, char **argv) {
     
     int toySeed = m_config->getInt("toySeed");
     int nToysTotal = m_config->getInt("nToysTotal");
-    int nToyJobs = ((m_config->getNum("CLScanMax") - 
-		     m_config->getNum("CLScanMin")) / 
-		    m_config->getNum("CLScanStep"));
-    for (int currIndex = 0; currIndex < nToyJobs; currIndex++) {
+    int nToysPerJob = m_config->getInt("nToysPerJob");
+    int highestSeed = toySeed + nToysTotal;
+    
+    // Loop over scan points:
+    int nToyPoints = ((m_config->getNum("CLScanMax") - 
+		       m_config->getNum("CLScanMin")) / 
+		      m_config->getNum("CLScanStep"));
+    for (int currIndex = 0; currIndex < nToyPoints; currIndex++) {
       TString currOptions = m_config->getStr("CLScanToyOptions");
       currOptions.Append(Form("%d",currIndex));
-      submitPEViaBsub(fullConfigPath, currOptions, toySeed, nToysTotal);
-      m_isFirstJob = false;
-      toySeed++;
+      
+      // Then split the toy jobs for each scan point:
+      for (int i_s = toySeed; i_s < highestSeed; i_s += nToysPerJob) {
+	submitPEViaBsub(fullConfigPath, currOptions, i_s, nToysPerJob);
+	m_isFirstJob = false;
+      }
     }
-    std::cout << "DHMaster: Submitted " << nToyJobs
+    std::cout << "DHMaster: Submitted " 
+	      << (nToyPoints * (int)(nToysTotal/nToysPerJob))
 	      << " total pseudo-experiments for CL scan." << std::endl;
   }
   

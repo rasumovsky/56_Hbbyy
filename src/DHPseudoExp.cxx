@@ -92,8 +92,11 @@ int main(int argc, char **argv) {
   TString tempOutputFileName = Form("%s/single_files/toy_mu%i_%i.root",
 				    outputDir.Data(), inputPoIVal, seed);
   if (options.Contains(config->getStr("CLScanToyOptions"))) {
-    tempOutputFileName = Form("%s/single_files/toy_mu%i_%i.root",
-			      outputDir.Data(), inputPoIVal, jobIndex.Atoi());
+    //tempOutputFileName = Form("%s/single_files/toy_mu%i_%i.root",
+    //			      outputDir.Data(), inputPoIVal, jobIndex.Atoi());
+    tempOutputFileName = Form("%s/single_files/toy_mu%i_%i_%i.root",
+			      outputDir.Data(), inputPoIVal, jobIndex.Atoi(),
+			      seed);
   }
   
   // Construct the output directories:

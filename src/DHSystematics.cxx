@@ -40,12 +40,14 @@ DHSystematics::DHSystematics(TString newConfigFile, TString options) {
 		     (m_config->getStr("MasterOutput")).Data(),
 		     jobName.Data());
   system(Form("mkdir -vp %s", m_outputDir.Data()));
+  system(Form("mkdir -vp %s/Plots", m_outputDir.Data()));
   
   // Clear the sys values and names storage:
   m_maxCategories = 0;
   m_cateNames.clear();
   m_missingSys = false;
   m_sampleNames.clear();
+  m_sysFormulas.clear();
   m_sysValues.clear();
   m_sysNames.clear();
   
@@ -54,6 +56,8 @@ DHSystematics::DHSystematics(TString newConfigFile, TString options) {
   m_centralValue.clear();
   m_sysType.clear();
   m_inclusive.clear();
+  
+  m_sysToIgnore.clear();
 }
 
 /**
@@ -280,6 +284,28 @@ void DHSystematics::groupSystAllSamples(TString groupName,
 
 /**
    -----------------------------------------------------------------------------
+   Check whether the given systematic should be ignored.
+   @param systematic - The name of the systematic uncertainty.
+*/
+bool DHSystematics::ignoreThisSyst(TString systematic) {
+  for (int i_s = 0; i_s < (int)m_sysToIgnore.size(); i_s++) {
+    if (systematic.Contains(m_sysToIgnore[i_s])) return true;
+  }
+  return false;
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Provide a list of systematics to ignore.
+   @param sysToIngore - A list of systematics that will not appear in the output
+   and will be deleted from the class.
+*/
+void DHSystematics::ignoreSystematics(std::vector<TString> sysToIgnore) {
+  m_sysToIgnore = sysToIgnore;
+}
+
+/**
+   -----------------------------------------------------------------------------
    List the names of samples in this class
 */
 std::vector<TString> DHSystematics::listSampleNames() {
@@ -366,38 +392,154 @@ TString DHSystematics::mKey(TString sample, TString systematic, int category,
 	      up_down.Data());
 }
 
-
 /**
    -----------------------------------------------------------------------------
    Parameterize a single systematic as a function of some variable. Different
    samples that have been loaded correspond to different variable values. The
    input map provides a mapping from sample name --> variable value.
+   @param groupedSample - The name of the grouped parameterized samples.
    @param sampleToVar - A map with keys as sample names and variable values as
    map values.
    @param systematic - The name of the systematic.
-
-void DHSystematics::parameterizeSingleSyst(std::map<TString,double> sampleToVar,
-					   TString systematic) {
-  // Do this for each category too! Or maybe that should be specified in the method? YES!!!
+*/
+void DHSystematics::parameterizeSingleSyst(TString groupedSample,
+					   std::map<TString,double> sampleToVar,
+					   TString systematic, int category,
+					   TString up_down) {
+  // Set ATLAS style template:
+  CommonFunc::SetAtlasStyle();
   
+  // Canvas for printing picture:
+  TCanvas *can = new TCanvas();
+  can->cd();
+  
+  // Store the graph points:
+  TGraph *gErrors = new TGraph();
+  
+  // Loop over samples: 
+  int pointIndex = 0; double min = 0; double max = 0;
+  for (std::map<TString,double>::iterator sampleIter = sampleToVar.begin();
+       sampleIter != sampleToVar.end(); sampleIter++) {
+    
+    // Construct the systematic name:
+    TString singleSysName
+      = Form("%s-%s", groupedSample.Data(), (sampleIter->first).Data());
+    
+    // Get the systematic value:
+    double currSysValue = 0.0;
+    // Inclusive case:
+    if (category == -1) {
+      if (up_down.Contains("symmetric")) {
+	currSysValue = getInclSymmetricSystematic(singleSysName, systematic);
+      }
+      else {
+	currSysValue = getInclSystematic(singleSysName, systematic, up_down);
+      }
+    }
+    // Category by category:
+    else {
+      if (up_down.Contains("symmetric")) {
+	currSysValue
+	  = getSymmetricSystematic(singleSysName, systematic, category);
+      }
+      else {
+	currSysValue
+	  = getSystematic(singleSysName, systematic, category, up_down);
+      }
+    }
+    
+    gErrors->SetPoint(pointIndex, sampleIter->second, currSysValue);
+    if (pointIndex == 0) {
+      max = sampleIter->second;
+      min = sampleIter->second;
+    }
+    if (sampleIter->second >= max) max = sampleIter->second;
+    if (sampleIter->second <= min) min = sampleIter->second;
+    pointIndex++;
+  }
+  
+  // Graphs to store systematics:
+  TF1 *currFunc = new TF1("currFunc", "pol1", min, max);
+  gErrors->Fit(currFunc);
+  gErrors->Draw("AP");
+  currFunc->Draw("LSAME");
+  
+  //currFunc->GetParameter(0)));
+  TString systExpression = currFunc->GetExpFormula("P");
+  
+  // Write the text on the plot:
+  TLatex text; text.SetNDC(); text.SetTextColor(1); text.SetTextSize(0.04);
+  text.DrawLatex(0.7, 0.85, systExpression);
+  
+  // Save the parameterization:
+  m_sysFormulas[mKey(groupedSample, systematic, category, up_down)]
+    = systExpression;
+  
+  // Print the canvas:
+  if (category == -1) {
+    can->Print(Form("%s/Plots/param_%s_%s_inclusive_%s.eps", m_outputDir.Data(),
+		    groupedSample.Data(), systematic.Data(), up_down.Data()));
+  }
+  else {
+    can->Print(Form("%s/Plots/param_%s_%s_%s_%s.eps", m_outputDir.Data(),
+		    groupedSample.Data(), systematic.Data(), 
+		    (m_cateNames[category]).Data(), up_down.Data()));
+  }
+  
+  delete can;
+  delete gErrors;
 }
 
-
+/**
    -----------------------------------------------------------------------------
    Parameterize all the systematics as a function of some variable. Different
    samples that have been loaded correspond to different variable values. The
    input map provides a mapping from sample name --> variable value.
+   @param groupedSample - The name of the grouped parameterized samples.
    @param sampleToVar - A map with keys as sample names and variable values as
    map values.
-
-void DHSystematics::parameterizeSyst(std::map<TString,double> sampleToVar) {
+*/
+void DHSystematics::parameterizeSyst(TString groupedSample,
+				     std::map<TString,double> sampleToVar) {
   
   // Loop over the systematics:
-  for (int i_s = 0; i_s < m_sysNames.size(); i_s++) {
-    parameterizeSingleSyst(sampleToVar, m_sysNames[i_s]);
+  for (int i_s = 0; i_s < (int)m_sysNames.size(); i_s++) {
+    
+    // Check whether this systematic should be ignored:
+    if (ignoreThisSyst(m_sysNames[i_s])) continue;
+    
+    if (m_inclusive[m_sysNames[i_s]]) {
+      // Asymmetric uncertainty:
+      if ((m_constraintType[m_sysNames[i_s]]).Contains("asym")) {
+	parameterizeSingleSyst(groupedSample, sampleToVar, m_sysNames[i_s],
+			       -1, "up");
+	parameterizeSingleSyst(groupedSample, sampleToVar, m_sysNames[i_s],
+			       -1, "down");
+      }
+      // Symmetric uncertainty:
+      else {
+	parameterizeSingleSyst(groupedSample, sampleToVar, m_sysNames[i_s],
+			       -1, "symmetric");
+      }
+    }
+    else {
+      for (int i_c = 0; i_c < m_maxCategories; i_c++) {
+	// Asymmetric uncertainty:
+	if ((m_constraintType[m_sysNames[i_s]]).Contains("asym")) {
+	  parameterizeSingleSyst(groupedSample, sampleToVar, m_sysNames[i_s],
+				 i_c, "up");
+	  parameterizeSingleSyst(groupedSample, sampleToVar, m_sysNames[i_s],
+				 i_c, "down");
+	}
+	// Symmetric uncertainty:
+	else {
+	  parameterizeSingleSyst(groupedSample, sampleToVar, m_sysNames[i_s],
+				 i_c, "symmetric");
+	}
+      }
+    }
   }
 }
-*/
 
 /**
    -----------------------------------------------------------------------------
@@ -426,12 +568,18 @@ void DHSystematics::printWorkspaceInput() {
   // First list the nuisance parameters:
   outputFile << "SysSources:		";
   for (int i_n = 0; i_n < (int)m_sysNames.size(); i_n++) {
+    // Check whether this systematic should be ignored:
+    if (ignoreThisSyst(m_sysNames[i_n])) continue;
     outputFile << m_sysNames[i_n] << " ";
   }
   outputFile << "\n" << std::endl;
   
   // Then go over the nuisance parameters:
   for (int i_n = 0; i_n < (int)m_sysNames.size(); i_n++) {
+    
+    // Check whether this systematic should be ignored:
+    if (ignoreThisSyst(m_sysNames[i_n])) continue;
+    
     outputFile << "SysForm_" << m_sysNames[i_n] << ": " << m_sysNames[i_n] 
 	       << "[constr=" << m_constraintType[m_sysNames[i_n]] 
 	       << ",center=" << m_centralValue[m_sysNames[i_n]] 

@@ -14,8 +14,10 @@
 
 // Package libraries:
 #include "CommonHead.h"
-//#include "CommonFunc.h"
+#include "CommonFunc.h"
 #include "Config.h"
+//#include "TF1.h"
+//#include "TFormula.h"
 
 class DHSystematics {
 
@@ -44,8 +46,15 @@ class DHSystematics {
 		 std::vector<TString> sysComponents);
   void groupSystAllSamples(TString groupName, 
 			   std::vector<TString> sysComponents);
+  bool ignoreThisSyst(TString systematic);
+  void ignoreSystematics(std::vector<TString> sysToIgnore);
   void loadSystematicsFile(TString fileName, TString sample);
-  //void parameterizeSyst(std::map<TString,double> sampleToVar);
+  void parameterizeSingleSyst(TString groupedSample,
+			      std::map<TString,double> sampleToVar,
+			      TString systematic, int category, 
+			      TString up_down);
+  void parameterizeSyst(TString groupedSample, 
+			std::map<TString,double> sampleToVar);
   void setSysToDefaults();
   void setConstrCenterTypeIncl(TString systematic, TString constraintType,
 			       double centralValue, TString systematicType,
@@ -69,6 +78,7 @@ class DHSystematics {
   int m_maxCategories;
   std::vector<TString> m_cateNames;
   std::vector<TString> m_sampleNames;
+  std::map<TString,TString> m_sysFormulas;
   std::map<TString,double> m_sysValues;
   std::vector<TString> m_sysNames;
   bool m_missingSys;
@@ -78,7 +88,10 @@ class DHSystematics {
   std::map<TString,double> m_centralValue;
   std::map<TString,TString> m_sysType;
   std::map<TString,bool> m_inclusive;
-
+  
+  // Systematics to ignore:
+  std::vector<TString> m_sysToIgnore;
+  
 };
 
 #endif

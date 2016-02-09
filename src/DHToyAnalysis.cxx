@@ -73,10 +73,10 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString options) {
     TString jobIndex = options;
     jobIndex.ReplaceAll("CLScan","");
     jobIndex.ReplaceAll("ForcePlot","");
-    toyFileMu0 = Form("%s/single_files/toy_mu0_%d.root",
-		      toyDir.Data(), jobIndex.Atoi());
-    toyFileMu1 = Form("%s/single_files/toy_mu1_%d.root",
-		      toyDir.Data(), jobIndex.Atoi());
+    system(Form("hadd -f %s %s/single_files/toy_mu0_%d_*",
+		toyFileMu0.Data(), toyDir.Data(), jobIndex.Atoi()));
+    system(Form("hadd -f %s %s/single_files/toy_mu1_%d_*", 
+		toyFileMu1.Data(), toyDir.Data(), jobIndex.Atoi()));
   }
   else {
     system(Form("hadd -f %s %s/single_files/toy_mu0*",
