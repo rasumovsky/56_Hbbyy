@@ -8,6 +8,8 @@
 //                                                                            //
 //  Plots the resonant analysis limits as a function of MX.                   //
 //                                                                            //
+//  Options: Can be "toy" or "asymptotic" or "both"                           //
+//                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "CommonFunc.h"
@@ -18,21 +20,20 @@
    -----------------------------------------------------------------------------
    The main method scans the 95% CL for various signal cross-sections.
    @param configFile - The analysis configuration file.
-   @param options - Job options.
+   @param options - Job options. Can be "toy" or "asymptotic" or "both"
    @param resMass - The resonance mass.
 */
 int main(int argc, char **argv) {
   
   // Check that arguments are provided.
-  if (argc < 4) {
+  if (argc < 3) {
     std::cout << "\nUsage: " << argv[0]
-	      << " <configFile> <options> <resMass>" << std::endl;
+	      << " <configFile> <options>" << std::endl;
     exit(0);
   }
   
   TString configFile = argv[1];
   TString options = argv[2];
-  int resonanceMass = atoi(argv[3]);
   
   // Load the analysis configuration file:
   Config *config = new Config(configFile);
@@ -45,26 +46,32 @@ int main(int argc, char **argv) {
 			  (config->getStr("MasterOutput")).Data(),
 			  (config->getStr("JobName")).Data());
   system(Form("mkdir -vp %s", outputDir.Data()));
-      
+  
+  // Check that we are doing resonant analysis:
+  if (!(config->getStr("AnalysisType")).EqualTo("Resonant")) {
+    std::cout << "DHPlotCLvsMX: Cannot plot CL vs MX for nonresonant analysis!"
+	      << std::endl;
+  }
+  
   // Set the plot Style to ATLAS defaults:
   CommonFunc::SetAtlasStyle();
         
   // Arrays to store band information:
   double varValues_asym[100] = {0};
-  double CLObs_asym[100] = {0};
-  double CLExp_asym_p2[100] = {0};
-  double CLExp_asym_p1[100] = {0};
-  double CLExp_asym[100] = {0};
-  double CLExp_asym_n1[100] = {0};
-  double CLExp_asym_n2[100] = {0};
+  double CLObs_asym[100]     = {0};
+  double CLExp_asym_p2[100]  = {0};
+  double CLExp_asym_p1[100]  = {0};
+  double CLExp_asym[100]     = {0};
+  double CLExp_asym_n1[100]  = {0};
+  double CLExp_asym_n2[100]  = {0};
 
   double varValues_toy[100] = {0};  
-  double CLObs_toy[100] = {0};
-  double CLExp_toy_p2[100] = {0};  
-  double CLExp_toy_p1[100] = {0};
-  double CLExp_toy[100] = {0};
-  double CLExp_toy_n1[100] = {0};
-  double CLExp_toy_n2[100] = {0};
+  double CLObs_toy[100]     = {0};
+  double CLExp_toy_p2[100]  = {0};  
+  double CLExp_toy_p1[100]  = {0};
+  double CLExp_toy[100]     = {0};
+  double CLExp_toy_n1[100]  = {0};
+  double CLExp_toy_n2[100]  = {0};
     
   int n_asym = 0;
   int n_toy = 0;
@@ -76,7 +83,7 @@ int main(int argc, char **argv) {
   
   //----------------------------------------//
   // Open CL values from files (different file for each MX):
-  for (int mX = mXMin; mX <= mXMax; mX++) {
+  for (int mX = mXMin; mX <= mXMax; mX += mXStep) {
     
     // Open the saved CL values from asymptotics:
     if (options.Contains("asymptotic") || options.Contains("both")) {
@@ -86,12 +93,14 @@ int main(int argc, char **argv) {
       if (inputFile_asym.is_open()) {
 	TString inName = ""; double inValue = 0.0;
 	while (inputFile_asym >> inName >> inValue) {
+	  inValue = inValue / 1000.0;
+	  // WARNING! The + and - are deliberately swapped here!
 	  if (inName.EqualTo("observedCL")) CLObs_asym[n_asym] = inValue;
 	  if (inName.EqualTo("expectedCL")) CLExp_asym[n_asym] = inValue;
-	  if (inName.EqualTo("expectedCL_p2")) CLExp_asym_p2[n_asym] = inValue;
-	  if (inName.EqualTo("expectedCL_p1")) CLExp_asym_p1[n_asym] = inValue;
-	  if (inName.EqualTo("expectedCL_n1")) CLExp_asym_n1[n_asym] = inValue;
-	  if (inName.EqualTo("expectedCL_n2")) CLExp_asym_n2[n_asym] = inValue;
+	  if (inName.EqualTo("expectedCL_n2")) CLExp_asym_p2[n_asym] = inValue;
+	  if (inName.EqualTo("expectedCL_n1")) CLExp_asym_p1[n_asym] = inValue;
+	  if (inName.EqualTo("expectedCL_p1")) CLExp_asym_n1[n_asym] = inValue;
+	  if (inName.EqualTo("expectedCL_p2")) CLExp_asym_n2[n_asym] = inValue;
 	}
       }
       inputFile_asym.close();
@@ -107,12 +116,14 @@ int main(int argc, char **argv) {
       if (inputFile_toy.is_open()) {
 	TString inName = ""; double inValue = 0.0;
 	while (inputFile_toy >> inName >> inValue) {
-	  if (inName.EqualTo("observedCL")) CLObs_toy[n_asym] = inValue;
-	  if (inName.EqualTo("expectedCL")) CLExp_toy[n_asym] = inValue;
-	  if (inName.EqualTo("expectedCL_p2")) CLExp_toy_p2[n_asym] = inValue;
-	  if (inName.EqualTo("expectedCL_p1")) CLExp_toy_p1[n_asym] = inValue;
-	  if (inName.EqualTo("expectedCL_n1")) CLExp_toy_n1[n_asym] = inValue;
-	  if (inName.EqualTo("expectedCL_n2")) CLExp_toy_n2[n_asym] = inValue;
+	  inValue = inValue / 1000.0;
+	  // WARNING! The + and - are deliberately swapped here!
+	  if (inName.EqualTo("observedCL")) CLObs_toy[n_toy] = inValue;
+	  if (inName.EqualTo("expectedCL")) CLExp_toy[n_toy] = inValue;
+	  if (inName.EqualTo("expectedCL_n2")) CLExp_toy_p2[n_toy] = inValue;
+	  if (inName.EqualTo("expectedCL_n1")) CLExp_toy_p1[n_toy] = inValue;
+	  if (inName.EqualTo("expectedCL_p1")) CLExp_toy_n1[n_toy] = inValue;
+	  if (inName.EqualTo("expectedCL_p2")) CLExp_toy_n2[n_toy] = inValue;
 	}
       }
       inputFile_toy.close();
@@ -174,37 +185,37 @@ int main(int argc, char **argv) {
   // Toy graph formatting:
   gCLExp_toy->GetXaxis()->SetTitle("M_{X} [GeV]");
   gCLObs_toy->GetXaxis()->SetTitle("M_{X} [GeV]");
+  gCLExp_toy_2s->GetXaxis()->SetTitle("M_{X} [GeV]");
   gCLExp_toy->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
   gCLObs_toy->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
+  gCLExp_toy_2s->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
   gCLExp_toy->SetLineColor(kBlack);
   gCLObs_toy->SetLineColor(kBlack);
   gCLExp_toy->SetLineStyle(2);
   gCLObs_toy->SetLineStyle(1);
   gCLExp_toy->SetLineWidth(2);
   gCLObs_toy->SetLineWidth(2);
-  //gCLObs_toy->GetXaxis()->SetRangeUser(xsMin, xsMax);
-  gCLExp_toy->GetYaxis()->SetRangeUser(0.0, 1.0);
   gCLExp_toy_2s->SetFillColor(kYellow);
   gCLExp_toy_1s->SetFillColor(kGreen);
 
   // Asymptotic graph formatting:
   gCLExp_asym->GetXaxis()->SetTitle("M_{X} [GeV]");
   gCLObs_asym->GetXaxis()->SetTitle("M_{X} [GeV]");
+  gCLExp_asym_2s->GetXaxis()->SetTitle("M_{X} [GeV]");
   gCLExp_asym->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
   gCLObs_asym->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
+  gCLExp_asym_2s->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
   gCLExp_asym->SetLineColor(kBlack);
   gCLObs_asym->SetLineColor(kBlack);
   gCLExp_asym->SetLineStyle(2);
   gCLObs_asym->SetLineStyle(1);
   gCLExp_asym->SetLineWidth(2);
   gCLObs_asym->SetLineWidth(2);
-  //gCLObs_asym->GetXaxis()->SetRangeUser(xsMin, xsMax);
-  gCLExp_asym->GetYaxis()->SetRangeUser(0.0, 1.0);
   gCLExp_asym_2s->SetFillColor(kYellow);
   gCLExp_asym_1s->SetFillColor(kGreen);
   
   // Legend:
-  TLegend leg(0.53,0.70,0.88,0.88);
+  TLegend leg(0.60,0.73,0.88,0.91);
   leg.SetBorderSize(0);
   leg.SetFillColor(0);
   leg.SetTextSize(0.04);
@@ -215,22 +226,28 @@ int main(int argc, char **argv) {
   
   // Plotting options:
   if (options.Contains("toy")) {
-    gCLExp_toy->Draw("AL");
-    gCLExp_toy_2s->Draw("3same");
+    //gCLExp_toy->Draw("AL");
+    //gCLExp_toy_2s->Draw("3same");
+    gCLExp_toy_2s->Draw("A3");
+    gCLExp_toy->Draw("Lsame");
     gCLExp_toy_1s->Draw("3same");
     gCLExp_toy->Draw("LSAME");
     if (!config->getBool("DoBlind")) gCLObs_toy->Draw("LSAME");
   }
   else if (options.Contains("asymptotic")) {
-    gCLExp_asym->Draw("AL");
-    gCLExp_asym_2s->Draw("3same");
+    //gCLExp_asym->Draw("AL");
+    //gCLExp_asym_2s->Draw("3same");
+    gCLExp_asym_2s->Draw("A3");
+    gCLExp_asym->Draw("Lsame");
     gCLExp_asym_1s->Draw("3same");
     gCLExp_asym->Draw("LSAME");
     if (!config->getBool("DoBlind")) gCLObs_asym->Draw("LSAME");
   }
   else if (options.Contains("both")) {
-    gCLExp_toy->Draw("AL");
-    gCLExp_toy_2s->Draw("3same");
+    //gCLExp_toy->Draw("AL");
+    //gCLExp_toy_2s->Draw("3same");
+    gCLExp_toy_2s->Draw("A3");
+    gCLExp_toy->Draw("Lsame");
     gCLExp_toy_1s->Draw("3same");
     gCLExp_toy->Draw("LSAME");
     if (!config->getBool("DoBlind")) gCLObs_toy->Draw("LSAME");

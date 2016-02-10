@@ -820,7 +820,8 @@ void DHWorkspace::createNewWS() {
   dhts->saveSnapshots(true);
   dhts->setPlotDirectory(Form("%s/Plots/", m_outputDir.Data()));
   //dhts->setPlotAxis(true, 0.02, 100.0, 1.0);
-  dhts->setPlotAxis(true, m_config->getNum("FitPlotYMin"),
+  dhts->setPlotAxis(m_config->getBool("FitPlotLogScale"),
+		    m_config->getNum("FitPlotYMin"),
 		    m_config->getNum("FitPlotYMax"),
 		    m_config->getNum("FitPlotGeVPerBin"));
   

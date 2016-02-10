@@ -440,14 +440,14 @@ int main (int argc, char **argv) {
 	m_isFirstJob = false;
       }
     }
-    int nJobsSubmits = (nToyPoints * (int)(nToysTotal/nToysPerJob));
+    int nJobSubmits = (nToyPoints * (int)(nToysTotal/nToysPerJob));
     if ((m_config->getStr("AnalysisType")).EqualTo("Resonant")) {
-      nJobsSubmits = ((nToyPoints * (int)(nToysTotal/nToysPerJob)) * 
-		      (int)((m_config->getInt("MXScanMax") - 
-			     m_config->getInt("MXScanMin")) / 
-			    m_config->getInt("MXScanStep")));
+      nJobSubmits = ((nToyPoints * (int)(nToysTotal/nToysPerJob)) * 
+		     (int)((m_config->getInt("MXScanMax") - 
+			    m_config->getInt("MXScanMin")) / 
+			   m_config->getInt("MXScanStep")));
     }
-    std::cout << "DHMaster: Submitted " nJobSubmits << " total CL scan toys."
+    std::cout << "DHMaster: Submitted " << nJobSubmits << " total CL scan toys."
 	      << std::endl;
   }
   
@@ -474,15 +474,8 @@ int main (int argc, char **argv) {
   // Step 8.2: Create the CL scan plot:
   if (masterOption.Contains("PlotCLVsMX")) {
     std::cout << "DHMaster: Step 8.2 - Get Plot of CL vs. MX" << std::endl;
-    
-    if ((m_config->getStr("AnalysisType")).EqualTo("Resonant")) {
-      system(Form("./bin/DHPlotCLvsMX %s %s", fullConfigPath.Data(),
-		  (m_config->getStr("CLMXPlotOptions")).Data()));
-    }
-    else {
-      std::cout << "DHMaster: Cannot plot CL vs MX for nonresonant analysis!"
-		<< std::endl;
-    }
+    system(Form("./bin/DHPlotCLvsMX %s %s", fullConfigPath.Data(),
+		(m_config->getStr("CLMXPlotOptions")).Data()));
   }
   
   return 0;
