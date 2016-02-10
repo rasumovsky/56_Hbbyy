@@ -4,7 +4,7 @@
 //                                                                            //
 //  Creator: Andrew Hard                                                      //
 //  Email: ahard@cern.ch                                                      //
-//  Date: 09/02/2016                                                          //
+//  Date: 10/02/2016                                                          //
 //                                                                            //
 //  Plots the resonant analysis limits as a function of MX.                   //
 //                                                                            //
@@ -13,9 +13,6 @@
 #include "CommonFunc.h"
 #include "CommonHead.h"
 #include "Config.h"
-#include "DHTestStat.h"
-#include "DHToyAnalysis.h"
-
 
 /**
    -----------------------------------------------------------------------------
@@ -44,27 +41,14 @@ int main(int argc, char **argv) {
   TString outputDir = Form("%s/%s/DHPlotCLvsMX", 
 			   (config->getStr("MasterOutput")).Data(),
 			   (config->getStr("JobName")).Data());
+  TString inputDir = Form("%s/%s/DHCLScan", 
+			  (config->getStr("MasterOutput")).Data(),
+			  (config->getStr("JobName")).Data());
   system(Form("mkdir -vp %s", outputDir.Data()));
-  
-  // Define the input file, then make a local copy (for remote jobs):
-  TString originFile = Form("%s/%s/DHWorkspace/rootfiles/workspaceDH_%s.root",
-			    (config->getStr("MasterOutput")).Data(), 
-			    jobName.Data(), anaType.Data());
-  
-  // Create a nametag for results:
-  TString tag = (anaType.EqualTo("Resonant")) ? 
-    Form("ResonantMX%d", resonanceMass) : "NonResonant";
-  
+      
   // Set the plot Style to ATLAS defaults:
   CommonFunc::SetAtlasStyle();
-  
-  // Open the workspace:
-  TFile wsFile(originFile, "read");
-  RooWorkspace *workspace = (RooWorkspace*)wsFile.Get("combinedWS");
-  
-  // Instantiate the test statistic class for calculations and plots:
-  DHTestStat *dhts = new DHTestStat(configFile, "new", workspace);
-    
+        
   // Arrays to store band information:
   double varValues_asym[100] = {0};
   double CLObs_asym[100] = {0};
@@ -73,6 +57,7 @@ int main(int argc, char **argv) {
   double CLExp_asym[100] = {0};
   double CLExp_asym_n1[100] = {0};
   double CLExp_asym_n2[100] = {0};
+
   double varValues_toy[100] = {0};  
   double CLObs_toy[100] = {0};
   double CLExp_toy_p2[100] = {0};  
@@ -80,199 +65,66 @@ int main(int argc, char **argv) {
   double CLExp_toy[100] = {0};
   double CLExp_toy_n1[100] = {0};
   double CLExp_toy_n2[100] = {0};
-  
-  double qMuObs_toy[100] = {0.0};
-  double qMuExp_toy[100] = {0.0};
-  
+    
   int n_asym = 0;
   int n_toy = 0;
   
   // Scan information:
-  double xsMin = config->getNum("CLScanMin");
-  double xsMax = config->getNum("CLScanMax");
-  double step = config->getNum("CLScanStep");
+  int mXMin = config->getInt("MXScanMin");
+  int mXMax = config->getInt("MXScanMax");
+  int mXStep = config->getInt("MXScanStep");
   
   //----------------------------------------//
-  // Open CL values from file:
-  if (options.Contains("FromFile")) {
+  // Open CL values from files (different file for each MX):
+  for (int mX = mXMin; mX <= mXMax; mX++) {
     
     // Open the saved CL values from asymptotics:
     if (options.Contains("asymptotic") || options.Contains("both")) {
-      ifstream inputFile_asym(Form("%s/scan_CLvalues_asym_%s.txt",
-				   outputDir.Data(), tag.Data()));
+      
+      ifstream inputFile_asym(Form("%s/limits_asymptotic_ResonantMX%d.txt",
+				   inputDir.Data(), mX));
       if (inputFile_asym.is_open()) {
-	while (!inputFile_asym.eof()) {
-	  inputFile_asym >> varValues_asym[n_asym] >> CLObs_asym[n_asym] 
-			 >> CLExp_asym[n_asym] >> CLExp_asym_p2[n_asym] 
-			 >> CLExp_asym_p1[n_asym] >> CLExp_asym_n1[n_asym] 
-			 >> CLExp_asym_n2[n_asym];
-	  n_asym++;
+	TString inName = ""; double inValue = 0.0;
+	while (inputFile_asym >> inName >> inValue) {
+	  if (inName.EqualTo("observedCL")) CLObs_asym[n_asym] = inValue;
+	  if (inName.EqualTo("expectedCL")) CLExp_asym[n_asym] = inValue;
+	  if (inName.EqualTo("expectedCL_p2")) CLExp_asym_p2[n_asym] = inValue;
+	  if (inName.EqualTo("expectedCL_p1")) CLExp_asym_p1[n_asym] = inValue;
+	  if (inName.EqualTo("expectedCL_n1")) CLExp_asym_n1[n_asym] = inValue;
+	  if (inName.EqualTo("expectedCL_n2")) CLExp_asym_n2[n_asym] = inValue;
 	}
       }
       inputFile_asym.close();
+      varValues_asym[n_asym] = mX;
+      n_asym++;
     }
     
     // Open the saved CL values from toys:
     if (options.Contains("toy") || options.Contains("both")) {
-      ifstream inputFile_toy(Form("%s/scan_CLvalues_toy_%s.txt",
-				  outputDir.Data(), tag.Data()));
+      
+      ifstream inputFile_toy(Form("%s/limits_toy_ResonantMX%d.txt",
+				  inputDir.Data(), mX));
       if (inputFile_toy.is_open()) {
-	while (!inputFile_toy.eof()) {
-	  inputFile_toy >> varValues_toy[n_toy] >> CLObs_toy[n_toy] 
-			>> CLExp_toy[n_toy] >> CLExp_toy_p2[n_toy] 
-			>> CLExp_toy_p1[n_toy] >> CLExp_toy_n1[n_toy] 
-			>> CLExp_toy_n2[n_toy];
-	  n_toy++;
+	TString inName = ""; double inValue = 0.0;
+	while (inputFile_toy >> inName >> inValue) {
+	  if (inName.EqualTo("observedCL")) CLObs_toy[n_asym] = inValue;
+	  if (inName.EqualTo("expectedCL")) CLExp_toy[n_asym] = inValue;
+	  if (inName.EqualTo("expectedCL_p2")) CLExp_toy_p2[n_asym] = inValue;
+	  if (inName.EqualTo("expectedCL_p1")) CLExp_toy_p1[n_asym] = inValue;
+	  if (inName.EqualTo("expectedCL_n1")) CLExp_toy_n1[n_asym] = inValue;
+	  if (inName.EqualTo("expectedCL_n2")) CLExp_toy_n2[n_asym] = inValue;
 	}
       }
       inputFile_toy.close();
+      varValues_toy[n_toy] = mX;
+      n_toy++;
     }
-  }
-  
-  //----------------------------------------//
-  // Calculate CL values from scratch and save them:
-  else {
-    // Save values for plotting again!
-    ofstream outFile_asym;
-    ofstream outFile_toy;
-    if (options.Contains("asymptotic") || options.Contains("both")) {
-      outFile_asym.open(Form("%s/scan_CLvalues_asym_%s.txt", 
-			     outputDir.Data(), tag.Data()));
-    }
-    if (options.Contains("toy") || options.Contains("both")) {
-      outFile_toy.open(Form("%s/scan_CLvalues_toy_%s.txt",
-			    outputDir.Data(), tag.Data()));
-    }
-    
-    // Loop over cross-section:
-    for (double crossSection = xsMin; crossSection < xsMax;
-	 crossSection += step) {
-      std::cout << "DHPlotCLvsMX: cross-section = " << crossSection << std::endl;
-      
-      // Set the value of the variable to scan:
-      dhts->setParam(config->getStr("CLScanVar"), crossSection, true);
-      
-      // If doing the resonant analysis, also set the res mass value:
-      if (anaType.EqualTo("Resonant")) {
-	dhts->setParam(config->getStr("CLScanMassVar"), resonanceMass, true);
-      }
-      
-      // Asymptotic calculation of CL:
-      if (options.Contains("asymptotic") || options.Contains("both")) {
-	std::cout << "DHPlotCLvsMX: calculating asymptotic CL" << std::endl;
-	
-	// Calculate the 95% CL value:
-	dhts->calculateNewCL();
-	
-	// Check that the fit converges:
-	if (dhts->fitsAllConverged()) {
-	  varValues_asym[n_asym] = crossSection;
-	  CLObs_asym[n_asym] = dhts->accessValue("CL", true, 0);
-	  CLExp_asym[n_asym] = dhts->accessValue("CL", false, 0);
-	  CLExp_asym_p2[n_asym] = dhts->accessValue("CL", false, 2);
-	  CLExp_asym_p1[n_asym] = dhts->accessValue("CL", false, 1);
-	  CLExp_asym_n1[n_asym] = dhts->accessValue("CL", false, -1);
-	  CLExp_asym_n2[n_asym] = dhts->accessValue("CL", false, -2);
-	  
-	  // Write CL values to file:
-	  outFile_asym << varValues_asym[n_asym] << " " 
-		       << CLObs_asym[n_asym] << " " 
-		       << CLExp_asym[n_asym] << " " 
-		       << CLExp_asym_p2[n_asym] << " " 
-		       << CLExp_asym_p1[n_asym] << " " 
-		       << CLExp_asym_n1[n_asym] << " " 
-		       << CLExp_asym_n2[n_asym] << std::endl;
-	}
-	n_asym++;
-	dhts->clearData();
-      }
-      
-      // Pseudo-experiment calculation of CL:
-      if (options.Contains("toy") || options.Contains("both")) {
-	std::cout << "DHPlotCLvsMX: calculating toy CL" << std::endl;
-	
-	// Calculate the observed qMu values:
-	double obsPoI = 0.0;
-	double nllObsMu1
-	  = dhts->getFitNLL("obsData", 1, true, obsPoI, false);
-	double nllObsMuFree
-	  = dhts->getFitNLL("obsData", 1, false, obsPoI, false);
-	qMuObs_toy[n_toy]
-	  = dhts->getQMuFromNLL(nllObsMu1, nllObsMuFree, obsPoI, 1);
-	
-	// Calculate the expected qMu values (see DHTestStat m_dataForExpQMu):
-	double expPoI = 0.0;
-	double nllExpMu1
-	  = dhts->getFitNLL("asimovDataMu0", 1, true, expPoI, false);
-	double nllExpMuFree
-	  = dhts->getFitNLL("asimovDataMu0", 1, false, expPoI, false);
-	qMuExp_toy[n_toy]
-	  = dhts->getQMuFromNLL(nllExpMu1, nllExpMuFree, expPoI, 1);
-	
-	std::cout << "nllObsMu1=" << nllObsMu1 
-		  << ", nllObsMuFree=" << nllObsMuFree
-		  << ", qMuObs=" << qMuObs_toy[n_toy] << std::endl;
-	
-	std::cout << "nllExpMu1=" << nllExpMu1
-		  << ", nllExpMuFree=" << nllExpMuFree
-		  << ", qMuExp=" << qMuExp_toy[n_toy] << std::endl;
-	
-	varValues_toy[n_toy] = crossSection;
-	n_toy++;
-      }
-    }
-    delete dhts;
-
-    
-    // Then specify file in DHToyAnalysis to load:
-    if (options.Contains("toy") || options.Contains("both")) {
-      for (int i_t = 0; i_t < n_toy; i_t++) {
-	
-	// Load the tool to analyze toys.
-	// NOTE: this was moved outside the loop above because of interference
-	// between the DHToyAnalysis class and DHTestStat, which is called
-	// in DHToyAnalysis...
-	TString toyScanOption = Form("CLScan%d",i_t);
-	if (i_t == 5) toyScanOption.Append("_ForcePlot");
-	DHToyAnalysis *dhta
-	  = new DHToyAnalysis(configFile, toyScanOption, resonanceMass);
-	if (!(dhta->areInputFilesOK())) {
-	  std::cout << "DHPlotCLvsMX: ERROR with toy scan option " << toyScanOption
-		    << std::endl;
-	  continue;
-	}
-	
-	CLObs_toy[i_t] = dhta->calculateCLFromToy(qMuObs_toy[i_t], 0);
-	CLExp_toy[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], 0);
-	CLExp_toy_p2[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], 2);
-	CLExp_toy_p1[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], 1);
-	CLExp_toy_n1[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], -1);
-	CLExp_toy_n2[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], -2);
-
-	// Write CL values to file:
-	outFile_toy << varValues_toy[i_t] << " " 
-		    << CLObs_toy[i_t] << " " 
-		    << CLExp_toy[i_t] << " "
-		    << CLExp_toy_p2[i_t] << " " 
-		    << CLExp_toy_p1[i_t] << " " 
-		    << CLExp_toy_n1[i_t] << " " 
-		    << CLExp_toy_n2[i_t] << std::endl;
-	
-	delete dhta;
-      }
-    }
-    
-    // Close the files that save CL data:
-    outFile_asym.close();
-    outFile_toy.close();
   }
   
   //----------------------------------------//
   // Plot the results:
   
-  //n_asym--;
-  //n_toy--;
-  
+  // Calculate errors for plot:
   double errExp_asym_p2[100] = {0};
   double errExp_asym_p1[100] = {0};
   double errExp_asym_n1[100] = {0};
@@ -320,10 +172,10 @@ int main(int argc, char **argv) {
   can->cd();
   
   // Toy graph formatting:
-  gCLExp_toy->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
-  gCLObs_toy->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
-  gCLExp_toy->GetYaxis()->SetTitle("CL");
-  gCLObs_toy->GetYaxis()->SetTitle("CL");
+  gCLExp_toy->GetXaxis()->SetTitle("M_{X} [GeV]");
+  gCLObs_toy->GetXaxis()->SetTitle("M_{X} [GeV]");
+  gCLExp_toy->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
+  gCLObs_toy->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
   gCLExp_toy->SetLineColor(kBlack);
   gCLObs_toy->SetLineColor(kBlack);
   gCLExp_toy->SetLineStyle(2);
@@ -336,10 +188,10 @@ int main(int argc, char **argv) {
   gCLExp_toy_1s->SetFillColor(kGreen);
 
   // Asymptotic graph formatting:
-  gCLExp_asym->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
-  gCLObs_asym->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
-  gCLExp_asym->GetYaxis()->SetTitle("CL");
-  gCLObs_asym->GetYaxis()->SetTitle("CL");
+  gCLExp_asym->GetXaxis()->SetTitle("M_{X} [GeV]");
+  gCLObs_asym->GetXaxis()->SetTitle("M_{X} [GeV]");
+  gCLExp_asym->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
+  gCLObs_asym->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
   gCLExp_asym->SetLineColor(kBlack);
   gCLObs_asym->SetLineColor(kBlack);
   gCLExp_asym->SetLineStyle(2);
@@ -352,7 +204,7 @@ int main(int argc, char **argv) {
   gCLExp_asym_1s->SetFillColor(kGreen);
   
   // Legend:
-  TLegend leg(0.53,0.19,0.88,0.37);
+  TLegend leg(0.53,0.70,0.88,0.88);
   leg.SetBorderSize(0);
   leg.SetFillColor(0);
   leg.SetTextSize(0.04);
@@ -397,37 +249,18 @@ int main(int argc, char **argv) {
   }
   gPad->RedrawAxis();
   leg.Draw("SAME");
-  
-  // 95% CL Line
-  TLine *line = new TLine();
-  line->SetLineStyle(1);
-  line->SetLineWidth(2);
-  line->SetLineColor(kRed);
-  if (options.Contains("toy") || options.Contains("both")) {
-    line->DrawLine(gCLExp_toy->GetXaxis()->GetXmin(), 0.95,
-		   gCLExp_toy->GetXaxis()->GetXmax(), 0.95);
-  }
-  else {
-    line->DrawLine(gCLExp_asym->GetXaxis()->GetXmin(), 0.95,
-		   gCLExp_asym->GetXaxis()->GetXmax(), 0.95);
-  }
-  
+    
   // Print the canvas:
   if (options.Contains("asymptotic")) {
-    can->Print(Form("%s/scan95CL_asymptotic_%s.eps",
-		    outputDir.Data(), tag.Data()));
+    can->Print(Form("%s/limits_asymptotic.eps", outputDir.Data()));
   }
   else if (options.Contains("toy")) {
-    can->Print(Form("%s/scan95CL_toy_%s.eps",outputDir.Data(), tag.Data()));
+    can->Print(Form("%s/limits_toy.eps", outputDir.Data()));
   }
-  else {
-    can->Print(Form("%s/scan95CL_comparison_%s.eps",
-		    outputDir.Data(), tag.Data()));
-  }
+  else can->Print(Form("%s/limits_comparison.eps", outputDir.Data()));
   
   // Delete pointers, close files, return:
   std::cout << "DHPlotCLvsMX: Finished!" << std::endl;
-  delete line;
   delete can;
   delete gCLObs_asym;
   delete gCLExp_asym;
@@ -437,8 +270,6 @@ int main(int argc, char **argv) {
   delete gCLExp_asym_1s;
   delete gCLExp_toy_2s;
   delete gCLExp_toy_1s;
-  delete workspace;
   delete config;
-  wsFile.Close();
   return 0;
 }
