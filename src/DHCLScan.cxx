@@ -402,7 +402,7 @@ int main(int argc, char **argv) {
   gCLExp_asym_1s->SetFillColor(kGreen);
   
   // Legend:
-  TLegend leg(0.53,0.19,0.88,0.37);
+  TLegend leg(0.65,0.19,0.9,0.37);
   leg.SetBorderSize(0);
   leg.SetFillColor(0);
   leg.SetTextSize(0.04);

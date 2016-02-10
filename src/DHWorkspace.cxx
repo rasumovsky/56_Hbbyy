@@ -198,8 +198,7 @@ void DHWorkspace::addCategory() {
     printer(Form("DHWorkspace: Loading data points from file %s",
 		 textFileName.Data()), false);
     double currMass; double currWeight;
-    while (!massInput.eof()) {
-      massInput >> currMass >> currWeight;
+    while (massInput >> currMass >> currWeight) {
       m_ws->var(observableName)->setVal(currMass);
       m_ws->var("wt")->setVal(currWeight);
       obsData->add(RooArgSet(*m_ws->var(observableName),*m_ws->var("wt")),

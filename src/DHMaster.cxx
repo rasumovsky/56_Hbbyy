@@ -430,7 +430,7 @@ int main (int argc, char **argv) {
 	if ((m_config->getStr("AnalysisType")).EqualTo("Resonant")) {
 	  for (int resMass = m_config->getInt("MXScanMin");
 	       resMass <= m_config->getInt("MXScanMax");
-	       resMass +=m_config->getInt("MXScanStep")) { 
+	       resMass += m_config->getInt("MXScanStep")) { 
 	    submitPEViaBsub(fullConfigPath,currOptions,i_s,nToysPerJob,resMass);
 	  }
 	}
@@ -440,9 +440,15 @@ int main (int argc, char **argv) {
 	m_isFirstJob = false;
       }
     }
-    std::cout << "DHMaster: Submitted " 
-	      << (nToyPoints * (int)(nToysTotal/nToysPerJob))
-	      << " total pseudo-experiments for CL scan." << std::endl;
+    int nJobsSubmits = (nToyPoints * (int)(nToysTotal/nToysPerJob));
+    if ((m_config->getStr("AnalysisType")).EqualTo("Resonant")) {
+      nJobsSubmits = ((nToyPoints * (int)(nToysTotal/nToysPerJob)) * 
+		      (int)((m_config->getInt("MXScanMax") - 
+			     m_config->getInt("MXScanMin")) / 
+			    m_config->getInt("MXScanStep")));
+    }
+    std::cout << "DHMaster: Submitted " nJobSubmits << " total CL scan toys."
+	      << std::endl;
   }
   
   //--------------------------------------//
