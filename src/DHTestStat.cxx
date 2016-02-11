@@ -35,7 +35,7 @@ DHTestStat::DHTestStat(TString newConfigFile, TString newOptions,
   m_config = new Config(newConfigFile);
   m_jobName = m_config->getStr("JobName");
   m_anaType = m_config->getStr("AnalysisType");
-      
+  
   // Use Asimov data if the analysis is blind.
   m_dataForExpQ0 = "asimovDataMu1";
   m_dataForExpQMu = "asimovDataMu0";
@@ -515,6 +515,69 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   //printSet("nuisanceParameters", nuisanceParameters);
   //printSet("globalObservables", globalObservables);
   
+  
+  /*
+  if ((m_config->getStr("AnalysisType")).EqualTo("NonResonant")) {
+    double n_AllProcesses_bb
+      = m_workspace->function("n_AllProcesses_bb")->getVal();
+    double n_BkgNonHiggs_bb
+      = m_workspace->function("n_BkgNonHiggs_bb")->getVal();
+    double n_SigSM_bb = (m_workspace->function("n_SigSMggH_bb")->getVal() + 
+			 m_workspace->function("n_SigSMVBF_bb")->getVal() +
+			 m_workspace->function("n_SigSMWH_bb")->getVal() +
+			 m_workspace->function("n_SigSMZH_bb")->getVal() +
+			 m_workspace->function("n_SigSMttH_bb")->getVal() +
+			 m_workspace->function("n_SigSMbbH_bb")->getVal());
+    
+    double n_SigBSM2H_bb = m_workspace->function("n_SigBSM2H_bb")->getVal();
+    std::cout << "\nPrinting bb values for comparison" << std::endl;
+    std::cout << "\tAllProcesses_bb = " << n_AllProcesses_bb << std::endl;
+    std::cout << "\tBkgContinuum_bb  = " << n_BkgNonHiggs_bb << std::endl;
+    std::cout << "\tSigSM_bb        = " << n_SigSM_bb << std::endl;
+    std::cout << "\tSigBSM2H_bb     = " << n_SigBSM2H_bb << std::endl;
+    
+    double n_AllProcesses_jj
+      = m_workspace->function("n_AllProcesses_jj")->getVal();
+    double n_BkgNonHiggs_jj
+      = m_workspace->function("n_BkgNonHiggs_jj")->getVal();
+    double n_SigSM_jj = (m_workspace->function("n_SigSMggH_jj")->getVal() + 
+			 m_workspace->function("n_SigSMVBF_jj")->getVal() +
+			 m_workspace->function("n_SigSMWH_jj")->getVal() +
+			 m_workspace->function("n_SigSMZH_jj")->getVal() +
+			 m_workspace->function("n_SigSMttH_jj")->getVal() +
+			 m_workspace->function("n_SigSMbbH_jj")->getVal());
+    
+    std::cout << "\nPrinting jj values for comparison" << std::endl;
+    std::cout << "\tAllProcesses_jj = " << n_AllProcesses_jj << std::endl;
+    std::cout << "\tBkgContinuum_jj  = " << n_BkgNonHiggs_jj << std::endl;
+    std::cout << "\tSigSM_jj        = " << n_SigSM_jj << std::endl;
+    std::cout << "\n" << std::endl;
+  }
+  else {
+    double n_AllProcesses_bb
+      = m_workspace->function("n_AllProcesses_bb")->getVal();
+    double n_BkgNonHiggs_bb
+      = m_workspace->function("n_BkgNonHiggs_bb")->getVal();
+    double n_SigSM_bb = (m_workspace->function("n_SigSMggH_bb")->getVal() + 
+			 m_workspace->function("n_SigSMVBF_bb")->getVal() +
+			 m_workspace->function("n_SigSMWH_bb")->getVal() +
+			 m_workspace->function("n_SigSMZH_bb")->getVal() +
+			 m_workspace->function("n_SigSMttH_bb")->getVal() +
+			 m_workspace->function("n_SigSMbbH_bb")->getVal() +
+			 m_workspace->function("n_SigSMhh_bb")->getVal());
+    
+    double n_SigBSM2H_bb = m_workspace->function("n_SigBSM2H_bb")->getVal();
+    std::cout << "\nPrinting bb values for comparison" << std::endl;
+    std::cout << "\tAllProcesses_bb = " << n_AllProcesses_bb << std::endl;
+    std::cout << "\tBkgContinuum_bb  = " << n_BkgNonHiggs_bb << std::endl;
+    std::cout << "\tSigSM_bb        = " << n_SigSM_bb << std::endl;
+    std::cout << "\tSigBSM2H_bb     = " << n_SigBSM2H_bb << std::endl;
+    std::cout << "\n" << std::endl;
+  }
+  */
+
+
+
   // Save a snapshot if requested:
   if (m_doSaveSnapshot) {
     TString textValPoI = fixPoI ? (Form("%d",(int)valPoI)) : "Free";
