@@ -202,7 +202,7 @@ int main(int argc, char **argv) {
       
       // If doing the resonant analysis, also set the res mass value:
       if (anaType.EqualTo("Resonant")) {
-	dhts->setParam(config->getStr("CLScanMassVar"), resonanceMass, true);
+	dhts->setParam("mResonance", resonanceMass, true);
       }
       
       // Asymptotic calculation of CL:

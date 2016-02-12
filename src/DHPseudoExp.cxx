@@ -186,6 +186,11 @@ int main(int argc, char **argv) {
       dhts->setParam(config->getStr("CLScanVar"), crossSection, true);
     }
     
+    // Be sure to set the value of the resonance mass for fitting!
+    if ((config->getStr("AnalysisType")).EqualTo("Resonant")) {
+      dhts->setParam("mResonance", resonanceMass, true);
+    }
+  
     RooDataSet *newToyData
       = dhts->createPseudoData(seed, inputPoIVal, options.Contains("FixMu"));
     numEvents = workspace->data("toyData")->sumEntries();

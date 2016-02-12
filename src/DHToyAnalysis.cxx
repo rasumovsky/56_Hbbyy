@@ -128,6 +128,11 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString options,
   m_dhts = new DHTestStat(newConfigFile, "new", m_workspace);
   if (!m_workspace) m_filesLoaded = false;
   
+  // Be sure to set the value of the resonance mass for fitting!
+  if ((m_config->getStr("AnalysisType")).EqualTo("Resonant")) {
+    m_dhts->setParam("mResonance", resonanceMass, true);
+  }
+  
   // Store the toy data:
   fillToyHistograms(0, treeMu0);
   fillToyHistograms(1, treeMu1);
