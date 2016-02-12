@@ -489,12 +489,13 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   firstPoI->setConstant(fixPoI);
   
   // NEW! If background-only fit, set spurious signal constant:
-  if (fixPoI && ((int)valPoI) == 0) {
+  //if (!fixPoI || (fixPoI && ((int)valPoI) == 0)) {
+  
+  if (m_config->getBool("UseSystematics") && fixPoI && ((int)valPoI) == 0) {
     
     m_workspace->var("MyyMODELING")->setVal(0);
     m_workspace->var("MyyMODELING")->setConstant(true);
   }
-
   
   // Check if other parameter settings have been specified for fit:
   for (std::map<TString,double>::iterator iterParam = m_paramValToSet.begin();
@@ -526,6 +527,7 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   
   /*
   if ((m_config->getStr("AnalysisType")).EqualTo("NonResonant")) {
+    
     double n_AllProcesses_bb
       = m_workspace->function("n_AllProcesses_bb")->getVal();
     double n_BkgNonHiggs_bb
@@ -536,13 +538,17 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
 			 m_workspace->function("n_SigSMZH_bb")->getVal() +
 			 m_workspace->function("n_SigSMttH_bb")->getVal() +
 			 m_workspace->function("n_SigSMbbH_bb")->getVal());
-    
     double n_SigBSM2H_bb = m_workspace->function("n_SigBSM2H_bb")->getVal();
+    double n_bias_bb = 0.0;
+    if (m_config->getBool("UseSystematics")) {
+      n_bias_bb = m_workspace->function("n_Bias_bb")->getVal();
+    }
     std::cout << "\nPrinting bb values for comparison" << std::endl;
     std::cout << "\tAllProcesses_bb = " << n_AllProcesses_bb << std::endl;
-    std::cout << "\tBkgContinuum_bb  = " << n_BkgNonHiggs_bb << std::endl;
+    std::cout << "\tBkgContinuum_bb = " << n_BkgNonHiggs_bb << std::endl;
     std::cout << "\tSigSM_bb        = " << n_SigSM_bb << std::endl;
     std::cout << "\tSigBSM2H_bb     = " << n_SigBSM2H_bb << std::endl;
+    std::cout << "\tBias_bb         = " << n_bias_bb << std::endl;
     
     double n_AllProcesses_jj
       = m_workspace->function("n_AllProcesses_jj")->getVal();
@@ -554,11 +560,15 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
 			 m_workspace->function("n_SigSMZH_jj")->getVal() +
 			 m_workspace->function("n_SigSMttH_jj")->getVal() +
 			 m_workspace->function("n_SigSMbbH_jj")->getVal());
-    
+    double n_bias_jj = 0.0;
+    if (m_config->getBool("UseSystematics")) {
+      n_bias_jj = m_workspace->function("n_Bias_jj")->getVal();
+    }
     std::cout << "\nPrinting jj values for comparison" << std::endl;
     std::cout << "\tAllProcesses_jj = " << n_AllProcesses_jj << std::endl;
-    std::cout << "\tBkgContinuum_jj  = " << n_BkgNonHiggs_jj << std::endl;
+    std::cout << "\tBkgContinuum_jj = " << n_BkgNonHiggs_jj << std::endl;
     std::cout << "\tSigSM_jj        = " << n_SigSM_jj << std::endl;
+    std::cout << "\tBias_jj         = " << n_bias_jj << std::endl;
     std::cout << "\n" << std::endl;
   }
   else {
@@ -582,10 +592,21 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
     std::cout << "\tSigBSM2H_bb     = " << n_SigBSM2H_bb << std::endl;
     std::cout << "\n" << std::endl;
   }
+  
+
+  m_workspace->var("RNDM_MyyMODELING")->setVal(0);
+  m_workspace->var("MyyMODELING")->setVal(0);
+  std::cout << "CENTRAL BGM= " << varNLL->getVal() << std::endl;
+  m_workspace->var("MyyMODELING")->setVal(1);
+  std::cout << "PULLED BGM= " << varNLL->getVal() << std::endl;
+  
+  m_workspace->var("LUMI")->setVal(0);
+  m_workspace->var("RNDM_LUMI")->setVal(0);
+  std::cout << "CENTRAL LUMI= " << varNLL->getVal() << std::endl;
+  m_workspace->var("LUMI")->setVal(1);
+  std::cout << "PULLED LUMI= " << varNLL->getVal() << std::endl;
   */
-
-
-
+  
   // Save a snapshot if requested:
   if (m_doSaveSnapshot) {
     TString textValPoI = fixPoI ? (Form("%d",(int)valPoI)) : "Free";
