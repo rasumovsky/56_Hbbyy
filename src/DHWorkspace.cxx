@@ -761,15 +761,6 @@ void DHWorkspace::createNewWS() {
   m_modelConfig->SetGlobalObservables((*m_ws->set("globalObservables")));
   m_ws->import(*m_modelConfig);
   
-  /*
-  m_ws->var("mu_SigBSM2H")->setVal(1.0);
-  std::cout << "SignalNorm = " << m_ws->function("n_SigBSM2H_bb")->getVal() << std::endl;
-  exit(0);
-  */
-
-
-
-
   //----------------------------------------//
   // Create Asimov data:
   printer("DHWorkspace: Perform b-only fit before Asimov creation", false);
@@ -828,7 +819,6 @@ void DHWorkspace::createNewWS() {
   DHTestStat *dhts = new DHTestStat(m_configFile, "new", m_ws);
   dhts->saveSnapshots(true);
   dhts->setPlotDirectory(Form("%s/Plots/", m_outputDir.Data()));
-  //dhts->setPlotAxis(true, 0.02, 100.0, 1.0);
   dhts->setPlotAxis(m_config->getBool("FitPlotLogScale"),
 		    m_config->getNum("FitPlotYMin"),
 		    m_config->getNum("FitPlotYMax"),

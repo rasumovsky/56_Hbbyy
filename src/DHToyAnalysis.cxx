@@ -22,7 +22,8 @@
    @param options - Options for the toy analysis: ForcePlot, CLScan
    @param resonanceMass - The resonance mass (resonant analysis only).
 */
-DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString options, int resonanceMass) {
+DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString options, 
+			     int resonanceMass) {
   
   // Load the config file:
   m_config = new Config(newConfigFile);
@@ -185,7 +186,6 @@ bool DHToyAnalysis::areInputFilesOK() {
    @return - The value of qMu.
 */
 double DHToyAnalysis::calculateBkgQMuForN(double N) {
-  
   // First get the probability corresponding to the Gaussian N:
   double probability = getPbFromN(N);
   
@@ -194,8 +194,10 @@ double DHToyAnalysis::calculateBkgQMuForN(double N) {
   int totalEvents = (int)m_valuesQMu_Mu0.size();
   for (int i_e = 0; i_e < totalEvents; i_e++) {
     double fraction = (((double)i_e) / ((double)totalEvents));
-    if (fraction > probability) return m_valuesQMu_Mu0[i_e];
+    if (fraction >= probability) return m_valuesQMu_Mu0[i_e];
   }
+  
+  printer("DHToyAnalysis::ERROR in QMu bkg calculation", true);
 }
 
 /**
@@ -209,6 +211,8 @@ double DHToyAnalysis::calculateCLsFromToy(double qMu) {
   //double pB = getPbFromN(N);
   double pB = calculatePBFromToy(qMu);
   double CLs = pMu / (1.0 - pB);
+  printer(Form("DHToyAnalysis::calculateCLsFromToy(%f) = (%f / (1.0 - %f))",
+	       qMu, pMu, pB), false);
   return CLs;
 }
 

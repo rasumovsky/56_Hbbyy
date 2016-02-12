@@ -489,10 +489,7 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   firstPoI->setConstant(fixPoI);
   
   // NEW! If background-only fit, set spurious signal constant:
-  //if (!fixPoI || (fixPoI && ((int)valPoI) == 0)) {
-  
   if (m_config->getBool("UseSystematics") && fixPoI && ((int)valPoI) == 0) {
-    
     m_workspace->var("MyyMODELING")->setVal(0);
     m_workspace->var("MyyMODELING")->setConstant(true);
   }
