@@ -68,6 +68,7 @@ DHToyAnalysis::DHToyAnalysis(TString newConfigFile, TString options, int resonan
   m_binMin = 0;
   m_binMax = 20;
   
+  m_valuesQMu_Mu0.clear();
   m_valuesQMu_Mu1.clear();
   
   // Set the fit types:
@@ -178,14 +179,35 @@ bool DHToyAnalysis::areInputFilesOK() {
 
 /**
    -----------------------------------------------------------------------------
+   Calculate the qMu corresponding to the median or +/-1,2 sigma values in
+   S+B fits to background only toys.
+   @param N - The sigma value (-2,-1,0,1,2). Use 0 for median.
+   @return - The value of qMu.
+*/
+double DHToyAnalysis::calculateBkgQMuForN(double N) {
+  
+  // First get the probability corresponding to the Gaussian N:
+  double probability = getPbFromN(N);
+  
+  // Then find first q_mu value above this probability:
+  std::sort(m_valuesQMu_Mu0.begin(), m_valuesQMu_Mu0.end());
+  int totalEvents = (int)m_valuesQMu_Mu0.size();
+  for (int i_e = 0; i_e < totalEvents; i_e++) {
+    double fraction = (((double)i_e) / ((double)totalEvents));
+    if (fraction > probability) return m_valuesQMu_Mu0[i_e];
+  }
+}
+
+/**
+   -----------------------------------------------------------------------------
    Calculate the CLs limit from toys (bands with N=-2,-1,0,+1,+2)
    @param qMu - The value of the test statistic.
-   @param N - The sigma value (-2,-1,0,1,2). Use 0 for median.
    @return - The CLs value.
 */
-double DHToyAnalysis::calculateCLsFromToy(double qMu, double N) {
+double DHToyAnalysis::calculateCLsFromToy(double qMu) {
   double pMu = calculatePMuFromToy(qMu);
-  double pB = getPbFromN(N);
+  //double pB = getPbFromN(N);
+  double pB = calculatePBFromToy(qMu);
   double CLs = pMu / (1.0 - pB);
   return CLs;
 }
@@ -194,11 +216,28 @@ double DHToyAnalysis::calculateCLsFromToy(double qMu, double N) {
    -----------------------------------------------------------------------------
    Calculate the CL from the toys.
    @param qMu - The value of the test statistic.
-   @param N - The sigma value (-2,-1,0,1,2). Use 0 for median.
    @return - The CL value.
 */
-double DHToyAnalysis::calculateCLFromToy(double qMu, double N) {
-  return (1.0 - calculateCLsFromToy(qMu, N));
+double DHToyAnalysis::calculateCLFromToy(double qMu) {
+  return (1.0 - calculateCLsFromToy(qMu));
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Calculate the fractional number of toys in the mu=0 toy dataset that give a
+   value of QMu less than than that observed QMu in data.
+   @param qMu - The value of the test statistic.
+   @return - The value of pB.
+*/
+double DHToyAnalysis::calculatePBFromToy(double qMu) {
+  int totalEvents = (int)m_valuesQMu_Mu0.size();
+  int passingEvents = 0;
+  for (int i_e = 0; i_e < totalEvents; i_e++) {
+    if (m_valuesQMu_Mu0[i_e] <= qMu) passingEvents++;
+  }
+  double probability = (totalEvents > 0) ?
+    (((double)passingEvents) / ((double)totalEvents)) : 0.0;
+  return probability;
 }
 
 /**
@@ -254,6 +293,7 @@ void DHToyAnalysis::fillToyHistograms(int muValue, DHToyTree *toyTree) {
   
   // Clear the qMu storage for pMu calculation if looking at Mu1 toy:
   if (muValue > 0) m_valuesQMu_Mu1.clear();
+  else  m_valuesQMu_Mu0.clear();
   
   // Get names of NP (and Globs):
   RooArgSet *setNuis = (RooArgSet*)m_workspace->set("nuisanceParameters");
@@ -314,6 +354,7 @@ void DHToyAnalysis::fillToyHistograms(int muValue, DHToyTree *toyTree) {
     
     // Also fill the QMu vector for pMu calculation:
     if (muValue > 0) m_valuesQMu_Mu1.push_back(valueQMu);
+    else m_valuesQMu_Mu0.push_back(valueQMu);
     
     // Loop over the nuis:
     for (int i_n = 0; i_n < (int)((*toyTree->namesNP).size()); i_n++) {

@@ -488,6 +488,14 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   firstPoI->setVal(valPoI);
   firstPoI->setConstant(fixPoI);
   
+  // NEW! If background-only fit, set spurious signal constant:
+  if (fixPoI && ((int)valPoI) == 0) {
+    
+    m_workspace->var("MyyMODELING")->setVal(0);
+    m_workspace->var("MyyMODELING")->setConstant(true);
+  }
+
+  
   // Check if other parameter settings have been specified for fit:
   for (std::map<TString,double>::iterator iterParam = m_paramValToSet.begin();
        iterParam != m_paramValToSet.end(); iterParam++) {

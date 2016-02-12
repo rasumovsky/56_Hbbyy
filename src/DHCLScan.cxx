@@ -127,6 +127,10 @@ int main(int argc, char **argv) {
   
   double qMuObs_toy[100] = {0.0};
   double qMuExp_toy[100] = {0.0};
+  double qMuExp_toy_p2[100] = {0.0};
+  double qMuExp_toy_p1[100] = {0.0};
+  double qMuExp_toy_n1[100] = {0.0};
+  double qMuExp_toy_n2[100] = {0.0};
   
   int n_asym = 0;
   int n_toy = 0;
@@ -243,8 +247,12 @@ int main(int argc, char **argv) {
 	  = dhts->getFitNLL("obsData", 1, false, obsPoI, false);
 	qMuObs_toy[n_toy]
 	  = dhts->getQMuFromNLL(nllObsMu1, nllObsMuFree, obsPoI, 1);
+	std::cout << "nllObsMu1=" << nllObsMu1 
+		  << ", nllObsMuFree=" << nllObsMuFree
+		  << ", qMuObs=" << qMuObs_toy[n_toy] << std::endl;
 	
 	// Calculate the expected qMu values (see DHTestStat m_dataForExpQMu):
+	/*
 	double expPoI = 0.0;
 	double nllExpMu1
 	  = dhts->getFitNLL("asimovDataMu0", 1, true, expPoI, false);
@@ -252,15 +260,10 @@ int main(int argc, char **argv) {
 	  = dhts->getFitNLL("asimovDataMu0", 1, false, expPoI, false);
 	qMuExp_toy[n_toy]
 	  = dhts->getQMuFromNLL(nllExpMu1, nllExpMuFree, expPoI, 1);
-	
-	std::cout << "nllObsMu1=" << nllObsMu1 
-		  << ", nllObsMuFree=" << nllObsMuFree
-		  << ", qMuObs=" << qMuObs_toy[n_toy] << std::endl;
-	
 	std::cout << "nllExpMu1=" << nllExpMu1
 		  << ", nllExpMuFree=" << nllExpMuFree
 		  << ", qMuExp=" << qMuExp_toy[n_toy] << std::endl;
-	
+	*/
 	varValues_toy[n_toy] = crossSection;
 	n_toy++;
       }
@@ -286,13 +289,20 @@ int main(int argc, char **argv) {
 	  continue;
 	}
 	
-	CLObs_toy[i_t] = dhta->calculateCLFromToy(qMuObs_toy[i_t], 0);
-	CLExp_toy[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], 0);
-	CLExp_toy_p2[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], 2);
-	CLExp_toy_p1[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], 1);
-	CLExp_toy_n1[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], -1);
-	CLExp_toy_n2[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t], -2);
-
+	// Calculate the expected qmu:
+	qMuExp_toy[i_t] = dhta->calculateBkgQMuForN(0);
+	qMuExp_toy_p2[i_t] = dhta->calculateBkgQMuForN(2.0);
+	qMuExp_toy_p1[i_t] = dhta->calculateBkgQMuForN(1.0);
+	qMuExp_toy_n1[i_t] = dhta->calculateBkgQMuForN(-1.0);
+	qMuExp_toy_n2[i_t] = dhta->calculateBkgQMuForN(-2.0);
+	
+	CLObs_toy[i_t] = dhta->calculateCLFromToy(qMuObs_toy[i_t]);
+	CLExp_toy[i_t] = dhta->calculateCLFromToy(qMuExp_toy[i_t]);
+	CLExp_toy_p2[i_t] = dhta->calculateCLFromToy(qMuExp_toy_p2[i_t]);
+	CLExp_toy_p1[i_t] = dhta->calculateCLFromToy(qMuExp_toy_p1[i_t]);
+	CLExp_toy_n1[i_t] = dhta->calculateCLFromToy(qMuExp_toy_n1[i_t]);
+	CLExp_toy_n2[i_t] = dhta->calculateCLFromToy(qMuExp_toy_n2[i_t]);
+	
 	// Write CL values to file:
 	outFile_toy << varValues_toy[i_t] << " " 
 		    << CLObs_toy[i_t] << " " 

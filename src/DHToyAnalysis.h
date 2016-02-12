@@ -29,8 +29,10 @@ class DHToyAnalysis {
   virtual ~DHToyAnalysis() {};
   
   bool areInputFilesOK();
-  double calculateCLsFromToy(double qMu, double N);
-  double calculateCLFromToy(double qMu, double N);
+  double calculateCLsFromToy(double qMu);
+  double calculateCLFromToy(double qMu);
+  double calculateBkgQMuForN(double N);
+  double calculatePBFromToy(double qMu);
   double calculatePMuFromToy(double qMu);
   double getPbFromN(double N);
 
@@ -69,6 +71,7 @@ class DHToyAnalysis {
   std::vector<TString> m_fitTypes;
   
   // Storage of QMu for pMu calculation:
+  std::vector<double> m_valuesQMu_Mu0;
   std::vector<double> m_valuesQMu_Mu1;
 
   // Histograms:

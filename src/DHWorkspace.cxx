@@ -761,6 +761,15 @@ void DHWorkspace::createNewWS() {
   m_modelConfig->SetGlobalObservables((*m_ws->set("globalObservables")));
   m_ws->import(*m_modelConfig);
   
+  /*
+  m_ws->var("mu_SigBSM2H")->setVal(1.0);
+  std::cout << "SignalNorm = " << m_ws->function("n_SigBSM2H_bb")->getVal() << std::endl;
+  exit(0);
+  */
+
+
+
+
   //----------------------------------------//
   // Create Asimov data:
   printer("DHWorkspace: Perform b-only fit before Asimov creation", false);
