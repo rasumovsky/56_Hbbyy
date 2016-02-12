@@ -213,6 +213,12 @@ double DHToyAnalysis::calculateCLsFromToy(double qMu) {
   double CLs = pMu / (1.0 - pB);
   printer(Form("DHToyAnalysis::calculateCLsFromToy(%f) = (%f / (1.0 - %f))",
 	       qMu, pMu, pB), false);
+  
+  // Check that it is finite:
+  if (isnan(CLs) || !isfinite(CLs)) {
+    CLs = 1.0;
+    printer("DHToyAnalysis::converting nan or inf to 1",false);
+  }
   return CLs;
 }
 
@@ -269,7 +275,8 @@ double DHToyAnalysis::calculatePMuFromToy(double qMu) {
    @return - The value of pB.
 */
 double DHToyAnalysis::getPbFromN(double N) {
-  return (1 - ROOT::Math::gaussian_cdf(N));
+  //return (1 - ROOT::Math::gaussian_cdf(N));
+  return ROOT::Math::gaussian_cdf(N);
 }
 
 /**

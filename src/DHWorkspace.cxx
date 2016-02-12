@@ -473,9 +473,14 @@ void DHWorkspace::addSystematic(TString systematicForm) {
     }
     else {
       // Uncertainty magnitude expression:
-      //m_ws->factory(Form("sigma_%s[%f]", varName.Data(), magnitude));
-      m_ws->factory(Form("sigma_%s[%s]", varName.Data(), magnitude.Data()));
-      
+      if (magnitude.Contains("expr")) {
+	//m_ws->factory(Form("sigma_%s[%s]", varName.Data(), magnitude.Data()));
+	m_ws->factory(magnitude.Data());
+      }
+      else {
+	m_ws->factory(Form("sigma_%s[%s]", varName.Data(), magnitude.Data()));
+      }
+
       //---------- Gaussian constraint ----------//
       if (constraint.EqualTo("gaus")) {
 	printer(Form("DHWorkspace: %s gaus constraint", systematicName.Data()),
