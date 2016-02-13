@@ -136,9 +136,7 @@ int main(int argc, char **argv) {
   int n_toy = 0;
   
   // Scan information:
-  double xsMin = config->getNum("CLScanMin");
-  double xsMax = config->getNum("CLScanMax");
-  double step = config->getNum("CLScanStep");
+  std::vector<double> scanValues = config->getNumV("CLScanValues");
   
   //----------------------------------------//
   // Open CL values from file:
@@ -193,8 +191,8 @@ int main(int argc, char **argv) {
     }
     
     // Loop over cross-section:
-    for (double crossSection = xsMin; crossSection < xsMax;
-	 crossSection += step) {
+    for (int i_x = 0; i_x < (int)scanValues.size(); i_x++) {
+      double crossSection = scanValues[i_x];
       std::cout << "DHCLScan: cross-section = " << crossSection << std::endl;
       
       // Set the value of the variable to scan:
@@ -250,26 +248,11 @@ int main(int argc, char **argv) {
 	std::cout << "nllObsMu1=" << nllObsMu1 
 		  << ", nllObsMuFree=" << nllObsMuFree
 		  << ", qMuObs=" << qMuObs_toy[n_toy] << std::endl;
-	
-	// Calculate the expected qMu values (see DHTestStat m_dataForExpQMu):
-	/*
-	double expPoI = 0.0;
-	double nllExpMu1
-	  = dhts->getFitNLL("asimovDataMu0", 1, true, expPoI, false);
-	double nllExpMuFree
-	  = dhts->getFitNLL("asimovDataMu0", 1, false, expPoI, false);
-	qMuExp_toy[n_toy]
-	  = dhts->getQMuFromNLL(nllExpMu1, nllExpMuFree, expPoI, 1);
-	std::cout << "nllExpMu1=" << nllExpMu1
-		  << ", nllExpMuFree=" << nllExpMuFree
-		  << ", qMuExp=" << qMuExp_toy[n_toy] << std::endl;
-	*/
 	varValues_toy[n_toy] = crossSection;
 	n_toy++;
       }
     }
     delete dhts;
-
     
     // Then specify file in DHToyAnalysis to load:
     if (options.Contains("toy") || options.Contains("both")) {
@@ -390,7 +373,6 @@ int main(int argc, char **argv) {
   gCLObs_toy->SetLineStyle(1);
   gCLExp_toy->SetLineWidth(2);
   gCLObs_toy->SetLineWidth(2);
-  //gCLObs_toy->GetXaxis()->SetRangeUser(xsMin, xsMax);
   gCLExp_toy->GetYaxis()->SetRangeUser(0.0, 1.0);
   gCLExp_toy_2s->SetFillColor(kYellow);
   gCLExp_toy_1s->SetFillColor(kGreen);
@@ -406,7 +388,6 @@ int main(int argc, char **argv) {
   gCLObs_asym->SetLineStyle(1);
   gCLExp_asym->SetLineWidth(2);
   gCLObs_asym->SetLineWidth(2);
-  //gCLObs_asym->GetXaxis()->SetRangeUser(xsMin, xsMax);
   gCLExp_asym->GetYaxis()->SetRangeUser(0.0, 1.0);
   gCLExp_asym_2s->SetFillColor(kYellow);
   gCLExp_asym_1s->SetFillColor(kGreen);

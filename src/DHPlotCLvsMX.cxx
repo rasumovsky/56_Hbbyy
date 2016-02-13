@@ -77,13 +77,12 @@ int main(int argc, char **argv) {
   int n_toy = 0;
   
   // Scan information:
-  int mXMin = config->getInt("MXScanMin");
-  int mXMax = config->getInt("MXScanMax");
-  int mXStep = config->getInt("MXScanStep");
-  
+  std::vector<double> scanMXValues = config->getNumV("MXScanValues");
+    
   //----------------------------------------//
   // Open CL values from files (different file for each MX):
-  for (int mX = mXMin; mX <= mXMax; mX += mXStep) {
+  for (int i_m = 0; i_m < (int)scanMXValues.size(); i_m++) {
+    int mX = (int)(scanMXValues[i_m]);
     
     // Open the saved CL values from asymptotics:
     if (options.Contains("asymptotic") || options.Contains("both")) {

@@ -500,6 +500,7 @@ TH1F* DHToyAnalysis::getStatHist(TString statistic, int toyMu) {
   else if (statistic.EqualTo("QMu")) return m_hQMu[toyMu];
   //else if (statistic.EqualTo("QMuTilde")) return m_hQMuTilde[toyMu];
   else printer(Form("DHToyAnalysis: ERROR! no %s", statistic.Data()), true);
+  return NULL;
 }
 
 /**

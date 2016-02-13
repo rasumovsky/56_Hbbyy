@@ -59,7 +59,7 @@ void mapToVectors(std::map<std::string,double> map,
    @param resonanceMass - The mass of the resonance (resonant analysis only)
 */
 int main(int argc, char **argv) {
-  if (argc < 6) {
+  if (argc < 7) {
     std::cout << "Usage: " << argv[0] 
 	      << " <configFile> <options> <seed> <toysPerJob> <poiVal>" 
 	      << std::endl;
@@ -181,8 +181,8 @@ int main(int argc, char **argv) {
     DHTestStat *dhts = new DHTestStat(configFile, "new", workspace);
     
     if (options.Contains(config->getStr("CLScanToyOptions"))) {
-      double crossSection = (config->getNum("CLScanMin") + 
-			     (jobIndex.Atoi() * config->getNum("CLScanStep")));
+      std::vector<double> scanValues = config->getNumV("CLScanValues");
+      double crossSection = scanValues[jobIndex.Atoi()];
       dhts->setParam(config->getStr("CLScanVar"), crossSection, true);
     }
     
@@ -190,7 +190,13 @@ int main(int argc, char **argv) {
     if ((config->getStr("AnalysisType")).EqualTo("Resonant")) {
       dhts->setParam("mResonance", resonanceMass, true);
     }
-  
+
+    // NEW! If background-only fit, set spurious signal constant:
+    if (config->getBool("UseSystematics") && inputPoIVal == 0) {
+      dhts->setParam("MyyMODELING", 0, true);
+      dhts->setParam("RNDM_MyyMODELING", 0, true);
+    }
+    
     RooDataSet *newToyData
       = dhts->createPseudoData(seed, inputPoIVal, options.Contains("FixMu"));
     numEvents = workspace->data("toyData")->sumEntries();

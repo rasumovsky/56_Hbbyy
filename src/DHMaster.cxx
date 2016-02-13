@@ -20,7 +20,7 @@
 //    - TestStat                                                              //
 //    - CLScanAnalysis                                                        //
 //    - CLScanSubmitToys                                                      //
-//    - PlotCLVsMX                                                            //
+//    - PlotCLvsMX                                                            //
 //                                                                            //
 //  Need to rethink the SigParam handling of the RooDataSet. Maybe we         //
 //  should just hand it a RooDataSet?                                         //
@@ -403,11 +403,12 @@ int main (int argc, char **argv) {
   if (masterOption.Contains("PlotPseudoExp")) {
     std::cout << "DHMaster: Step 5.2 - Plot pseudoexperiment results."
 	      << std::endl;
+    std::vector<double> scanMXValues = m_config->getNumV("MXScanValues");
     DHToyAnalysis *dhta
-      = new DHToyAnalysis(configFileName,"NONE", m_config->getInt("MXScanMin"));
-    //DHToyAnalysis *dhta = new DHToyAnalysis(configFileName, "ForcePlotCLScan3", m_config->getInt("MXScanMin"));
+      = new DHToyAnalysis(configFileName,"NONE", (int)(scanMXValues[0]));
+    //DHToyAnalysis *dhta = new DHToyAnalysis(configFileName, "ForcePlotCLScan3", (int)(scanMXValues[0]));
   }
-
+  
   //--------------------------------------//
   // Step 6.0: Calculate CL and p0 statistics with asymptotic formulae:
   if (masterOption.Contains("TestStat")) {
@@ -449,10 +450,8 @@ int main (int argc, char **argv) {
     int highestSeed = toySeed + nToysTotal;
     
     // Loop over scan points:
-    int nToyPoints = ((m_config->getNum("CLScanMax") - 
-		       m_config->getNum("CLScanMin")) / 
-		      m_config->getNum("CLScanStep"));
-    for (int currIndex = 0; currIndex < nToyPoints; currIndex++) {
+    std::vector<double> scanCLValues = m_config->getNumV("CLScanValues");
+    for (int currIndex = 0; currIndex < (int)scanCLValues.size(); currIndex++) {
       TString currOptions = m_config->getStr("CLScanToyOptions");
       currOptions.Append(Form("%d",currIndex));
       
@@ -460,10 +459,10 @@ int main (int argc, char **argv) {
       for (int i_s = toySeed; i_s < highestSeed; i_s += nToysPerJob) {
 	// Loop over resonance masses for resonant analysis:
 	if ((m_config->getStr("AnalysisType")).EqualTo("Resonant")) {
-	  for (int resMass = m_config->getInt("MXScanMin");
-	       resMass <= m_config->getInt("MXScanMax");
-	       resMass += m_config->getInt("MXScanStep")) { 
-	    submitPEViaBsub(fullConfigPath,currOptions,i_s,nToysPerJob,resMass);
+	  std::vector<double> scanMXValues = m_config->getNumV("MXScanValues");
+	  for (int i_m = 0; i_m < (int)scanMXValues.size(); i_m++) {
+	    submitPEViaBsub(fullConfigPath, currOptions, i_s, nToysPerJob, 
+			    (int)(scanMXValues[i_m]));
 	  }
 	}
 	else {
@@ -472,12 +471,11 @@ int main (int argc, char **argv) {
 	m_isFirstJob = false;
       }
     }
-    int nJobSubmits = (nToyPoints * (int)(nToysTotal/nToysPerJob));
+    int nJobSubmits = ((int)scanCLValues.size()*(int)(nToysTotal/nToysPerJob));
     if ((m_config->getStr("AnalysisType")).EqualTo("Resonant")) {
-      nJobSubmits = ((nToyPoints * (int)(nToysTotal/nToysPerJob)) * 
-		     (int)((m_config->getInt("MXScanMax") - 
-			    m_config->getInt("MXScanMin")) / 
-			   m_config->getInt("MXScanStep")));
+      std::vector<double> scanMXValues = m_config->getNumV("MXScanValues");
+      nJobSubmits = (((int)scanCLValues.size()*(int)(nToysTotal/nToysPerJob)) * 
+		     (int)(scanMXValues.size()));
     }
     std::cout << "DHMaster: Submitted " << nJobSubmits << " total CL scan toys."
 	      << std::endl;
@@ -489,11 +487,12 @@ int main (int argc, char **argv) {
     std::cout << "DHMaster: Step 8.2 - Get CL Scan Plot" << std::endl;
     
     if ((m_config->getStr("AnalysisType")).EqualTo("Resonant")) {
-      for (int resMass = m_config->getInt("MXScanMin");
-	       resMass <= m_config->getInt("MXScanMax");
-	       resMass +=m_config->getInt("MXScanStep")) { 
+      
+      std::vector<double> scanMXValues = m_config->getNumV("MXScanValues");
+      for (int i_m = 0; i_m < (int)scanMXValues.size(); i_m++) {
 	system(Form("./bin/DHCLScan %s %s %d", fullConfigPath.Data(),
-		    (m_config->getStr("CLScanOptions")).Data(), resMass));
+		    (m_config->getStr("CLScanOptions")).Data(),
+		    scanMXValues[i_m]));
       }
     }
     else {
@@ -504,7 +503,7 @@ int main (int argc, char **argv) {
   
   //--------------------------------------//
   // Step 8.2: Create the CL scan plot:
-  if (masterOption.Contains("PlotCLVsMX")) {
+  if (masterOption.Contains("PlotCLvsMX")) {
     std::cout << "DHMaster: Step 8.2 - Get Plot of CL vs. MX" << std::endl;
     system(Form("./bin/DHPlotCLvsMX %s %s", fullConfigPath.Data(),
 		(m_config->getStr("CLMXPlotOptions")).Data()));

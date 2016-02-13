@@ -246,7 +246,7 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
 	       seed, valPoI, (int)fixPoI), false);
     
   // Load the original parameters from profiling:
-  m_workspace->loadSnapshot("paramsOrigin");
+  //m_workspace->loadSnapshot("paramsOrigin");
   
   // Load the parameters from profiling data to create UNCONDITIONAL ENSEMBLE:
   m_workspace->loadSnapshot(Form("paramsProfilePoI%d", valPoI));
@@ -273,11 +273,7 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   // Randomize the global observables and set them constant for now:
   statistics::randomizeSet(combPdf, globalObservables, seed); 
   statistics::constSet(globalObservables, true);
-  
-  //std::cout << "toy values AFTER randomization etc." << std::endl;
-  //printSet("nuisanceParameters", nuisanceParameters);
-  //printSet("globalObservables", globalObservables);
-  
+    
   // Set the parameter of interest value and status:
   firstPoI->setVal(valPoI);
   firstPoI->setConstant(fixPoI);
@@ -298,6 +294,10 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
     }
   }
   
+  //std::cout << "toy values AFTER randomization AND setting" << std::endl;
+  //printSet("nuisanceParameters", nuisanceParameters);
+  //printSet("globalObservables", globalObservables);
+
   // Iterate over the categories:
   RooSimultaneous *simPdf = (RooSimultaneous*)m_workspace->pdf("combinedPdfSB");
   TIterator *cateIter = simPdf->indexCat().typeIterator();
