@@ -33,6 +33,7 @@ Every program in this package can be run via the "DHMaster" main method.
  - Workspace: Make workspaces for the analysis (resonant or non-resonant).
  - TossPseudoExp: Create a pseudoexperiment ensemble for mu=0 and mu=1.
  - PlotPseudoExp: Plot the results of fits to a pseudo experiment ensemble.
+ - TestStat: Get asymptotic p0 and CL statistical results.
  - CLScanSubmitToys: Submit toys for the CL scan, if toy result desired.
  - CLScanAnalysis: Get the 95% CL value from a CL scan (toys or asymptotics!).
  - PlotCLVsMX: Plot the resonant analysis limits vs. resonant mass.

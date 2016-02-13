@@ -17,6 +17,7 @@
 //    - Workspace                                                             //
 //    - TossPseudoExp                                                         //
 //    - PlotPseudoExp                                                         //
+//    - TestStat                                                              //
 //    - CLScanAnalysis                                                        //
 //    - CLScanSubmitToys                                                      //
 //    - PlotCLVsMX                                                            //
@@ -405,6 +406,36 @@ int main (int argc, char **argv) {
     DHToyAnalysis *dhta
       = new DHToyAnalysis(configFileName,"NONE", m_config->getInt("MXScanMin"));
     //DHToyAnalysis *dhta = new DHToyAnalysis(configFileName, "ForcePlotCLScan3", m_config->getInt("MXScanMin"));
+  }
+
+  //--------------------------------------//
+  // Step 6.0: Calculate CL and p0 statistics with asymptotic formulae:
+  if (masterOption.Contains("TestStat")) {
+    std::cout << "DHMaster: Step 6.0 - Asymptotic CL and p0 calculation."
+	      << std::endl;
+    // Instantiate the statistics class:
+    DHTestStat *dhts = new DHTestStat(configFileName, 
+				      m_config->getStr("TestStatOptions"),
+				      NULL);
+    dhts->setParam(m_config->getStr("CrossSectionVar"),
+		   m_config->getNum("CrossSectionValue"), true);
+    
+    // Non-resonant analysis: specify cross-section:
+    
+    // Resonant analysis: specify cross-section and resonance mass:
+    if ((m_config->getStr("AnalysisType")).EqualTo("Resonant")) {
+      dhts->setParam(m_config->getStr("ResonanceMassVar"),
+		     m_config->getNum("ResonanceMassValue"), true);
+    }
+    
+    // Calculate CL and then p0:
+    dhts->calculateNewCL();
+    dhts->calculateNewP0();
+    
+    // Check that fits succeeded:
+    if (!dhts->fitsAllConverged()) {
+      std::cout << "\nDMMaster: ERROR! Statistics fits failed.\n" << std::endl;
+    }
   }
   
   //--------------------------------------//
