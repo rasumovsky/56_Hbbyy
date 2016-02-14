@@ -597,7 +597,7 @@ void DHWorkspace::createStupidAsimovData(int valPoI, int nBinsAsimov) {
   }
   delete currObs;
   delete iterObs;
-  
+
   // Create the Asimov dataset object:
   TString asimovName = Form("asimovDataMu%d_%s", valPoI, m_currCateName.Data());
   RooDataSet *currAsimov
@@ -608,7 +608,7 @@ void DHWorkspace::createStupidAsimovData(int valPoI, int nBinsAsimov) {
   // Total number of events in the current model category:
   double totalEvents
     = m_ws->function(Form("n_AllProcesses_%s",m_currCateName.Data()))->getVal();
-  
+
   // Prevents spam from the ROOT integration:
   RooMsgService::instance().setGlobalKillBelow(RooFit::WARNING);
   
@@ -616,12 +616,12 @@ void DHWorkspace::createStupidAsimovData(int valPoI, int nBinsAsimov) {
   double originMin = m_ws->var(nameObs)->getMin();
   double originMax = m_ws->var(nameObs)->getMax();
   double width = ((originMax - originMin) / ((double)nBinsAsimov));
-  
+
   // Get a PDF:
   RooAbsPdf *currPdf
     = (RooAbsPdf*)(m_ws->pdf(Form("model_%s",m_currCateName.Data()))
 		   ->Clone("newPDF"));
-  
+
   // Loop over Asimov bins:
   for (int i_b = 0; i_b < nBinsAsimov; i_b++) {
     // Get window min and window max:
@@ -639,7 +639,7 @@ void DHWorkspace::createStupidAsimovData(int valPoI, int nBinsAsimov) {
     currAsimov->add(RooArgSet(*m_ws->var(nameObs),m_ws->var("wt")), currWeight);
     delete currIntegral;
   }
-  
+
   m_ws->var(nameObs)->setRange("rangeFull", originMin, originMax);
   
   // Import the dataset to the workspace and add to data map:
@@ -652,7 +652,7 @@ void DHWorkspace::createStupidAsimovData(int valPoI, int nBinsAsimov) {
   }
   printer(Form("DHWorkspace: Asimov data entries=%f",currAsimov->sumEntries()),
 	  false); 
-  
+
   // Return PoI to original settings:
   m_ws->var(namePoI)->setVal(initialPoIVal);
   m_ws->var(namePoI)->setConstant(false);
@@ -857,11 +857,11 @@ void DHWorkspace::createNewWS() {
   std::cout << "\tnll(muDH = 0):  " << nllMu0 << std::endl;
   std::cout << "\tnll(muDH free): " << nllMuFree << std::endl;
   std::cout << " " << endl;
-  std::cout << "\t2nll(S+B)/nll(B) = " << 2 * (nllMu1 - nllMu0) 
+  std::cout << "\t2 * nll(S+B)/nll(B) = " << 2 * (nllMu1 - nllMu0) 
 	    << std::endl;
-  std::cout << "\t2nll(muDH=1)/nll(muhat) = " << 2 * (nllMu1 - nllMuFree) 
+  std::cout << "\t2 * nll(muDH=1)/nll(muhat) = " << 2 * (nllMu1 - nllMuFree) 
 	    << std::endl;
-  std::cout << "\t2nll(muDH=0)/nll(muhat) = " << 2 * (nllMu0 - nllMuFree) 
+  std::cout << "\t2 * nll(muDH=0)/nll(muhat) = " << 2 * (nllMu0 - nllMuFree) 
 	    << std::endl;
   if (m_allGoodFits) std::cout << "all good fits = TRUE" << std::endl;
   else std::cout << "all good fits = FALSE" << std::endl;
