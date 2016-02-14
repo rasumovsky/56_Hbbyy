@@ -326,12 +326,20 @@ void DHWorkspace::addSystematic(TString systematicForm) {
     printer("DHWorkspace: Implementing an asymmetric uncertainty with only the"
 	    " one-sided fluctuation provided. Equating up and down variations.",
 	    false);
-    
+        
     // Loop through the map, turning values negative:
     for (std::map<TString,TString>::iterator compIter = components.begin(); 
 	 compIter != components.end(); compIter++) {
       TString name = compIter->first;
       TString val = compIter->second;
+      
+      if (val.Contains("expr")) {
+	std::cout << "DHWorkspace: not prepared for this eventuality" 
+		  << std::endl;
+	exit(0);
+      }
+
+      
       if (val.Contains("-")) val.ReplaceAll("-","");
       else val.Prepend("-");
       componentsLo[name] = val;
@@ -849,9 +857,12 @@ void DHWorkspace::createNewWS() {
   std::cout << "\tnll(muDH = 0):  " << nllMu0 << std::endl;
   std::cout << "\tnll(muDH free): " << nllMuFree << std::endl;
   std::cout << " " << endl;
-  std::cout << "\tnll(S+B)/nll(B) " << nllMu1 - nllMu0 << std::endl;
-  std::cout << "\tnll(muDH=1)/nll(muhat) = " << nllMu1-nllMuFree << std::endl;
-  std::cout << "\tnll(muDH=0)/nll(muhat) = " << nllMu0-nllMuFree << std::endl;
+  std::cout << "\t2nll(S+B)/nll(B) = " << 2 * (nllMu1 - nllMu0) 
+	    << std::endl;
+  std::cout << "\t2nll(muDH=1)/nll(muhat) = " << 2 * (nllMu1 - nllMuFree) 
+	    << std::endl;
+  std::cout << "\t2nll(muDH=0)/nll(muhat) = " << 2 * (nllMu0 - nllMuFree) 
+	    << std::endl;
   if (m_allGoodFits) std::cout << "all good fits = TRUE" << std::endl;
   else std::cout << "all good fits = FALSE" << std::endl;
   std::cout << "Profiled muDH value : " << profiledPOIVal << std::endl;

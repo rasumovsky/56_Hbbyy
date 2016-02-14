@@ -203,6 +203,7 @@ double DHToyAnalysis::calculateBkgQMuForN(double N) {
   }
   
   printer("DHToyAnalysis::ERROR in QMu bkg calculation", true);
+  return 0.0;
 }
 
 /**
@@ -478,6 +479,7 @@ TH1F* DHToyAnalysis::getHist(TString paramName, TString fitType, int toyMu) {
 			fitType.Data(), toyMu);
   if (m_histStorage.count(mapKey) > 0) return m_histStorage[mapKey];
   else printer(Form("DHToyAnalysis:: ERROR no hist %s",mapKey.Data()), true);
+  return NULL;
 }
 
 /**

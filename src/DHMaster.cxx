@@ -492,7 +492,7 @@ int main (int argc, char **argv) {
       for (int i_m = 0; i_m < (int)scanMXValues.size(); i_m++) {
 	system(Form("./bin/DHCLScan %s %s %d", fullConfigPath.Data(),
 		    (m_config->getStr("CLScanOptions")).Data(),
-		    scanMXValues[i_m]));
+		    (int)(scanMXValues[i_m])));
       }
     }
     else {
