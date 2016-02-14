@@ -244,12 +244,19 @@ void DHTestStat::clearFitParamSettings() {
 RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   printer(Form("DHTestStatLLcreatePseudoData(seed=%d, PoI=%d, fixPoI=%d)",
 	       seed, valPoI, (int)fixPoI), false);
-    
-  // Load the original parameters from profiling:
-  //m_workspace->loadSnapshot("paramsOrigin");
   
   // Load the parameters from profiling data to create UNCONDITIONAL ENSEMBLE:
-  m_workspace->loadSnapshot(Form("paramsProfilePoI%d", valPoI));
+  TString snapshotName = Form("paramsProfilePoI%d", valPoI);
+  if (m_workspace->getSnapshot(snapshotName)) {
+    m_workspace->loadSnapshot(snapshotName);
+    printer(Form("DHTestStat: Loaded snapshot %s",snapshotName.Data()), false);
+  }
+  else {
+    // Load the original parameters from profiling:
+    //m_workspace->loadSnapshot("paramsOrigin");
+    printer(Form("DHTestStat: ERROR! No snapshot %s", snapshotName.Data()),
+	    true);
+  }
   
   //RooSimultaneous* combPdf = (RooSimultaneous*)m_mc->GetPdf();
   RooAbsPdf* combPdf = (RooAbsPdf*)m_mc->GetPdf();

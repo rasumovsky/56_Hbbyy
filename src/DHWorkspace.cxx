@@ -830,7 +830,7 @@ void DHWorkspace::createNewWS() {
   printer("DHWorkspace: Start profiling data", false);
   
   DHTestStat *dhts = new DHTestStat(m_configFile, "new", m_ws);
-  dhts->saveSnapshots(true);
+  dhts->saveSnapshots(false);
   dhts->setPlotDirectory(Form("%s/Plots/", m_outputDir.Data()));
   dhts->setPlotAxis(m_config->getBool("FitPlotLogScale"),
 		    m_config->getNum("FitPlotYMin"),

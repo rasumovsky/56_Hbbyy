@@ -197,6 +197,16 @@ int main(int argc, char **argv) {
       dhts->setParam("RNDM_MyyMODELING", 0, true);
     }
     
+    // Then create snapshot for Mu=1 or Mu=0 hypothesis! This must be re-done
+    // for every toy job, since the signal hypothesis can change!
+    dhts->saveSnapshots(true);
+    TString dataToProf = (config->getBool("DoBlind")) ? 
+      "asimovDataMu1" : "obsData";
+    if (inputPoIVal == 0) dhts->getFitNLL(dataToProf, 0, true, profiledPOIVal);
+    else dhts->getFitNLL(dataToProf, 1, true, profiledPOIVal);
+    dhts->saveSnapshots(false);
+    
+    // Create the pseudo data:
     RooDataSet *newToyData
       = dhts->createPseudoData(seed, inputPoIVal, options.Contains("FixMu"));
     numEvents = workspace->data("toyData")->sumEntries();
