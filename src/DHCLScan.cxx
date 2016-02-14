@@ -263,7 +263,7 @@ int main(int argc, char **argv) {
 	// between the DHToyAnalysis class and DHTestStat, which is called
 	// in DHToyAnalysis...
 	TString toyScanOption = Form("CLScan%d",i_t);
-	if (i_t == 3) toyScanOption.Append("_ForcePlot");
+	if (i_t == 9) toyScanOption.Append("_ForcePlot");
 	DHToyAnalysis *dhta
 	  = new DHToyAnalysis(configFile, toyScanOption, resonanceMass);
 	if (!(dhta->areInputFilesOK())) {
