@@ -192,10 +192,10 @@ int main(int argc, char **argv) {
     }
 
     // NEW! If background-only fit, set spurious signal constant:
-    if (config->getBool("UseSystematics") && inputPoIVal == 0) {
-      dhts->setParam("MyyMODELING", 0, true);
-      dhts->setParam("RNDM_MyyMODELING", 0, true);
-    }
+    //if (config->getBool("UseSystematics") && inputPoIVal == 0) {
+    //dhts->setParam("MyyMODELING", 0, true);
+    //dhts->setParam("RNDM_MyyMODELING", 0, true);
+    //}
     
     // Then create snapshot for Mu=1 or Mu=0 hypothesis! This must be re-done
     // for every toy job, since the signal hypothesis can change!

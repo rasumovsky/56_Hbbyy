@@ -640,10 +640,10 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   firstPoI->setConstant(fixPoI);
   
   // NEW! If background-only fit, set spurious signal constant:
-  if (m_config->getBool("UseSystematics") && fixPoI && ((int)valPoI) == 0) {
-    m_workspace->var("MyyMODELING")->setVal(0);
-    m_workspace->var("MyyMODELING")->setConstant(true);
-  }
+  //if (m_config->getBool("UseSystematics") && fixPoI && ((int)valPoI) == 0) {
+  //m_workspace->var("MyyMODELING")->setVal(0);
+  //m_workspace->var("MyyMODELING")->setConstant(true);
+  //}
   
   // Check if other parameter settings have been specified for fit:
   for (std::map<TString,double>::iterator iterParam = m_paramValToSet.begin();
@@ -671,9 +671,6 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   //std::cout << "Post-fit parameter values" << std::endl;
   //printSet("nuisanceParameters", nuisanceParameters);
   //printSet("globalObservables", globalObservables);
-  
-  std::cout << "CONTINUUM: " 
-	    << m_workspace->function("n_BkgNonHiggs_bbSideBand") << std::endl;
   
   /*
   if ((m_config->getStr("AnalysisType")).EqualTo("NonResonant")) {

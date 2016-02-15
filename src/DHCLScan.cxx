@@ -174,10 +174,7 @@ int main(int argc, char **argv) {
 	       >> CLExp_toy[n_toy] >> CLExp_toy_p2[n_toy] 
 	       >> CLExp_toy_p1[n_toy] >> CLExp_toy_n1[n_toy] 
 	       >> CLExp_toy_n2[n_toy]) {
-	  
-	  //if (n_toy == 8 && !skipped) skipped = true;
-	  //else n_toy++;
-	  
+	  n_toy++;
 	}
       }
       else {
