@@ -141,36 +141,51 @@ int main(int argc, char **argv) {
   //----------------------------------------//
   // Open CL values from file:
   if (options.Contains("FromFile")) {
-    
+
     // Open the saved CL values from asymptotics:
+    TString inputAsymName = Form("%s/scan_CLvalues_asym_%s.txt",
+				 outputDir.Data(), tag.Data());
     if (options.Contains("asymptotic") || options.Contains("both")) {
-      ifstream inputFile_asym(Form("%s/scan_CLvalues_asym_%s.txt",
-				   outputDir.Data(), tag.Data()));
+      ifstream inputFile_asym(inputAsymName);
       if (inputFile_asym.is_open()) {
-	while (!inputFile_asym.eof()) {
-	  inputFile_asym >> varValues_asym[n_asym] >> CLObs_asym[n_asym] 
-			 >> CLExp_asym[n_asym] >> CLExp_asym_p2[n_asym] 
-			 >> CLExp_asym_p1[n_asym] >> CLExp_asym_n1[n_asym] 
-			 >> CLExp_asym_n2[n_asym];
+	while (inputFile_asym >> varValues_asym[n_asym] >> CLObs_asym[n_asym] 
+	       >> CLExp_asym[n_asym] >> CLExp_asym_p2[n_asym] 
+	       >> CLExp_asym_p1[n_asym] >> CLExp_asym_n1[n_asym] 
+	       >> CLExp_asym_n2[n_asym]) {
 	  n_asym++;
 	}
       }
+      else {
+	std::cout << "DHCLScan: ERROR opnening asymptotic file " 
+		  << inputAsymName << std::endl;
+	exit(0);
+      }
+      
       inputFile_asym.close();
     }
-    
+    //bool skipped = false;
     // Open the saved CL values from toys:
+    TString inputToyName = Form("%s/scan_CLvalues_toy_%s.txt",
+				outputDir.Data(), tag.Data());
     if (options.Contains("toy") || options.Contains("both")) {
-      ifstream inputFile_toy(Form("%s/scan_CLvalues_toy_%s.txt",
-				  outputDir.Data(), tag.Data()));
+      ifstream inputFile_toy(inputToyName);
       if (inputFile_toy.is_open()) {
-	while (!inputFile_toy.eof()) {
-	  inputFile_toy >> varValues_toy[n_toy] >> CLObs_toy[n_toy] 
-			>> CLExp_toy[n_toy] >> CLExp_toy_p2[n_toy] 
-			>> CLExp_toy_p1[n_toy] >> CLExp_toy_n1[n_toy] 
-			>> CLExp_toy_n2[n_toy];
-	  n_toy++;
+	while (inputFile_toy >> varValues_toy[n_toy] >> CLObs_toy[n_toy] 
+	       >> CLExp_toy[n_toy] >> CLExp_toy_p2[n_toy] 
+	       >> CLExp_toy_p1[n_toy] >> CLExp_toy_n1[n_toy] 
+	       >> CLExp_toy_n2[n_toy]) {
+	  
+	  //if (n_toy == 8 && !skipped) skipped = true;
+	  //else n_toy++;
+	  
 	}
       }
+      else {
+	std::cout << "DHCLScan: ERROR opnening toy file " << inputToyName
+		  << std::endl;
+	exit(0);
+      }
+      
       inputFile_toy.close();
     }
   }
@@ -263,7 +278,7 @@ int main(int argc, char **argv) {
 	// between the DHToyAnalysis class and DHTestStat, which is called
 	// in DHToyAnalysis...
 	TString toyScanOption = Form("CLScan%d",i_t);
-	if (i_t == 9) toyScanOption.Append("_ForcePlot");
+	if (i_t == 0) toyScanOption.Append("_ForcePlot");
 	DHToyAnalysis *dhta
 	  = new DHToyAnalysis(configFile, toyScanOption, resonanceMass);
 	if (!(dhta->areInputFilesOK())) {

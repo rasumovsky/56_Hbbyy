@@ -240,7 +240,7 @@ void DHTestStat::clearFitParamSettings() {
    @param valPoI - The value of the parameter of interest.
    @param fixPoI - True iff. the parameter of interest should be fixed. 
    @return - A pseudo-dataset.
-
+*/
 RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   printer(Form("DHTestStatLLcreatePseudoData(seed=%d, PoI=%d, fixPoI=%d)",
 	       seed, valPoI, (int)fixPoI), false);
@@ -272,11 +272,7 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   RooRandom::randomGenerator()->SetSeed(seed);
   statistics::constSet(nuisanceParameters, true);
   statistics::constSet(globalObservables, false);
-  
-  // Store the toy dataset and number of events per dataset:
-  map<string,RooDataSet*> toyDataMap; toyDataMap.clear();
-  m_numEventsPerCate.clear();
-    
+      
   // Randomize the global observables and set them constant for now:
   statistics::randomizeSet(combPdf, globalObservables, seed); 
   statistics::constSet(globalObservables, true);
@@ -304,7 +300,11 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   //std::cout << "toy values AFTER randomization AND setting" << std::endl;
   //printSet("nuisanceParameters", nuisanceParameters);
   //printSet("globalObservables", globalObservables);
-
+  
+  // Store the toy dataset and number of events per dataset:
+  map<string,RooDataSet*> toyDataMap; toyDataMap.clear();
+  m_numEventsPerCate.clear();
+  
   // Iterate over the categories:
   RooSimultaneous *simPdf = (RooSimultaneous*)m_workspace->pdf("combinedPdfSB");
   TIterator *cateIter = simPdf->indexCat().typeIterator();
@@ -359,16 +359,18 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   m_workspace->import(*pseudoData);
   return pseudoData;
 }
-*/
 
-/**
+/*
    -----------------------------------------------------------------------------
    Create a pseudo-dataset with a given value of DM and SM signal strength.
    @param seed - The random seed for dataset generation.
    @param valPoI - The value of the parameter of interest.
    @param fixPoI - True iff. the parameter of interest should be fixed. 
    @return - A pseudo-dataset.
-*/
+
+WARNING! THIS METHOD IS FLAWED. IT WILL BIAS YOUR TOYS AND DOES NOT CREATE
+AN UNCONDITIONAL ENSEMBLE. IT WILL BIAS YOUR OBSERVATIONS...
+
 RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   printer(Form("DHTestStatLLcreatePseudoData(seed=%d, PoI=%d, fixPoI=%d)",
 	       seed, valPoI, (int)fixPoI), false);
@@ -499,6 +501,7 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   m_workspace->import(*pseudoData);
   return pseudoData;
 }
+*/
 
 /**
    -----------------------------------------------------------------------------
@@ -669,6 +672,8 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   //printSet("nuisanceParameters", nuisanceParameters);
   //printSet("globalObservables", globalObservables);
   
+  std::cout << "CONTINUUM: " 
+	    << m_workspace->function("n_BkgNonHiggs_bbSideBand") << std::endl;
   
   /*
   if ((m_config->getStr("AnalysisType")).EqualTo("NonResonant")) {

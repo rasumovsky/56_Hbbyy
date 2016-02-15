@@ -199,9 +199,12 @@ double DHToyAnalysis::calculateBkgQMuForN(double N) {
   int totalEvents = (int)m_valuesQMu_Mu0.size();
   for (int i_e = 0; i_e < totalEvents; i_e++) {
     double fraction = (((double)i_e) / ((double)totalEvents));
-    if (fraction >= probability) return m_valuesQMu_Mu0[i_e];
+    if (fraction >= probability) {
+      printer(Form("calculateBkgQMuForN(%f) = %f using i_e=%d / totalEvents=%d",
+		   N, m_valuesQMu_Mu0[i_e], i_e, totalEvents), false);
+      return m_valuesQMu_Mu0[i_e];
+    }
   }
-  
   printer("DHToyAnalysis::ERROR in QMu bkg calculation", true);
   return 0.0;
 }
@@ -217,8 +220,8 @@ double DHToyAnalysis::calculateCLsFromToy(double qMu) {
   //double pB = getPbFromN(N);
   double pB = calculatePBFromToy(qMu);
   double CLs = pMu / (1.0 - pB);
-  printer(Form("DHToyAnalysis::calculateCLsFromToy(%f) = (%f / (1.0 - %f))",
-	       qMu, pMu, pB), false);
+  printer(Form("DHToyAnalysis::calculateCLsFromToy(%f) = (%f / (1 - %f)) = %f",
+	       qMu, pMu, pB, CLs), false);
   
   // Check that it is finite:
   if (isnan(CLs) || !isfinite(CLs)) {
@@ -253,6 +256,10 @@ double DHToyAnalysis::calculatePBFromToy(double qMu) {
   }
   double probability = (totalEvents > 0) ?
     (((double)passingEvents) / ((double)totalEvents)) : 0.0;
+  
+  printer(Form("calculatePBFromToy(%f) using passingEvents=%d / totalEvents=%d",
+	       qMu, passingEvents, totalEvents), false);
+  
   return probability;
 }
 
@@ -271,6 +278,10 @@ double DHToyAnalysis::calculatePMuFromToy(double qMu) {
   }
   double probability = (totalEvents > 0) ?
     (((double)passingEvents) / ((double)totalEvents)) : 0.0;
+  
+  printer(Form("calculatePBFromToy(%f) using passingEvents=%d / totalEvents=%d",
+	       qMu, passingEvents, totalEvents), false);
+  
   return probability;
 }
 
