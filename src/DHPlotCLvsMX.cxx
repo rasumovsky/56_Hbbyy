@@ -8,7 +8,11 @@
 //                                                                            //
 //  Plots the resonant analysis limits as a function of MX.                   //
 //                                                                            //
-//  Options: Can be "toy" or "asymptotic" or "both"                           //
+//  Macro options:                                                            //
+//  - "toy"        Get limits from toy MC jobs.                               //
+//  - "asymptotic" Get asymptotic limits.                                     //
+//  - "both"       Compares toy and asymptotic limits.                        //
+//  - "NEvents"    Calculate limits in terms of number of events.             //
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -86,13 +90,14 @@ int main(int argc, char **argv) {
     
     // Open the saved CL values from asymptotics:
     if (options.Contains("asymptotic") || options.Contains("both")) {
-      
-      ifstream inputFile_asym(Form("%s/limits_asymptotic_ResonantMX%d.txt",
-				   inputDir.Data(), mX));
+      TString fileAsymName = (options.Contains("NEvents")) ? 
+	Form("%s/limits_asymptotic_ResonantMX%d_NEvent.txt",inputDir.Data(),mX):
+	Form("%s/limits_asymptotic_ResonantMX%d.txt", inputDir.Data(), mX);
+      ifstream inputFile_asym(fileAsymName);
       if (inputFile_asym.is_open()) {
 	TString inName = ""; double inValue = 0.0;
 	while (inputFile_asym >> inName >> inValue) {
-	  inValue = inValue / 1000.0;
+	  if (!options.Contains("NEvents")) inValue = inValue / 1000.0;
 	  // WARNING! The + and - are deliberately swapped here!
 	  if (inName.EqualTo("observedCL")) CLObs_asym[n_asym] = inValue;
 	  if (inName.EqualTo("expectedCL")) CLExp_asym[n_asym] = inValue;
@@ -109,13 +114,14 @@ int main(int argc, char **argv) {
     
     // Open the saved CL values from toys:
     if (options.Contains("toy") || options.Contains("both")) {
-      
-      ifstream inputFile_toy(Form("%s/limits_toy_ResonantMX%d.txt",
-				  inputDir.Data(), mX));
+      TString fileToyName = (options.Contains("NEvents")) ? 
+	Form("%s/limits_toy_ResonantMX%d_NEvent.txt", inputDir.Data(), mX) :
+	Form("%s/limits_toy_ResonantMX%d.txt", inputDir.Data(), mX);
+      ifstream inputFile_toy(fileToyName);
       if (inputFile_toy.is_open()) {
 	TString inName = ""; double inValue = 0.0;
 	while (inputFile_toy >> inName >> inValue) {
-	  inValue = inValue / 1000.0;
+	  if (!options.Contains("NEvents")) inValue = inValue / 1000.0;
 	  // WARNING! The + and - are deliberately swapped here!
 	  if (inName.EqualTo("observedCL")) CLObs_toy[n_toy] = inValue;
 	  if (inName.EqualTo("expectedCL")) CLExp_toy[n_toy] = inValue;
@@ -185,9 +191,17 @@ int main(int argc, char **argv) {
   gCLExp_toy->GetXaxis()->SetTitle("M_{X} [GeV]");
   gCLObs_toy->GetXaxis()->SetTitle("M_{X} [GeV]");
   gCLExp_toy_2s->GetXaxis()->SetTitle("M_{X} [GeV]");
-  gCLExp_toy->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
-  gCLObs_toy->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
-  gCLExp_toy_2s->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
+  if (options.Contains("NEvents")) {
+    gCLExp_toy->GetYaxis()->SetTitle("95% CL Events");
+    gCLObs_toy->GetYaxis()->SetTitle("95% CL Events");
+    gCLExp_toy_2s->GetYaxis()->SetTitle("95% CL Events");
+  }
+  else {
+    gCLExp_toy->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
+    gCLObs_toy->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
+    gCLExp_toy_2s->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
+  }
+  
   gCLExp_toy->SetLineColor(kBlack);
   gCLObs_toy->SetLineColor(kBlack);
   gCLExp_toy->SetLineStyle(2);
@@ -201,9 +215,16 @@ int main(int argc, char **argv) {
   gCLExp_asym->GetXaxis()->SetTitle("M_{X} [GeV]");
   gCLObs_asym->GetXaxis()->SetTitle("M_{X} [GeV]");
   gCLExp_asym_2s->GetXaxis()->SetTitle("M_{X} [GeV]");
-  gCLExp_asym->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
-  gCLObs_asym->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
-  gCLExp_asym_2s->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
+  if (options.Contains("NEvents")) {
+    gCLExp_asym->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
+    gCLObs_asym->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
+    gCLExp_asym_2s->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
+  }
+  else {
+    gCLExp_asym->GetYaxis()->SetTitle("95% CL Events");
+    gCLObs_asym->GetYaxis()->SetTitle("95% CL Events");
+    gCLExp_asym_2s->GetYaxis()->SetTitle("95% CL Events");
+  }
   gCLExp_asym->SetLineColor(kBlack);
   gCLObs_asym->SetLineColor(kBlack);
   gCLExp_asym->SetLineStyle(2);
@@ -214,7 +235,7 @@ int main(int argc, char **argv) {
   gCLExp_asym_1s->SetFillColor(kGreen);
   
   // Legend:
-  TLegend leg(0.60,0.73,0.88,0.91);
+  TLegend leg(0.61,0.73,0.89,0.91);
   leg.SetBorderSize(0);
   leg.SetFillColor(0);
   leg.SetTextSize(0.04);
@@ -225,8 +246,6 @@ int main(int argc, char **argv) {
   
   // Plotting options:
   if (options.Contains("toy")) {
-    //gCLExp_toy->Draw("AL");
-    //gCLExp_toy_2s->Draw("3same");
     gCLExp_toy_2s->Draw("A3");
     gCLExp_toy->Draw("Lsame");
     gCLExp_toy_1s->Draw("3same");
@@ -234,8 +253,6 @@ int main(int argc, char **argv) {
     if (!config->getBool("DoBlind")) gCLObs_toy->Draw("LSAME");
   }
   else if (options.Contains("asymptotic")) {
-    //gCLExp_asym->Draw("AL");
-    //gCLExp_asym_2s->Draw("3same");
     gCLExp_asym_2s->Draw("A3");
     gCLExp_asym->Draw("Lsame");
     gCLExp_asym_1s->Draw("3same");
@@ -243,8 +260,6 @@ int main(int argc, char **argv) {
     if (!config->getBool("DoBlind")) gCLObs_asym->Draw("LSAME");
   }
   else if (options.Contains("both")) {
-    //gCLExp_toy->Draw("AL");
-    //gCLExp_toy_2s->Draw("3same");
     gCLExp_toy_2s->Draw("A3");
     gCLExp_toy->Draw("Lsame");
     gCLExp_toy_1s->Draw("3same");
@@ -265,16 +280,38 @@ int main(int argc, char **argv) {
   }
   gPad->RedrawAxis();
   leg.Draw("SAME");
-    
+  
+  // Print ATLAS text on the plot:    
+  TLatex t; t.SetNDC(); t.SetTextColor(kBlack);
+  t.SetTextFont(72); t.SetTextSize(0.05);
+  t.DrawLatex(0.2, 0.87, "ATLAS");
+  t.SetTextFont(42); t.SetTextSize(0.05);
+  t.DrawLatex(0.32, 0.87, config->getStr("ATLASLabel"));
+  //t.SetTextSize(0.04);
+  t.DrawLatex(0.2, 0.81, 
+	      Form("#sqrt{s} = 13 TeV: #scale[0.7]{#int}Ldt = %2.1f fb^{-1}",
+		   (config->getNum("AnalysisLuminosity")/1000.0)));
+  
   // Print the canvas:
   if (options.Contains("asymptotic")) {
-    can->Print(Form("%s/limits_asymptotic.eps", outputDir.Data()));
+    if (options.Contains("NEvents")) {
+      can->Print(Form("%s/limits_asymptotic_NEvent.eps", outputDir.Data()));
+    }
+    else can->Print(Form("%s/limits_asymptotic.eps", outputDir.Data()));
   }
   else if (options.Contains("toy")) {
-    can->Print(Form("%s/limits_toy.eps", outputDir.Data()));
+    if (options.Contains("NEvents")) {
+      can->Print(Form("%s/limits_toy_NEvent.eps", outputDir.Data()));
+    }
+    else can->Print(Form("%s/limits_toy.eps", outputDir.Data()));
   }
-  else can->Print(Form("%s/limits_comparison.eps", outputDir.Data()));
-  
+  else {
+    if (options.Contains("NEvents")) {
+      can->Print(Form("%s/limits_comparison_NEvent.eps", outputDir.Data()));
+    }
+    else can->Print(Form("%s/limits_comparison.eps", outputDir.Data()));
+  }
+
   // Delete pointers, close files, return:
   std::cout << "DHPlotCLvsMX: Finished!" << std::endl;
   delete can;

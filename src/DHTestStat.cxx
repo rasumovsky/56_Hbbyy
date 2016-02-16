@@ -1307,6 +1307,10 @@ void DHTestStat::setParam(TString paramName, double paramVal,
 			  bool doSetConstant) {
   m_paramValToSet[paramName] = paramVal;
   m_paramConstToSet[paramName] = doSetConstant;
+  
+  // Do this immediately?
+  m_workspace->var(paramName)->setVal(paramVal);
+  m_workspace->var(paramName)->setConstant(doSetConstant);
 }
 
 /**
@@ -1322,4 +1326,23 @@ void DHTestStat::storeParams(RooArgSet *set, std::map<std::string,double>& map){
   while ((curr = (RooRealVar*)iterSet->Next())) {
     map[(std::string)curr->GetName()] = curr->getVal();
   }
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Get the workspace.
+   @return - A pointer to the class RooWorkspace object.
+*/
+RooWorkspace *DHTestStat::theWorkspace() {
+  return m_workspace;
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Get the ModelConfig.
+   @return - A pointer to the class ModelConfig object.
+*/
+
+ModelConfig *DHTestStat::theModelConfig() {
+  return m_mc;
 }

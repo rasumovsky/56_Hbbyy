@@ -64,7 +64,9 @@ class DHTestStat {
 		   double GeVPerBin);
   void setPlotDirectory(TString directory);
   void setParam(TString paramName, double paramVal, bool doSetConstant);
-      
+  RooWorkspace *theWorkspace();
+  ModelConfig *theModelConfig();
+  
  private:
   
   TString getKey(TString testStat, bool observed, int N);

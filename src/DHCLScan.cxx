@@ -9,6 +9,14 @@
 //  Performs a scan of the 95% CL for the non-resonant Di-Higgs analysis as a //
 //  function of signal cross-section.                                         //
 //                                                                            //
+//  Macro options:                                                            //
+//  - "New"        Calculate everything from scratch.                         //
+//  - "FromFile"   Load CL values from file.                                  //
+//  - "toy"        Get limits from toy MC jobs.                               //
+//  - "asymptotic" Get asymptotic limits.                                     //
+//  - "both"       Compares toy and asymptotic limits.                        //
+//  - "NEvents"    Calculate limits in terms of number of events.             //
+//                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "CommonFunc.h"
@@ -65,7 +73,7 @@ double getIntercept(TGraph *graph, double valueToIntercept) {
    -----------------------------------------------------------------------------
    The main method scans the 95% CL for various signal cross-sections.
    @param configFile - The analysis configuration file.
-   @param options - Job options.
+   @param options - Job options: "New","FromFile","toy","asymptotic","NEvents"
    @param resMass - The resonance mass.
 */
 int main(int argc, char **argv) {
@@ -98,6 +106,7 @@ int main(int argc, char **argv) {
   // Create a nametag for results:
   TString tag = (anaType.EqualTo("Resonant")) ? 
     Form("ResonantMX%d", resonanceMass) : "NonResonant";
+  if (options.Contains("NEvents")) tag.Append("_NEvent");
   
   // Set the plot Style to ATLAS defaults:
   CommonFunc::SetAtlasStyle();
@@ -224,7 +233,13 @@ int main(int argc, char **argv) {
 	
 	// Check that the fit converges:
 	if (dhts->fitsAllConverged()) {
-	  varValues_asym[n_asym] = crossSection;
+	  if (options.Contains("NEvents")) {
+	    varValues_asym[n_asym]
+	      = (dhts->theWorkspace())->function("nRaw_SigBSM2H_bb")->getVal();
+	  }
+	  else {
+	    varValues_asym[n_asym] = crossSection;
+	  }
 	  CLObs_asym[n_asym] = dhts->accessValue("CL", true, 0);
 	  CLExp_asym[n_asym] = dhts->accessValue("CL", false, 0);
 	  CLExp_asym_p2[n_asym] = dhts->accessValue("CL", false, 2);
@@ -260,7 +275,13 @@ int main(int argc, char **argv) {
 	std::cout << "nllObsMu1=" << nllObsMu1 
 		  << ", nllObsMuFree=" << nllObsMuFree
 		  << ", qMuObs=" << qMuObs_toy[n_toy] << std::endl;
-	varValues_toy[n_toy] = crossSection;
+	if (options.Contains("NEvents")) {
+	  varValues_toy[n_toy]
+	    = (dhts->theWorkspace())->function("nRaw_SigBSM2H_bb")->getVal();
+	}
+	else {
+	  varValues_toy[n_toy] = crossSection;
+	}
 	n_toy++;
       }
     }
@@ -275,7 +296,7 @@ int main(int argc, char **argv) {
 	// between the DHToyAnalysis class and DHTestStat, which is called
 	// in DHToyAnalysis...
 	TString toyScanOption = Form("CLScan%d",i_t);
-	if (i_t == 0) toyScanOption.Append("_ForcePlot");
+	if (i_t == 2) toyScanOption.Append("_ForcePlot");
 	DHToyAnalysis *dhta
 	  = new DHToyAnalysis(configFile, toyScanOption, resonanceMass);
 	if (!(dhta->areInputFilesOK())) {
@@ -375,8 +396,14 @@ int main(int argc, char **argv) {
   can->cd();
   
   // Toy graph formatting:
-  gCLExp_toy->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
-  gCLObs_toy->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
+  if (options.Contains("NEvents")) {
+    gCLExp_toy->GetXaxis()->SetTitle("Events");
+    gCLObs_toy->GetXaxis()->SetTitle("Events");
+  }
+  else {
+    gCLExp_toy->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
+    gCLObs_toy->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
+  }
   gCLExp_toy->GetYaxis()->SetTitle("CL");
   gCLObs_toy->GetYaxis()->SetTitle("CL");
   gCLExp_toy->SetLineColor(kBlack);
@@ -390,8 +417,14 @@ int main(int argc, char **argv) {
   gCLExp_toy_1s->SetFillColor(kGreen);
 
   // Asymptotic graph formatting:
-  gCLExp_asym->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
-  gCLObs_asym->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
+  if (options.Contains("NEvents")) {
+    gCLExp_asym->GetXaxis()->SetTitle("Events");
+    gCLObs_asym->GetXaxis()->SetTitle("Events");
+  }
+  else {
+    gCLExp_asym->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
+    gCLObs_asym->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
+  }
   gCLExp_asym->GetYaxis()->SetTitle("CL");
   gCLObs_asym->GetYaxis()->SetTitle("CL");
   gCLExp_asym->SetLineColor(kBlack);
@@ -405,7 +438,7 @@ int main(int argc, char **argv) {
   gCLExp_asym_1s->SetFillColor(kGreen);
   
   // Legend:
-  TLegend leg(0.65,0.19,0.9,0.37);
+  TLegend leg(0.54,0.20,0.79,0.38);
   leg.SetBorderSize(0);
   leg.SetFillColor(0);
   leg.SetTextSize(0.04);
@@ -464,6 +497,17 @@ int main(int argc, char **argv) {
     line->DrawLine(gCLExp_asym->GetXaxis()->GetXmin(), 0.95,
 		   gCLExp_asym->GetXaxis()->GetXmax(), 0.95);
   }
+  
+  // Print ATLAS text on the plot:    
+  TLatex t; t.SetNDC(); t.SetTextColor(kBlack);
+  t.SetTextFont(72); t.SetTextSize(0.05);
+  t.DrawLatex(0.54, 0.48, "ATLAS");
+  t.SetTextFont(42); t.SetTextSize(0.05);
+  t.DrawLatex(0.66, 0.48, config->getStr("ATLASLabel"));
+  //t.SetTextSize(0.04);
+  t.DrawLatex(0.54, 0.42, 
+	      Form("#sqrt{s} = 13 TeV: #scale[0.7]{#int}Ldt = %2.1f fb^{-1}",
+		   (config->getNum("AnalysisLuminosity")/1000.0)));
   
   // Print the canvas:
   if (options.Contains("asymptotic")) {
