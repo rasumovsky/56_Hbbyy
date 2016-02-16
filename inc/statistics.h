@@ -1,3 +1,11 @@
+////////////////////////////////////////////////////////////////////////////////
+//                                                                            //
+//  Author: Haichen Wang                                                      //
+//  Copyright (C) 2008                                                        //
+//  All Rights Reserved                                                       //
+//                                                                            //
+////////////////////////////////////////////////////////////////////////////////
+
 #ifndef STATISTICS_H
 #define STATISTICS_H
 #include "CommonHead.h"
