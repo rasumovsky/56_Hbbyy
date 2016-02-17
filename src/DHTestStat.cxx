@@ -668,6 +668,43 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   RooFitResult *fitResult = statistics::minimize(varNLL, "", NULL, true);
   if (!fitResult || fitResult->status() != 0) m_allGoodFits = false;
   
+  /*
+  std::cout << "PRINTING NORMALIZATIONS AND ERRORS" << std::endl;
+  double bkgVal_jj = m_workspace->var("n_BkgNonHiggs_jj")->getVal();
+  double bkgErr_jj =  m_workspace->var("n_BkgNonHiggs_jj")->getError();
+  double SigSMVal_jj = m_workspace->function("n_SigSM_jj")->getVal();
+  double SigSMErr_jj
+    = m_workspace->function("n_SigSM_jj")->getPropagatedError(*fitResult);
+  
+  std::cout << "bkgVal_jj = " << bkgVal_jj << " +/- " << bkgErr_jj << std::endl;
+  std::cout << "SigSMVal_jj = " << SigSMVal_jj << " +/- " << SigSMErr_jj
+	    << std::endl;
+  
+  
+  double bkgVal_bb = m_workspace->var("n_BkgNonHiggs_bb")->getVal();
+  double bkgErr_bb =  m_workspace->var("n_BkgNonHiggs_bb")->getError();
+  double SigSMVal_bb = m_workspace->function("n_SigSM_bb")->getVal();
+  double SigSMErr_bb
+    = m_workspace->function("n_SigSM_bb")->getPropagatedError(*fitResult);
+  
+  std::cout << "bkgVal_bb = " << bkgVal_bb << " +/- " << bkgErr_bb << std::endl;
+  std::cout << "SigSMVal_bb = " << SigSMVal_bb << " +/- " << SigSMErr_bb
+	    << std::endl;
+  */
+
+  
+  //std::cout << "CONTINUUM: " 
+  //	    << m_workspace->function("n_BkgNonHiggs_bbSideBand")->getVal() 
+  //	    << " +/- "
+  //	    << m_workspace->function("n_BkgNonHiggs_bbSideBand")->getError() 
+  //	    << std::endl;
+  
+  
+
+
+
+
+
   //std::cout << "Post-fit parameter values" << std::endl;
   //printSet("nuisanceParameters", nuisanceParameters);
   //printSet("globalObservables", globalObservables);
