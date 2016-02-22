@@ -64,6 +64,7 @@ class DHTestStat {
 		   double GeVPerBin);
   void setPlotDirectory(TString directory);
   void setParam(TString paramName, double paramVal, bool doSetConstant);
+  void setSubPlot(TString ratioOrSubtraction);
   RooWorkspace *theWorkspace();
   ModelConfig *theModelConfig();
   
@@ -75,6 +76,9 @@ class DHTestStat {
   TGraphErrors* plotDivision(TString dataName, TString pdfName, TString obsName,
 			     double xMin, double xMax, double xBins);
   void plotFits(TString fitType, TString datasetName);
+  TGraphErrors* plotSubtract(TString dataName, TString pdfName,
+			     TString obsName, double xMin, double xMax,
+			     double xBins);
   void printer(TString statement, bool isFatal);
   void printSet(TString setName, RooArgSet* set);
   void storeParams(RooArgSet *set, std::map<std::string,double>& map);
@@ -128,7 +132,7 @@ class DHTestStat {
   double m_yMin;
   double m_yMax;
   double m_geVPerBin;
-  
+  TString m_ratioOrSubtraction;
 };
 
 #endif

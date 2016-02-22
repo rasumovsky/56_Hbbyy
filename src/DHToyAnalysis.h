@@ -31,6 +31,8 @@ class DHToyAnalysis {
   bool areInputFilesOK();
   double calculateCLsFromToy(double qMu);
   double calculateCLFromToy(double qMu);
+  double calculateErrorPVal(double pValue, int nToys);
+  double calculateErrorCLVal(double qMu);
   double calculateBkgQMuForN(double N);
   double calculatePBFromToy(double qMu);
   double calculatePMuFromToy(double qMu);

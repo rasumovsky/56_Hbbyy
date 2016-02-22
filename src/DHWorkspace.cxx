@@ -836,6 +836,7 @@ void DHWorkspace::createNewWS() {
 		    m_config->getNum("FitPlotYMin"),
 		    m_config->getNum("FitPlotYMax"),
 		    m_config->getNum("FitPlotGeVPerBin"));
+  dhts->setSubPlot(m_config->getStr("SubPlotStyle"));
   
   double profiledPOIVal = -999.0;
   // Mu = 0 fits:

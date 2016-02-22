@@ -188,18 +188,21 @@ int main(int argc, char **argv) {
   can->cd();
   
   // Toy graph formatting:
-  gCLExp_toy->GetXaxis()->SetTitle("M_{X} [GeV]");
-  gCLObs_toy->GetXaxis()->SetTitle("M_{X} [GeV]");
-  gCLExp_toy_2s->GetXaxis()->SetTitle("M_{X} [GeV]");
+  gCLExp_toy->GetXaxis()->SetTitle("m_{X} [GeV]");
+  gCLObs_toy->GetXaxis()->SetTitle("m_{X} [GeV]");
+  gCLExp_toy_2s->GetXaxis()->SetTitle("m_{X} [GeV]");
   if (options.Contains("NEvents")) {
-    gCLExp_toy->GetYaxis()->SetTitle("95% CL Events");
-    gCLObs_toy->GetYaxis()->SetTitle("95% CL Events");
-    gCLExp_toy_2s->GetYaxis()->SetTitle("95% CL Events");
+    gCLExp_toy->GetYaxis()->SetTitle("95% CL limit on events");
+    gCLObs_toy->GetYaxis()->SetTitle("95% CL limit on events");
+    gCLExp_toy_2s->GetYaxis()->SetTitle("95% CL limit on events");
   }
   else {
-    gCLExp_toy->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
-    gCLObs_toy->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
-    gCLExp_toy_2s->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
+    gCLExp_toy->GetYaxis()
+      ->SetTitle("95% CL limit on #sigma_{X#rightarrowhh} [pb]");
+    gCLObs_toy->GetYaxis()
+      ->SetTitle("95% CL limit on #sigma_{X#rightarrowhh} [pb]");
+    gCLExp_toy_2s->GetYaxis()
+      ->SetTitle("95% CL limit on #sigma_{X#rightarrowhh} [pb]");
   }
   
   gCLExp_toy->SetLineColor(kBlack);
@@ -212,18 +215,21 @@ int main(int argc, char **argv) {
   gCLExp_toy_1s->SetFillColor(kGreen);
 
   // Asymptotic graph formatting:
-  gCLExp_asym->GetXaxis()->SetTitle("M_{X} [GeV]");
-  gCLObs_asym->GetXaxis()->SetTitle("M_{X} [GeV]");
-  gCLExp_asym_2s->GetXaxis()->SetTitle("M_{X} [GeV]");
+  gCLExp_asym->GetXaxis()->SetTitle("m_{X} [GeV]");
+  gCLObs_asym->GetXaxis()->SetTitle("m_{X} [GeV]");
+  gCLExp_asym_2s->GetXaxis()->SetTitle("m_{X} [GeV]");
   if (options.Contains("NEvents")) {
-    gCLExp_asym->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
-    gCLObs_asym->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
-    gCLExp_asym_2s->GetYaxis()->SetTitle("95% CL #sigma_{X#rightarrowhh} [pb]");
+    gCLExp_asym->GetYaxis()
+      ->SetTitle("95% CL limit on #sigma_{X#rightarrowhh} [pb]");
+    gCLObs_asym->GetYaxis()
+      ->SetTitle("95% CL limit on #sigma_{X#rightarrowhh} [pb]");
+    gCLExp_asym_2s->GetYaxis()
+      ->SetTitle("95% CL limit on #sigma_{X#rightarrowhh} [pb]");
   }
   else {
-    gCLExp_asym->GetYaxis()->SetTitle("95% CL Events");
-    gCLObs_asym->GetYaxis()->SetTitle("95% CL Events");
-    gCLExp_asym_2s->GetYaxis()->SetTitle("95% CL Events");
+    gCLExp_asym->GetYaxis()->SetTitle("95% CL limit on events");
+    gCLObs_asym->GetYaxis()->SetTitle("95% CL limit on events");
+    gCLExp_asym_2s->GetYaxis()->SetTitle("95% CL limit on events");
   }
   gCLExp_asym->SetLineColor(kBlack);
   gCLObs_asym->SetLineColor(kBlack);
@@ -239,10 +245,10 @@ int main(int argc, char **argv) {
   leg.SetBorderSize(0);
   leg.SetFillColor(0);
   leg.SetTextSize(0.04);
-  if (!config->getBool("DoBlind")) leg.AddEntry(gCLObs_toy,"Obs. Limit","l");
-  leg.AddEntry(gCLExp_toy,"Exp. Limit","l");
-  leg.AddEntry(gCLExp_toy_1s,"Exp. Limit #pm1#sigma_{exp}","F");
-  leg.AddEntry(gCLExp_toy_2s,"Exp. Limit #pm2#sigma_{exp}","F");
+  if (!config->getBool("DoBlind")) leg.AddEntry(gCLObs_toy,"Obs. limit","l");
+  leg.AddEntry(gCLExp_toy,"Exp. limit","l");
+  leg.AddEntry(gCLExp_toy_1s,"Exp. limit #pm1#sigma_{exp}","F");
+  leg.AddEntry(gCLExp_toy_2s,"Exp. limit #pm2#sigma_{exp}","F");
   
   // Plotting options:
   if (options.Contains("toy")) {
@@ -274,9 +280,9 @@ int main(int argc, char **argv) {
     gCLExp_asym->Draw("LSAME");
     if (!config->getBool("DoBlind")) {
       gCLObs_asym->Draw("LSAME");
-      leg.AddEntry(gCLObs_asym,"Obs. Limit (asymptotic)","l");
+      leg.AddEntry(gCLObs_asym,"Obs. limit (asymptotic)","l");
     }
-    leg.AddEntry(gCLExp_asym,"Exp. Limit (asymptotic)","l");
+    leg.AddEntry(gCLExp_asym,"Exp. limit (asymptotic)","l");
   }
   gPad->RedrawAxis();
   leg.Draw("SAME");
@@ -288,30 +294,44 @@ int main(int argc, char **argv) {
   t.SetTextFont(42); t.SetTextSize(0.05);
   t.DrawLatex(0.32, 0.87, config->getStr("ATLASLabel"));
   //t.SetTextSize(0.04);
-  t.DrawLatex(0.2, 0.81, 
-	      Form("#sqrt{s} = 13 TeV: #scale[0.7]{#int}Ldt = %2.1f fb^{-1}",
-		   (config->getNum("AnalysisLuminosity")/1000.0)));
+  //t.DrawLatex(0.2, 0.81, 
+  //	      Form("#sqrt{s} = 13 TeV: #scale[0.7]{#int}Ldt = %2.1f fb^{-1}",
+  //		   (config->getNum("AnalysisLuminosity")/1000.0)));
+  t.DrawLatex(0.2, 0.81, Form("#sqrt{s} = 13 TeV, %2.1f fb^{-1}",
+			      (config->getNum("AnalysisLuminosity")/1000.0)));
   
   // Print the canvas:
   if (options.Contains("asymptotic")) {
     if (options.Contains("NEvents")) {
       can->Print(Form("%s/limits_asymptotic_NEvent.eps", outputDir.Data()));
+      can->Print(Form("%s/limits_asymptotic_NEvent.C", outputDir.Data()));
     }
-    else can->Print(Form("%s/limits_asymptotic.eps", outputDir.Data()));
+    else {
+      can->Print(Form("%s/limits_asymptotic.eps", outputDir.Data()));
+      can->Print(Form("%s/limits_asymptotic.C", outputDir.Data()));
+    }
   }
   else if (options.Contains("toy")) {
     if (options.Contains("NEvents")) {
       can->Print(Form("%s/limits_toy_NEvent.eps", outputDir.Data()));
+      can->Print(Form("%s/limits_toy_NEvent.C", outputDir.Data()));
     }
-    else can->Print(Form("%s/limits_toy.eps", outputDir.Data()));
+    else {
+      can->Print(Form("%s/limits_toy.eps", outputDir.Data()));
+      can->Print(Form("%s/limits_toy.C", outputDir.Data()));
+    }
   }
   else {
     if (options.Contains("NEvents")) {
       can->Print(Form("%s/limits_comparison_NEvent.eps", outputDir.Data()));
+      can->Print(Form("%s/limits_comparison_NEvent.C", outputDir.Data()));
     }
-    else can->Print(Form("%s/limits_comparison.eps", outputDir.Data()));
+    else {
+      can->Print(Form("%s/limits_comparison.eps", outputDir.Data()));
+      can->Print(Form("%s/limits_comparison.C", outputDir.Data()));
+    }
   }
-
+  
   // Delete pointers, close files, return:
   std::cout << "DHPlotCLvsMX: Finished!" << std::endl;
   delete can;

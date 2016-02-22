@@ -70,7 +70,8 @@ DHTestStat::DHTestStat(TString newConfigFile, TString newOptions,
   
   // Use linear plot y-axis by default:
   setPlotAxis(false, 0.0, 100.0, 1.0);
-
+  setSubPlot("Subtraction");
+    
   // Create output directories:
   m_outputDir = Form("%s/%s/DHTestStat", 
 		     (m_config->getStr("MasterOutput")).Data(),
@@ -1144,15 +1145,15 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     if ((m_workspace->pdf("model_"+cateNames[i_c]))) {
       (*m_workspace->data(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()))).plotOn(frame);
       if ((m_workspace->pdf("pdf_SigBSM2H_"+cateNames[i_c]))) {
-	(*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_SigBSM2H_"+cateNames[i_c]))), LineColor(6));
+	(*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_SigBSM2H_"+cateNames[i_c]))), LineColor(6), LineStyle(3));
       }
       if ((m_workspace->pdf("pdf_SigSM_"+cateNames[i_c]))) {
-	(*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_SigSM_"+cateNames[i_c]))), LineColor(3));
+	(*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_SigSM_"+cateNames[i_c]))), LineColor(3), LineStyle(4));
       }
       if ((m_workspace->pdf("pdf_BkgNonHiggs_"+cateNames[i_c]))) {
-	(*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_BkgNonHiggs_"+cateNames[i_c]))), LineColor(4));
+	(*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_BkgNonHiggs_"+cateNames[i_c]))), LineColor(4), LineStyle(2));
       }
-      (*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, LineColor(2));
+      (*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, LineColor(2), LineStyle(1));
     }
     TString xTitle =m_config->getStr(Form("OBSPrint_%s",cateNames[i_c].Data()));
     frame->SetXTitle(xTitle);
@@ -1174,29 +1175,40 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     histSH->SetLineColor(3);
     histBkg->SetLineColor(4);
     histSig->SetLineColor(2);
-    TLegend leg(0.60, 0.55, 0.92, 0.70);
+    
+    histDH->SetLineStyle(3);
+    histSH->SetLineStyle(4);
+    histBkg->SetLineStyle(2);
+    histSig->SetLineStyle(1);
+    
+    TLegend leg(0.63, 0.76, 0.92, 0.92);
     leg.SetFillColor(0);
-    leg.SetTextSize(0.04);
+    leg.SetTextSize(0.05);
     leg.SetBorderSize(0);
-    leg.AddEntry(histDH, "Di-Higgs", "l");
+    leg.SetTextFont(42);
+    leg.AddEntry(histDH, "DiHiggs", "l");
     leg.AddEntry(histSH, "Single Higgs", "l");
-    leg.AddEntry(histBkg, "Non-resonant", "l");
+    leg.AddEntry(histBkg, "Continuum Bkg.", "l");
     leg.AddEntry(histSig, "Sum", "l");
     leg.Draw("SAME");
     
     // Print ATLAS text on the plot:    
     TLatex t; t.SetNDC(); t.SetTextColor(kBlack);
     t.SetTextFont(72); t.SetTextSize(0.05);
-    t.DrawLatex(0.55, 0.88, "ATLAS");
+    t.DrawLatex(0.20, 0.88, "ATLAS");
     t.SetTextFont(42); t.SetTextSize(0.05);
-    t.DrawLatex(0.67, 0.88, m_config->getStr("ATLASLabel"));
+    t.DrawLatex(0.32, 0.88, m_config->getStr("ATLASLabel"));
     //t.SetTextSize(0.04);
-    t.DrawLatex(0.55, 0.82, 
-		Form("#sqrt{s} = 13 TeV: #scale[0.7]{#int}Ldt = %2.1f fb^{-1}",
-		     (m_config->getNum("AnalysisLuminosity")/1000.0)));
+    //t.DrawLatex(0.55, 0.82, 
+    //		Form("#sqrt{s} = 13 TeV: #scale[0.7]{#int}Ldt = %2.1f fb^{-1}",
+    //		     (m_config->getNum("AnalysisLuminosity")/1000.0)));
+    t.DrawLatex(0.20, 0.82, Form("#sqrt{s} = 13 TeV: %2.1f fb^{-1}",
+				 (m_config->getNum("AnalysisLuminosity")/
+				  1000.0)));
+    
     TString printCateName 
       = m_config->getStr(Form("PrintCateName_%s", cateNames[i_c].Data()));
-    t.DrawLatex(0.55, 0.76, printCateName);
+    t.DrawLatex(0.20, 0.76, printCateName);
     
     // Second pad on the canvas (Ratio Plot):
     pad2->cd();
@@ -1206,44 +1218,66 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     double ratioMax = 2.0;//2.2
     TH1F *medianHist = new TH1F("median","median",nBinsForPlot,obsMin,obsMax);
     for (int i_b = 1; i_b <= nBinsForPlot; i_b++) {
-      medianHist->SetBinContent(i_b, 1.0);
+      if (m_ratioOrSubtraction.EqualTo("Ratio")) {
+	medianHist->SetBinContent(i_b, 1.0);
+      }
+      else {
+	medianHist->SetBinContent(i_b, 0.0);
+      }
     }
     medianHist->SetLineColor(kRed);
     medianHist->SetLineWidth(2);
     medianHist->GetXaxis()->SetTitle(xTitle);
-    medianHist->GetYaxis()->SetTitle("Data / Fit");
+    if (m_ratioOrSubtraction.EqualTo("Ratio")) {
+      medianHist->GetYaxis()->SetTitle("Data / Fit");
+    }
+    else {
+      medianHist->GetYaxis()->SetTitle("Data - Fit");
+    }
     medianHist->GetXaxis()->SetTitleOffset(0.95);
     medianHist->GetYaxis()->SetTitleOffset(0.7);
     medianHist->GetXaxis()->SetTitleSize(0.1);
     medianHist->GetYaxis()->SetTitleSize(0.1);
     medianHist->GetXaxis()->SetLabelSize(0.1);
     medianHist->GetYaxis()->SetLabelSize(0.1);
-    medianHist->GetYaxis()->SetRangeUser(ratioMin, ratioMax);
-    //medianHist->GetYaxis()->SetNdivisions(5);
+    if (m_ratioOrSubtraction.EqualTo("Ratio")) {
+      medianHist->GetYaxis()->SetRangeUser(ratioMin, ratioMax);
+    }
     medianHist->GetYaxis()->SetNdivisions(4);
-    medianHist->Draw();
+    if (m_ratioOrSubtraction.EqualTo("Ratio")) medianHist->Draw();
     
+    TGraphErrors* subData = NULL;
+    if (m_ratioOrSubtraction.EqualTo("Ratio")) {
+      subData 
+	= plotDivision(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()),
+		       Form("model_%s", cateNames[i_c].Data()), obsName, obsMin,
+		       obsMax, nBinsForPlot);
+      
+      TLine *line = new TLine();
+      line->SetLineStyle(1);
+      line->SetLineWidth(2);
+      line->SetLineColor(kBlack);
+      line->SetLineWidth(1);
+      line->SetLineStyle(2);
+      line->DrawLine(obsMin,((1.0+ratioMin)/2.0), obsMax,((1.0+ratioMin)/2.0));
+      line->DrawLine(obsMin,((1.0+ratioMax)/2.0), obsMax,((1.0+ratioMax)/2.0));
+      
+      subData->Draw("EPSAME");
+    }
+    else {
+      subData
+	= plotSubtract(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()),
+		       Form("model_%s", cateNames[i_c].Data()), obsName,
+		       obsMin, obsMax, nBinsForPlot);
+      medianHist->GetYaxis()->SetRangeUser(subData->GetYaxis()->GetXmin(),
+					   subData->GetYaxis()->GetXmax());
+      medianHist->Draw();
+      subData->Draw("EPSAME");
+    }
     
-    //medianHist->GetXaxis()->SetRangeUser(obsMin, obsMax);
-    
-    TGraphErrors* subData
-      = plotDivision(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()),
-		     Form("model_%s", cateNames[i_c].Data()), obsName, obsMin,
-		     obsMax, nBinsForPlot);
-    subData->Draw("EPSAME");
-    
-    TLine *line = new TLine();
-    line->SetLineStyle(1);
-    line->SetLineWidth(2);
-    line->SetLineColor(kBlack);
-    //line->DrawLine(obsMin, 1.0, obsMax, 1.0); 
-    line->SetLineWidth(1);
-    line->SetLineStyle(2);
-    line->DrawLine(obsMin, ((1.0+ratioMin)/2.0), obsMax, ((1.0+ratioMin)/2.0));
-    line->DrawLine(obsMin, ((1.0+ratioMax)/2.0), obsMax, ((1.0+ratioMax)/2.0));
-    subData->Draw("EPSAME");
-        
     can->Print(Form("%s/fitPlot_%s_%s_%s.eps", m_plotDir.Data(),
+		    m_anaType.Data(), fitType.Data(), cateNames[i_c].Data()));
+    can->Print(Form("%s/fitPlot_%s_%s_%s.C", m_plotDir.Data(),
 		    m_anaType.Data(), fitType.Data(), cateNames[i_c].Data()));
     delete histDH;
     delete histSH;
@@ -1252,6 +1286,74 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     delete frame;
   }
   delete can;
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Create a subtraction plot:
+   @param dataName - The name of the RooAbsData set in the workspace.
+   @param pdfName - The name of the RooAbsPdf in the workspace.
+   @param xMin - The minimum value of the observable range.
+   @param xMax - The maximum value of the observable range.
+   @param xBins - The number of bins for the observable.
+   @return - A TGraphErrors to plot.
+*/
+TGraphErrors* DHTestStat::plotSubtract(TString dataName, TString pdfName, 
+				       TString obsName, double xMin, 
+				       double xMax, double xBins){
+  printer(Form("DHTestStat::plotSubtract(%s, %s, %s, %f, %f, %f)",
+	       dataName.Data(),pdfName.Data(),obsName.Data(),xMin,xMax,xBins),
+	  false);
+  
+  RooRealVar *observable = m_workspace->var(obsName);
+  RooAbsData *data = m_workspace->data(dataName);
+  RooAbsPdf *pdf = m_workspace->pdf(pdfName); 
+  double minOrigin = observable->getMin();
+  double maxOrigin = observable->getMax();
+  double nEvents = data->sumEntries();
+    
+  observable->setRange("fullRange", xMin, xMax);
+  TH1F *originHist
+    = (TH1F*)data->createHistogram("dataSub", *observable,
+  				   RooFit::Binning(xBins, xMin, xMax));
+  TGraphErrors *result = new TGraphErrors();
+  double increment = (xMax - xMin) / ((double)xBins);
+  
+  RooAbsReal* intTot
+    = (RooAbsReal*)pdf->createIntegral(RooArgSet(*observable),
+				       RooFit::NormSet(*observable), 
+				       RooFit::Range("fullRange"));
+  double valTot = intTot->getVal();
+  
+  int pointIndex = 0;
+  for (double i_m = xMin; i_m < xMax; i_m += increment) {
+    observable->setRange(Form("range%2.2f",i_m), i_m, (i_m+increment));
+    RooAbsReal* intCurr
+      = (RooAbsReal*)pdf->createIntegral(RooArgSet(*observable), 
+					 RooFit::NormSet(*observable), 
+					 RooFit::Range(Form("range%2.2f",i_m)));
+    double valCurr = intCurr->getVal();
+    
+    double currMass = i_m + (0.5*increment);
+    double currPdfWeight = nEvents * (valCurr / valTot);
+    TString varName = observable->GetName();
+    double currDataWeight = data->sumEntries(Form("%s>%f&&%s<%f",varName.Data(),
+						  i_m,varName.Data(),
+						  (i_m+increment)));
+    double currWeight = currDataWeight - currPdfWeight;
+    //if (currDataWeight == 0) currWeight = 1.0;
+    if (currDataWeight > 0.000001) {
+      result->SetPoint(pointIndex, currMass, currWeight);
+    }
+    
+    //double currError = originHist->GetBinError(pointIndex+1) / currPdfWeight;
+    double currError = originHist->GetBinError(pointIndex+1);
+    result->SetPointError(pointIndex, 0.0, currError);
+    pointIndex++;
+  }
+  observable->setMin(minOrigin);
+  observable->setMax(maxOrigin);
+  return result;
 }
 
 /**
@@ -1309,6 +1411,15 @@ void DHTestStat::printSet(TString setName, RooArgSet* set) {
 */
 void DHTestStat::saveSnapshots(bool doSaveSnapshot) {
   m_doSaveSnapshot = doSaveSnapshot;
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Choose to plot ratio or subtraction plot below plot of mass points.
+   @param ratioOrSubtraction - "Ratio" or "Subtraction" plot below main plot.
+*/
+void DHTestStat::setSubPlot(TString ratioOrSubtraction) {
+  m_ratioOrSubtraction = ratioOrSubtraction;
 }
 
 /**

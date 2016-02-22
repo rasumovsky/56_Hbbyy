@@ -243,6 +243,36 @@ double DHToyAnalysis::calculateCLFromToy(double qMu) {
 
 /**
    -----------------------------------------------------------------------------
+   Calculate the error from toy MC statistics on calculated p-value.
+   @param pValue - The p-value for which we are computing the error.
+   @param nToys - The number of toy MC used to compute the p-value.
+   @return - The binomial error on the p-value.
+*/
+double DHToyAnalysis::calculateErrorPVal(double pValue, int nToys) {
+  return sqrt(pValue * (1.0 - pValue) / ((double)nToys));
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Calculate the error from toy MC statistics on calculated CL value.
+   @param qMu - The value of the test statistic.
+   @return - The binomial error on the p-value.
+*/
+double DHToyAnalysis::calculateErrorCLVal(double qMu) {
+  // First obtain the p-values:
+  double pMu = calculatePMuFromToy(qMu);
+  double pB = calculatePBFromToy(qMu);
+  
+  // Then calculate the error for each p-value:
+  double pBErr = calculateErrorPVal(pB, ((int)m_valuesQMu_Mu0.size()));
+  double pMuErr = calculateErrorPVal(pMu, ((int)m_valuesQMu_Mu1.size()));
+  
+  // Finally, sum the errors in quadrature:
+  return sqrt((pBErr * pBErr) + (pMuErr * pMuErr));
+}
+
+/**
+   -----------------------------------------------------------------------------
    Calculate the fractional number of toys in the mu=0 toy dataset that give a
    value of QMu less than than that observed QMu in data.
    @param qMu - The value of the test statistic.
@@ -862,4 +892,3 @@ TString DHToyAnalysis::printStatName(TString statistic) {
   else if (statistic.EqualTo("QMuTilde")) return TString("#tilde{q}_{#mu}");
   else return TString("q");
 }
-
