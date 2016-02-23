@@ -65,6 +65,9 @@ DHTestStat::DHTestStat(TString newConfigFile, TString newOptions,
   // Then get the model configuration:
   m_mc = (ModelConfig*)m_workspace->obj("modelConfig");
   
+  // Reset nuisance parameters after fitting by default:
+  resetParamsAfterFit(true);
+  
   // Map storing all calculations:
   m_calculatedValues.clear();
   
@@ -815,8 +818,13 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   storeParams(globalObservables, m_mapGlobs);
   storeParams((RooArgSet*)m_workspace->set("nonSysParameters"), m_mapPars);
   
-  // release nuisance parameters after fit and recovery the default values
-  statistics::constSet(nuisanceParameters, false, origValNP);
+  // release nuisance parameters after fit and recovery the default values:
+  if (m_doResetParamsAfterFit) {
+    statistics::constSet(nuisanceParameters, false, origValNP);
+  }
+  else {
+    statistics::constSet(nuisanceParameters, false);
+  }
   
   // Finish up, return NLL value.
   printer("DHTestStat: Fit has completed. Returning NLL.", false);
@@ -1402,6 +1410,16 @@ void DHTestStat::printSet(TString setName, RooArgSet* set) {
 			    curr->getVal());
     printer(currLine, false);
   }
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Choose whether or not to reset nuisance parameters after calling getFitNLL().
+   @param doResetParamsAfterFit - True iff. parameters should be set to original
+   values after fitting.
+*/
+void DHTestStat::resetParamsAfterFit(bool doResetParamsAfterFit) {
+  m_doResetParamsAfterFit = doResetParamsAfterFit;
 }
 
 /**

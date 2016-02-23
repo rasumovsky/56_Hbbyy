@@ -117,7 +117,7 @@ int main(int argc, char **argv) {
   
   // Instantiate the test statistic class for calculations and plots:
   DHTestStat *dhts = new DHTestStat(configFile, "new", workspace);
-    
+  
   // Arrays to store band information:
   double varValues_asym[100] = {0};
   double CLObs_asym[100] = {0};
@@ -237,9 +237,8 @@ int main(int argc, char **argv) {
 	    varValues_asym[n_asym]
 	      = (dhts->theWorkspace())->function("nRaw_SigBSM2H_bb")->getVal();
 	  }
-	  else {
-	    varValues_asym[n_asym] = crossSection;
-	  }
+	  else varValues_asym[n_asym] = crossSection / 1000.0;
+	  
 	  CLObs_asym[n_asym] = dhts->accessValue("CL", true, 0);
 	  CLExp_asym[n_asym] = dhts->accessValue("CL", false, 0);
 	  CLExp_asym_p2[n_asym] = dhts->accessValue("CL", false, 2);
@@ -279,9 +278,8 @@ int main(int argc, char **argv) {
 	  varValues_toy[n_toy]
 	    = (dhts->theWorkspace())->function("nRaw_SigBSM2H_bb")->getVal();
 	}
-	else {
-	  varValues_toy[n_toy] = crossSection;
-	}
+	else varValues_toy[n_toy] = crossSection / 1000.0;
+	
 	n_toy++;
       }
     }
@@ -404,8 +402,8 @@ int main(int argc, char **argv) {
     gCLExp_toy->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
     gCLObs_toy->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
   }
-  gCLExp_toy->GetYaxis()->SetTitle("CL");
-  gCLObs_toy->GetYaxis()->SetTitle("CL");
+  gCLExp_toy->GetYaxis()->SetTitle("CL limit");
+  gCLObs_toy->GetYaxis()->SetTitle("CL limit");
   gCLExp_toy->SetLineColor(kBlack);
   gCLObs_toy->SetLineColor(kBlack);
   gCLExp_toy->SetLineStyle(2);
@@ -425,8 +423,8 @@ int main(int argc, char **argv) {
     gCLExp_asym->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
     gCLObs_asym->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
   }
-  gCLExp_asym->GetYaxis()->SetTitle("CL");
-  gCLObs_asym->GetYaxis()->SetTitle("CL");
+  gCLExp_asym->GetYaxis()->SetTitle("CL limit");
+  gCLObs_asym->GetYaxis()->SetTitle("CL limit");
   gCLExp_asym->SetLineColor(kBlack);
   gCLObs_asym->SetLineColor(kBlack);
   gCLExp_asym->SetLineStyle(2);
@@ -442,10 +440,10 @@ int main(int argc, char **argv) {
   leg.SetBorderSize(0);
   leg.SetFillColor(0);
   leg.SetTextSize(0.04);
-  if (!config->getBool("DoBlind")) leg.AddEntry(gCLObs_toy,"Obs. Limit","l");
-  leg.AddEntry(gCLExp_toy,"Exp. Limit","l");
-  leg.AddEntry(gCLExp_toy_1s,"Exp. Limit #pm1#sigma_{exp}","F");
-  leg.AddEntry(gCLExp_toy_2s,"Exp. Limit #pm2#sigma_{exp}","F");
+  if (!config->getBool("DoBlind")) leg.AddEntry(gCLObs_toy,"Obs. limit","l");
+  leg.AddEntry(gCLExp_toy,"Exp. limit","l");
+  leg.AddEntry(gCLExp_toy_1s,"Exp. limit #pm1#sigma_{exp}","F");
+  leg.AddEntry(gCLExp_toy_2s,"Exp. limit #pm2#sigma_{exp}","F");
   
   // Plotting options:
   if (options.Contains("toy")) {
@@ -477,9 +475,9 @@ int main(int argc, char **argv) {
     gCLExp_asym->Draw("LSAME");
     if (!config->getBool("DoBlind")) {
       gCLObs_asym->Draw("LSAME");
-      leg.AddEntry(gCLObs_asym,"Obs. Limit (asymptotic)","l");
+      leg.AddEntry(gCLObs_asym,"Obs. limit (asymptotic)","l");
     }
-    leg.AddEntry(gCLExp_asym,"Exp. Limit (asymptotic)","l");
+    leg.AddEntry(gCLExp_asym,"Exp. limit (asymptotic)","l");
   }
   gPad->RedrawAxis();
   leg.Draw("SAME");
@@ -505,9 +503,11 @@ int main(int argc, char **argv) {
   t.SetTextFont(42); t.SetTextSize(0.05);
   t.DrawLatex(0.66, 0.48, config->getStr("ATLASLabel"));
   //t.SetTextSize(0.04);
-  t.DrawLatex(0.54, 0.42, 
-	      Form("#sqrt{s} = 13 TeV: #scale[0.7]{#int}Ldt = %2.1f fb^{-1}",
-		   (config->getNum("AnalysisLuminosity")/1000.0)));
+  //t.DrawLatex(0.54, 0.42, 
+  //	      Form("#sqrt{s} = 13 TeV: #scale[0.7]{#int}Ldt = %2.1f fb^{-1}",
+  //		   (config->getNum("AnalysisLuminosity")/1000.0)));
+  t.DrawLatex(0.54, 0.42, Form("#sqrt{s} = 13 TeV, %2.1f fb^{-1}",
+			       (config->getNum("AnalysisLuminosity")/1000.0)));
   
   // Print the canvas:
   if (options.Contains("asymptotic")) {

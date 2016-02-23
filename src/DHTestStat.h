@@ -59,7 +59,10 @@ class DHTestStat {
   double getQMuTildeFromNLL(double nllMu, double nllMu0, double nllMuHat,
 			    double muHat, double muTest);
   void loadStatsFromFile();
+  void resetParamsAfterFit(bool doResetParamsAfterFit);
   void saveSnapshots(bool doSaveSnapshot);
+  //void scanNLL(TString varToScan, std::vector<TString> varsToFix);
+  
   void setPlotAxis(bool useLogScale, double yMin, double yMax, 
 		   double GeVPerBin);
   void setPlotDirectory(TString directory);
@@ -107,7 +110,8 @@ class DHTestStat {
 
   // Check whether all fits successful:
   bool m_allGoodFits;
-  
+  bool m_doResetParamsAfterFit;
+
   // The workspace for the fits:
   RooWorkspace *m_workspace;
   ModelConfig *m_mc;
