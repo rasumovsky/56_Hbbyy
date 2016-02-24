@@ -19,51 +19,6 @@
 #include "Config.h"
 #include "DHTestStat.h"
 #include "DHToyAnalysis.h"
-#include "DHNP.h"
-
-/**
-   -----------------------------------------------------------------------------
-   Get the intersection point for the graph.
-*/
-double getIntercept(TGraph *graph, double valueToIntercept) {
-  
-  // Loop over points in the graph to get search range:
-  double rangeMin = 0.0; double rangeMax = 0.0;
-  for (int i_p = 0; i_p < graph->GetN(); i_p++) {
-    double xCurr; double yCurr;
-    graph->GetPoint(i_p, xCurr, yCurr);
-    if (i_p == 0) rangeMin = xCurr;
-    if (i_p == (graph->GetN()-1)) rangeMax = xCurr;
-  }
-  
-  // Bisection method to search for intercept:
-  double precision = 0.0001;
-  int nIterations = 0;
-  int maxIterations = 30;
-  double stepSize = (rangeMax - rangeMin) / 2.0;
-  double currXValue = (rangeMax + rangeMin) / 2.0;
-  double currYValue = graph->Eval(currXValue);
-  while ((fabs(currYValue - valueToIntercept)/valueToIntercept) > precision && 
-	 nIterations <= maxIterations) {
-    
-    currYValue = graph->Eval(currXValue);
-    
-    nIterations++;
-    stepSize = 0.5 * stepSize;
-
-    if (currYValue > valueToIntercept) currXValue -= stepSize;
-    else currXValue += stepSize;
-  }
-  
-  // Print error message and return bad value if convergence not achieved:
-  if (nIterations == maxIterations) {
-    std::cout << "DHNuisanceParameters: ERROR! Intercept not found."
-	      << std::cout;
-    return -999;
-  }
-  
-  return currXValue;
-}
 
 /**
    -----------------------------------------------------------------------------
@@ -159,14 +114,29 @@ int main(int argc, char **argv) {
     
     //----------------------------------------//
     // Storage for nuisance parameter data:
-    std::map<TString,DHNP*> parameterData; parameterData.clear();
+    std::vector<TString> paramNames; paramNames.clear();
     RooArgSet *nuisParameters = dhts->theModelConfig()->GetNuisanceParameters();
     TIterator *iterNuis = nuisParameters->createIterator();
     RooRealVar *currNuis = NULL;
     while ((currNuis = (RooRealVar*)iterNuis->Next())) {
-      TString currNuisName = (TString)(currNuis->GetName());
-      parameterData[currNuisName] = new DHNP(currNuisName);
+      paramNames.push_back((TString)(currNuis->GetName()));
     }
+    
+    double points[100] = {0.0};
+    double muLo[100] = {0.0};
+    double muHi[100] = {0.0};
+    
+    double valMu0[100] = {0.0};
+    double errLoMu0[100] = {0.0};
+    double errHiMu0[100] = {0.0};
+    
+    double valMu1[100] = {0.0};
+    double errLoMu1[100] = {0.0};
+    double errHiMu1[100] = {0.0};
+    
+    double valMuFree[100] = {0.0};
+    double errLoMuFree[100] = {0.0};
+    double errHiMuFree[100] = {0.0};
     
     //----------------------------------------//
     // First get NP values from profiling data:
@@ -176,59 +146,53 @@ int main(int argc, char **argv) {
     double nllMu0 = dhts->getFitNLL(m_dataToPlot, 0, true, profiledPOIVal);
     if (!dhts->fitsAllConverged()) m_allGoodFits = false;
     else {
-      saveNuisData("Mu0", parameterData, 
-		   dhts->theModelConfig()->GetNuisanceParameters());
+      RooArgSet *setMu0 = dhts->theModelConfig()->GetNuisanceParameters();
     }
     
     // Mu = 1 fits:
     double nllMu1 = dhts->getFitNLL(m_dataToPlot, 1, true, profiledPOIVal);
     if (!dhts->fitsAllConverged()) m_allGoodFits = false;
     else {
-      saveNuisData("Mu1", parameterData, 
-		   dhts->theModelConfig()->GetNuisanceParameters());
+      RooArgSet *setMu1 = dhts->theModelConfig()->GetNuisanceParameters();
     }
 
     // Mu free fits:
     double nllMuFree = dhts->getFitNLL(m_dataToPlot, 1, false, profiledPOIVal);
     if (!dhts->fitsAllConverged()) m_allGoodFits = false;
     else {
-      saveNuisData("MuFree", parameterData, 
-		   dhts->theModelConfig()->GetNuisanceParameters());
-      
-      // Also get total uncertainty on mu here.
+      RooArgSet *setMuFree = dhts->theModelConfig()->GetNuisanceParameters();
     }
-    
-    
-
-    
-    
-    
+        
     
     
     //----------------------------------------//
     // Then get the impact of each NP on the signal strength:
     
+    // First get the full uncertainty on mu:
+    std::vector<TString> nullSet; nullSet.clear();
+    std::map<int,double> mlScan
+      = dhts->scanNLL("mlScan", config->getStr("DataToScan"),
+		      config->getStr("ParamToScan"), nullSet);
+    
     // Loop over the NP:
-    
-    // fit the NP to the best-fit value from mu-free fit:
-    
-    // float other NP:
-    
-    // Get the uncertainty on mu from this fit
-    
-    // Take the difference as the uncertainty on mu from this NP
-    
-
-
-    
-    // Calculate the 95% CL value:
-    dhts->calculateNewCL();
-    
-    // Check that the fit converges:
-    if (dhts->fitsAllConverged()) {
+    for (int i_n = 0; i_n < (int)paramNames.size(); i_n++) {
       
-      dhts->clearData();
+      // Set the current parameter constant in the fit:
+      std::vector<TString> currParamsToFix;
+      currParamToFix.clear();
+      currParamsToFix.push_back(paramNames[i_n]);
+      
+      // Get the uncertainty on mu from this fit:
+      std::map<int,double> currScan
+	= dhts->scanNLL("currScan", config->getStr("DataToScan"),
+			config->getStr("ParamToScan"), currParamsToFix);
+      
+      // Take the difference with usual error as uncertainty on mu from this NP:
+      muLo[i_n] = -1.0 * fabs(mlScan[-1] - currScan[-1]);
+      muHi[i_n] = fabs(currScan[1] - mlScan[1]);
+      points[i_n] = i_n;
     }
+
     
         
     // Close the files that save CL data:

@@ -21,6 +21,8 @@
 //    - CLScanAnalysis                                                        //
 //    - CLScanSubmitToys                                                      //
 //    - PlotCLvsMX                                                            //
+//    - ScanNLL                                                               //
+//    - RankNP                                                                //
 //                                                                            //
 //  Need to rethink the SigParam handling of the RooDataSet. Maybe we         //
 //  should just hand it a RooDataSet?                                         //
@@ -317,6 +319,11 @@ int main (int argc, char **argv) {
     sys->setConstrCenterTypeIncl("JET_GroupedNP",
 				 "asym", 1.0, "yield", false);
     
+    sys->setConstrCenterTypeIncl("EG_SCALE_ALL",
+				 "asym", 1.0, "yield", true);
+    sys->setConstrCenterTypeIncl("EG_RESOLUTION_ALL",
+				 "asym", 1.0, "yield", true);
+    
     // Also create a list of systematic uncertainties to ignore:
     std::vector<TString> sysToIgnore; sysToIgnore.clear();
     sysToIgnore.push_back("FT_EFF_Eigen_B_0");
@@ -418,10 +425,10 @@ int main (int argc, char **argv) {
     DHTestStat *dhts = new DHTestStat(configFileName, 
 				      m_config->getStr("TestStatOptions"),
 				      NULL);
-    dhts->setParam(m_config->getStr("CrossSectionVar"),
-		   m_config->getNum("CrossSectionValue"), true);
     
     // Non-resonant analysis: specify cross-section:
+    dhts->setParam(m_config->getStr("CrossSectionVar"),
+		   m_config->getNum("CrossSectionValue"), true);
     
     // Resonant analysis: specify cross-section and resonance mass:
     if ((m_config->getStr("AnalysisType")).EqualTo("Resonant")) {
@@ -502,11 +509,28 @@ int main (int argc, char **argv) {
   }
   
   //--------------------------------------//
-  // Step 8.2: Create the CL scan plot:
+  // Step 9.0: Create the 95% CL limit plot vs. MX for resonant search:
   if (masterOption.Contains("PlotCLvsMX")) {
-    std::cout << "DHMaster: Step 8.2 - Get Plot of CL vs. MX" << std::endl;
+    std::cout << "DHMaster: Step 9.0 - Get Plot of CL vs. MX" << std::endl;
     system(Form("./bin/DHPlotCLvsMX %s %s", fullConfigPath.Data(),
 		(m_config->getStr("CLMXPlotOptions")).Data()));
+  }
+  
+  //--------------------------------------//
+  // Step 10: Create the NLL scan:
+  if (masterOption.Contains("ScanNLL")) {
+    std::cout << "DHMaster: Step 10.0 - Get NLL Scan Results" << std::endl;
+    system(Form("./bin/DHNLLScan %s %s 0", fullConfigPath.Data(),
+		(m_config->getStr("NLLScanOptions")).Data()));
+  }
+  
+  //--------------------------------------//
+  // Step 11: Create the nuisance parameter ranking:
+  if (masterOption.Contains("RankNP")) {
+    std::cout << "DHMaster: Step 11.0 - Rank the nuisance parameters" 
+	      << std::endl;
+    system(Form("./bin/DHNuisanceParameters %s %s 0", fullConfigPath.Data(),
+		(m_config->getStr("NLLScanOptions")).Data()));
   }
   
   return 0;

@@ -28,6 +28,9 @@
 /**
    -----------------------------------------------------------------------------
    Get the intersection point for the graph.
+   @param graph - The graph for which intercept points will be found.
+   @param valueToIntercept - The y-value to intercept.
+   @return - The x-value of the intercept.
 */
 double getIntercept(TGraph *graph, double valueToIntercept) {
   
@@ -63,11 +66,9 @@ double getIntercept(TGraph *graph, double valueToIntercept) {
   if (nIterations == maxIterations) {
     std::cout << "DHCLScan: ERROR! Intercept not found." << std::cout;
     return -999;
-  }
-  
+  } 
   return currXValue;
 }
-
 
 /**
    -----------------------------------------------------------------------------

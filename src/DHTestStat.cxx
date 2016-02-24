@@ -74,7 +74,7 @@ DHTestStat::DHTestStat(TString newConfigFile, TString newOptions,
   // Use linear plot y-axis by default:
   setPlotAxis(false, 0.0, 100.0, 1.0);
   setSubPlot("Subtraction");
-    
+  
   // Create output directories:
   m_outputDir = Form("%s/%s/DHTestStat", 
 		     (m_config->getStr("MasterOutput")).Data(),
@@ -226,6 +226,7 @@ void DHTestStat::clearData() {
   m_doPlot = false;
   m_plotDir = "";
   clearFitParamSettings();
+  m_graphNLL = NULL;
 }
 
 /**
@@ -364,149 +365,6 @@ RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
   return pseudoData;
 }
 
-/*
-   -----------------------------------------------------------------------------
-   Create a pseudo-dataset with a given value of DM and SM signal strength.
-   @param seed - The random seed for dataset generation.
-   @param valPoI - The value of the parameter of interest.
-   @param fixPoI - True iff. the parameter of interest should be fixed. 
-   @return - A pseudo-dataset.
-
-WARNING! THIS METHOD IS FLAWED. IT WILL BIAS YOUR TOYS AND DOES NOT CREATE
-AN UNCONDITIONAL ENSEMBLE. IT WILL BIAS YOUR OBSERVATIONS...
-
-RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
-  printer(Form("DHTestStatLLcreatePseudoData(seed=%d, PoI=%d, fixPoI=%d)",
-	       seed, valPoI, (int)fixPoI), false);
-  
-  //RooSimultaneous* combPdf = (RooSimultaneous*)m_mc->GetPdf();
-  RooAbsPdf* combPdf = (RooAbsPdf*)m_mc->GetPdf();
-  RooArgSet* nuisanceParameters = (RooArgSet*)m_mc->GetNuisanceParameters();
-  RooArgSet* globalObservables = (RooArgSet*)m_mc->GetGlobalObservables();
-  RooArgSet* observables = (RooArgSet*)m_mc->GetObservables();
-  RooRealVar* firstPoI = (RooRealVar*)m_mc->GetParametersOfInterest()->first();
-  
-  // Load snapshot with all nuisance parameters and global observables at 0:
-  m_workspace->loadSnapshot("paramsOrigin");
-
-  //std::cout << "toy values FROM ORIGIN etc." << std::endl;
-  //printSet("nuisanceParameters", nuisanceParameters);
-  //printSet("globalObservables", globalObservables);
-  
-  // Randomize the global observables and set them constant for now:
-  RooRandom::randomGenerator()->SetSeed(seed);
-  statistics::constSet(globalObservables, false);
-  statistics::randomizeSet(combPdf, globalObservables, seed); 
-  statistics::constSet(globalObservables, true);
-  
-  //std::cout << "toy values AFTER randomization of globs" << std::endl;
-  //printSet("nuisanceParameters", nuisanceParameters);
-  //printSet("globalObservables", globalObservables);
-  
-  // Load the parameters from profiling data to create UNCONDITIONAL ENSEMBLE:
-  RooArgSet *profiledSnapshot = NULL;
-  TString snapshotName = Form("paramsProfilePoI%d", valPoI);
-  if (m_workspace->getSnapshot(snapshotName)) {
-    m_workspace->loadSnapshot(snapshotName);
-    printer(Form("DHTestStat: Loaded snapshot %s",snapshotName.Data()), false);
-  }
-  else {
-    // Load the original parameters from profiling:
-    //m_workspace->loadSnapshot("paramsOrigin");
-    printer(Form("DHTestStat: ERROR! No snapshot %s", snapshotName.Data()),
-	    true);
-  }
-  
-  statistics::constSet(nuisanceParameters, true, profiledSnapshot);
-  
-  //std::cout << "toy values AFTER randomization AND profiled NP" << std::endl;
-  //printSet("nuisanceParameters", nuisanceParameters);
-  //printSet("globalObservables", globalObservables);
-  
-  // Store the toy dataset and number of events per dataset:
-  map<string,RooDataSet*> toyDataMap; toyDataMap.clear();
-  m_numEventsPerCate.clear();
-  
-  // Set the parameter of interest value and status:
-  firstPoI->setVal(valPoI);
-  firstPoI->setConstant(fixPoI);
-    
-  // Check if other parameter settings have been specified for toys:
-  // WARNING! This overrides the randomization settings above!
-  for (std::map<TString,double>::iterator iterParam = m_paramValToSet.begin();
-       iterParam != m_paramValToSet.end(); iterParam++) {
-    // Check that workspace contains parameter:
-    if (m_workspace->var(iterParam->first)) {
-      m_workspace->var(iterParam->first)->setVal(iterParam->second);
-      m_workspace->var(iterParam->first)
-	->setConstant(m_paramConstToSet[iterParam->first]);
-    }
-    else {
-      m_workspace->Print("v");
-      printer(Form("DHTestStat: Error! Parameter %s not found in workspace! See printout above for clues...", (iterParam->first).Data()), true);
-    }
-  }
-  
-  std::cout << "toy values AFTER randomization AND setting" << std::endl;
-  printSet("nuisanceParameters", nuisanceParameters);
-  printSet("globalObservables", globalObservables);
-
-  // Iterate over the categories:
-  RooSimultaneous *simPdf = (RooSimultaneous*)m_workspace->pdf("combinedPdfSB");
-  TIterator *cateIter = simPdf->indexCat().typeIterator();
-  RooCatType *cateType = NULL;
-  while ((cateType = (RooCatType*)cateIter->Next())) {
-    //RooAbsPdf *currPdf = combPdf->getPdf(cateType->GetName());
-    RooAbsPdf *currPdf = simPdf->getPdf(cateType->GetName());
-    RooArgSet *currObs = currPdf->getObservables(observables);
-        
-    // If you want to bin the pseudo-data (speeds up calculation):
-    if (m_options.Contains("Binned")) {
-      currPdf->setAttribute("PleaseGenerateBinned");
-      TIterator *iterObs = currObs->createIterator();
-      RooRealVar *currObs = NULL;
-      // Bin each of the observables:
-      while ((currObs = (RooRealVar*)iterObs->Next())) currObs->setBins(120);
-      toyDataMap[(std::string)cateType->GetName()]
-	= (RooDataSet*)currPdf->generate(*currObs, AutoBinned(true),
-					 Extended(currPdf->canBeExtended()),
-					 GenBinned("PleaseGenerateBinned"));
-    }
-    // Construct unbinned pseudo-data by default:
-    else {
-      toyDataMap[(std::string)cateType->GetName()]
-	= (RooDataSet*)currPdf->generate(*currObs,Extended(true));
-    }
-    double currEvt = toyDataMap[(std::string)cateType->GetName()]->sumEntries();
-    m_numEventsPerCate.push_back(currEvt);
-  }
-  
-  // Create the combined toy RooDataSet:
-  RooCategory *categories = (RooCategory*)m_workspace->obj("categories");
-  RooDataSet* pseudoData = new RooDataSet("toyData", "toyData", *observables, 
-					  RooFit::Index(*categories),
-					  RooFit::Import(toyDataMap));
-  
-  // Save the parameters used to generate toys:
-  storeParams(nuisanceParameters, m_mapNP);
-  storeParams(globalObservables, m_mapGlobs);
-  storeParams((RooArgSet*)m_workspace->set("nonSysParameters"), m_mapPars);
-  
-  // release nuisance parameters (but don't change the values!):
-  //m_workspace->loadSnapshot("paramsOrigin");
-  statistics::constSet(nuisanceParameters, false);
-  statistics::constSet(globalObservables, true);
-  
-  //std::cout << "toy values FINAL reloading." << std::endl;
-  //printSet("nuisanceParameters", nuisanceParameters);
-  //printSet("globalObservables", globalObservables);
-
-  // Import into the workspace then return:
-  m_workspace->import(*pseudoData);
-  return pseudoData;
-}
-*/
-
 /**
    -----------------------------------------------------------------------------
    Check if all of the fits done by this class have converged.
@@ -625,7 +483,7 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   poiAndNuis->add(*nuisanceParameters);
   poiAndNuis->add(*poi);
   
-  // Look for dataset. Create if non-existent & Asimov or requires binning.
+  // Look for dataset:
   if (!m_workspace->data(datasetName)) {
     printer(Form("DHTestStat: Error! Requested data not available: %s",
 		 datasetName.Data()), true);
@@ -694,7 +552,7 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   std::cout << "bkgVal_bb = " << bkgVal_bb << " +/- " << bkgErr_bb << std::endl;
   std::cout << "SigSMVal_bb = " << SigSMVal_bb << " +/- " << SigSMErr_bb
 	    << std::endl;
-  */
+  
 
   
   //std::cout << "CONTINUUM: " 
@@ -713,7 +571,7 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   //printSet("nuisanceParameters", nuisanceParameters);
   //printSet("globalObservables", globalObservables);
   
-  /*
+  
   if ((m_config->getStr("AnalysisType")).EqualTo("NonResonant")) {
     
     double n_AllProcesses_bb
@@ -748,15 +606,15 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
 			 m_workspace->function("n_SigSMZH_jj")->getVal() +
 			 m_workspace->function("n_SigSMttH_jj")->getVal() +
 			 m_workspace->function("n_SigSMbbH_jj")->getVal());
-    double n_bias_jj = 0.0;
-    if (m_config->getBool("UseSystematics")) {
-      n_bias_jj = m_workspace->function("n_Bias_jj")->getVal();
-    }
+    //double n_bias_jj = 0.0;
+    //if (m_config->getBool("UseSystematics")) {
+    //n_bias_jj = m_workspace->function("n_Bias_jj")->getVal();
+    //}
     std::cout << "\nPrinting jj values for comparison" << std::endl;
     std::cout << "\tAllProcesses_jj = " << n_AllProcesses_jj << std::endl;
     std::cout << "\tBkgContinuum_jj = " << n_BkgNonHiggs_jj << std::endl;
     std::cout << "\tSigSM_jj        = " << n_SigSM_jj << std::endl;
-    std::cout << "\tBias_jj         = " << n_bias_jj << std::endl;
+    //std::cout << "\tBias_jj         = " << n_bias_jj << std::endl;
     std::cout << "\n" << std::endl;
   }
   else {
@@ -781,7 +639,7 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
     std::cout << "\n" << std::endl;
   }
   
-
+  
   m_workspace->var("RNDM_MyyMODELING")->setVal(0);
   m_workspace->var("MyyMODELING")->setVal(0);
   std::cout << "CENTRAL BGM= " << varNLL->getVal() << std::endl;
@@ -818,7 +676,7 @@ double DHTestStat::getFitNLL(TString datasetName, double valPoI, bool fixPoI,
   storeParams(globalObservables, m_mapGlobs);
   storeParams((RooArgSet*)m_workspace->set("nonSysParameters"), m_mapPars);
   
-  // release nuisance parameters after fit and recovery the default values:
+  // release nuisance parameters after fit and recover the default values:
   if (m_doResetParamsAfterFit) {
     statistics::constSet(nuisanceParameters, false, origValNP);
   }
@@ -979,6 +837,64 @@ double DHTestStat::getQMuTildeFromNLL(double nllMu, double nllMu0,
 
 /**
    -----------------------------------------------------------------------------
+   Get the intersection point for the graph.
+   @param graph - The graph for which intercept points will be found.
+   @param valueToIntercept - The y-value to intercept.
+   @return - The x-value of the intercept.
+*/
+double DHTestStat::graphIntercept(TGraph *graph, double valueToIntercept) {
+  
+  // Loop over points in the graph to get search range:
+  double rangeMin = 0.0; double rangeMax = 0.0;
+  for (int i_p = 0; i_p < graph->GetN(); i_p++) {
+    double xCurr; double yCurr;
+    graph->GetPoint(i_p, xCurr, yCurr);
+    if (i_p == 0) rangeMin = xCurr;
+    if (i_p == (graph->GetN()-1)) rangeMax = xCurr;
+    // Also exit prematurely if only one point:
+    if (graph->GetN() < 2) return xCurr;
+  }
+  
+  // 
+  bool increasing = true;
+  if (graph->Eval(rangeMin) > graph->Eval(rangeMax)) increasing = false;
+
+  // Bisection method to search for intercept:
+  double precision = 0.0001;
+  int nIterations = 0;
+  int maxIterations = 30;
+  double stepSize = (rangeMax - rangeMin) / 2.0;
+  double currXValue = (rangeMax + rangeMin) / 2.0;
+  double currYValue = graph->Eval(currXValue);
+  while ((fabs(currYValue - valueToIntercept)/valueToIntercept) > precision && 
+	 nIterations <= maxIterations) {
+    
+    currYValue = graph->Eval(currXValue);
+    
+    nIterations++;
+    stepSize = 0.5 * stepSize;
+
+    if (increasing) {
+      if (currYValue > valueToIntercept) currXValue -= stepSize;
+      else currXValue += stepSize;
+    }
+    else {
+      if (currYValue > valueToIntercept) currXValue += stepSize;
+      else currXValue -= stepSize;
+    }
+  }
+  
+  // Print error message and return bad value if convergence not achieved:
+  if (nIterations == maxIterations) {
+    std::cout << "DHCLScan: ERROR! Intercept not found." << std::cout;
+    return -999;
+  }
+  
+  return currXValue;
+}
+
+/**
+   -----------------------------------------------------------------------------
    Load the statistics files (p0 and CL) that were previously generated. If none
    are found, then create from scratch automatically.
 */
@@ -1043,6 +959,15 @@ TString DHTestStat::nameOfVar(TString varForm) {
   TString name = varForm;
   name.Remove(name.First("["));
   return name;
+}
+
+/**
+   -----------------------------------------------------------------------------
+   Get the most recent NLL scan graph.
+   @return - The most recent NLL scan TGraph.
+*/
+TGraph *DHTestStat::nllScanGraph() {
+  return m_graphNLL;
 }
 
 /**
@@ -1206,10 +1131,6 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     t.DrawLatex(0.20, 0.88, "ATLAS");
     t.SetTextFont(42); t.SetTextSize(0.05);
     t.DrawLatex(0.32, 0.88, m_config->getStr("ATLASLabel"));
-    //t.SetTextSize(0.04);
-    //t.DrawLatex(0.55, 0.82, 
-    //		Form("#sqrt{s} = 13 TeV: #scale[0.7]{#int}Ldt = %2.1f fb^{-1}",
-    //		     (m_config->getNum("AnalysisLuminosity")/1000.0)));
     t.DrawLatex(0.20, 0.82, Form("#sqrt{s} = 13 TeV: %2.1f fb^{-1}",
 				 (m_config->getNum("AnalysisLuminosity")/
 				  1000.0)));
@@ -1433,6 +1354,243 @@ void DHTestStat::saveSnapshots(bool doSaveSnapshot) {
 
 /**
    -----------------------------------------------------------------------------
+   Scan the NLL of a particular variable.
+   @param scanName - The name of the scan (for saving plots...).
+   @param datasetName - The name of the dataset in the workspace.
+   @param varToScan - The variable that will be scanned.
+   @param varsToFix - The variables that will be fixed at max-likelihood values.
+   @return - The -1 sigma, median, and +1 sigma variable values.
+*/
+std::map<int,double> DHTestStat::scanNLL(TString scanName, TString datasetName,
+					 TString varToScan,
+					 std::vector<TString> varsToFix) {
+  printer(Form("DHTestStat::scanNLL(datasetName = %s, varToScan = %s)",
+	       datasetName.Data(), varToScan.Data()), false);
+  
+  // A map to store the scan results (median = 0, sigmas are +/-1, +/-2, etc...)
+  std::map<int,double> result; result.clear();
+  
+  // Load objects for fitting:
+  RooAbsPdf* combPdf = m_mc->GetPdf();
+  RooArgSet* nuisanceParameters = (RooArgSet*)m_mc->GetNuisanceParameters();
+  RooArgSet* globalObservables = (RooArgSet*)m_mc->GetGlobalObservables();
+  RooArgSet* origValNP = (RooArgSet*)m_workspace->getSnapshot("paramsOrigin");
+  RooArgSet* poi = (RooArgSet*)m_mc->GetParametersOfInterest();
+  RooRealVar* firstPoI = (RooRealVar*)poi->first();
+  RooArgSet* poiAndNuis = new RooArgSet();
+  poiAndNuis->add(*nuisanceParameters);
+  poiAndNuis->add(*poi);
+  
+  m_workspace->loadSnapshot("paramsOrigin");
+  
+  // Look for dataset:
+  if (!m_workspace->data(datasetName)) {
+    printer(Form("DHTestStat: Error! Requested data not available: %s",
+		 datasetName.Data()), true);
+  }
+  
+  // Allow the PoI to float:
+  firstPoI->setConstant(false);
+  
+  // Release nuisance parameters before fit and set to the default values
+  statistics::constSet(nuisanceParameters, false, origValNP);
+  // The global observables should be fixed to the nominal values...
+  statistics::constSet(globalObservables, true);
+  
+  // Check if other parameter settings have been specified for fit:
+  for (std::map<TString,double>::iterator iterParam = m_paramValToSet.begin();
+       iterParam != m_paramValToSet.end(); iterParam++) {
+    // Check that workspace contains parameter:
+    if (m_workspace->var(iterParam->first)) {
+      m_workspace->var(iterParam->first)->setVal(iterParam->second);
+      m_workspace->var(iterParam->first)
+	->setConstant(m_paramConstToSet[iterParam->first]);
+    }
+    else {
+      m_workspace->Print("v");
+      printer(Form("DHTestStat: Error! Parameter %s not found in workspace!",
+		   ((TString)iterParam->first).Data()), true);
+    }
+  }
+    
+  // First do a fit to get the unconditional maximum likelihood fit result:
+  RooNLLVar* varMLNLL
+    = (RooNLLVar*)combPdf->createNLL(*m_workspace->data(datasetName),
+				     Extended(combPdf->canBeExtended()));
+  RooFitResult *fitResultML = statistics::minimize(varMLNLL, "", NULL, true);
+  if (!fitResultML || fitResultML->status() != 0) m_allGoodFits = false;
+  m_workspace->saveSnapshot("paramsProfileML", *poiAndNuis);
+  double minNLLVal = varMLNLL->getVal();
+  delete fitResultML;
+  delete varMLNLL;
+  
+  // Then retrieve the central value and error as "preliminary result":
+  double errorLo = m_workspace->var(varToScan)->getError();
+  double errorHi = m_workspace->var(varToScan)->getError();
+  result[0] = m_workspace->var(varToScan)->getVal();
+  result[-1] = result[0] - errorLo;
+  result[1] = result[0] + errorHi;
+  double scanMin = result[0] - (2.0 * errorLo);
+  double scanMax = result[0] + (2.0 * errorHi);
+  if (scanMin < m_workspace->var(varToScan)->getMin()) {
+    scanMin = m_workspace->var(varToScan)->getMin();
+  }
+  if (scanMax > m_workspace->var(varToScan)->getMax()) {
+    scanMax = m_workspace->var(varToScan)->getMax();
+  }
+  
+  // Compile a list of points to scan:
+  std::vector<double> scanValues; scanValues.clear();
+  for (double currValue = scanMin; currValue <= scanMax; 
+       currValue += ((scanMax-scanMin)/m_config->getNum("NumberOfScanPoints"))){
+    scanValues.push_back(currValue);
+  }
+  scanValues.push_back(result[0]);
+  std::sort(scanValues.begin(), scanValues.end());
+  
+  //----------------------------------------//
+  // Scan the variable of interest, and perform a fit at each point to get NLL:
+  
+  TGraph *gNLL = new TGraph(); 
+  gNLL->SetNameTitle(Form("tmp%s",scanName.Data()),
+		     Form("tmp%s",scanName.Data()));
+  TGraph *gNLLLo = new TGraph();
+  TGraph *gNLLHi = new TGraph();
+  int indexLo = 0;
+  int indexHi = 0;
+  
+  for (int scanIndex = 0; scanIndex < (int)scanValues.size(); scanIndex++) {
+    // Load the snapshot from the ML fit:
+    m_workspace->loadSnapshot("paramsProfileML");
+    
+    // Release nuisance parameters before fit and set to the default values
+    statistics::constSet(nuisanceParameters, false);
+    // The global observables should be fixed to the nominal values...
+    statistics::constSet(globalObservables, true);
+    
+    // Check if other parameter settings have been specified for fit:
+    for (std::map<TString,double>::iterator iterParam = m_paramValToSet.begin();
+	 iterParam != m_paramValToSet.end(); iterParam++) {
+      // Check that workspace contains parameter:
+      if (m_workspace->var(iterParam->first)) {
+	m_workspace->var(iterParam->first)->setVal(iterParam->second);
+	m_workspace->var(iterParam->first)
+	  ->setConstant(m_paramConstToSet[iterParam->first]);
+      }
+      else {
+	m_workspace->Print("v");
+	printer(Form("DHTestStat: Error! Parameter %s not found in workspace!",
+		     ((TString)iterParam->first).Data()), true);
+      }
+    }
+        
+    // Also fix other variables to ML values:
+    for (int i_v = 0; i_v < (int)varsToFix.size(); i_v++) {
+      if (m_workspace->var(varsToFix[i_v])) {
+	m_workspace->var(varsToFix[i_v])->setConstant(true);
+      }
+      else {
+	printer(Form("DHTestStat: ERROR! Parameter %s not found in workspace!",
+		     varsToFix[i_v].Data()), true);
+      }
+    }
+    
+    // Set the value of the variable to scan:
+    m_workspace->var(varToScan)->setVal(scanValues[scanIndex]);
+    m_workspace->var(varToScan)->setConstant(true);
+    
+    // The actual fit command:
+    RooNLLVar* currNLL
+      = (RooNLLVar*)combPdf->createNLL(*m_workspace->data(datasetName),
+				       Extended(combPdf->canBeExtended()));
+    
+    RooFitResult *currFitResult = statistics::minimize(currNLL, "", NULL, true);
+    if (!currFitResult || currFitResult->status() != 0) m_allGoodFits = false;
+    double currNLLValue = currNLL->getVal();
+    delete currFitResult;
+    delete currNLL;
+    
+    double deltaNLL = 2 * (currNLLValue - minNLLVal);
+    // Add to the scan graph:
+    gNLL->SetPoint(scanIndex, scanValues[scanIndex], deltaNLL);
+    
+    if (scanValues[scanIndex] <= result[0]) {
+      gNLLLo->SetPoint(indexLo, scanValues[scanIndex], deltaNLL);
+      indexLo++;
+    }
+    if (scanValues[scanIndex] >= result[0]) {
+      gNLLHi->SetPoint(indexHi, scanValues[scanIndex], deltaNLL);
+      indexHi++;
+    }
+    printer(Form("DHTestStat: NLL at %f is %f (%f - %f).",
+		 scanValues[scanIndex], currNLLValue-minNLLVal,
+		 currNLLValue, minNLLVal), false);
+  }
+  
+  // Release nuisance parameters after fit and recover the default values:
+  statistics::constSet(nuisanceParameters, false, origValNP);
+  
+  // Calculate the actual intercept values:
+  result[-1] = result[0] - graphIntercept(gNLLLo, 1.0);
+  result[1] = graphIntercept(gNLLHi, 1.0) - result[0];
+
+  if (m_doPlot) {
+    // Draw the graph:
+    TCanvas *can = new TCanvas("can", "can", 800, 600);
+    can->cd();
+    gNLL->SetLineColor(kRed+1);
+    gNLL->SetLineWidth(2);
+    gNLL->GetXaxis()->SetTitle(varToScan);
+    gNLL->GetYaxis()->SetTitle("-2#DeltaNLL");
+    gNLL->GetYaxis()->SetRangeUser(0, gNLL->GetMaximum());
+    gNLL->Draw("AL");
+    
+    // 1 sigma and 2 sigma lines:
+    TLine *line = new TLine();
+    line->SetLineStyle(2);
+    line->SetLineWidth(1);
+    line->DrawLine(gNLL->GetXaxis()->GetXmin(), 1.0,
+		   gNLL->GetXaxis()->GetXmax(), 1.0);
+    line->DrawLine(gNLL->GetXaxis()->GetXmin(), 4.0,
+		   gNLL->GetXaxis()->GetXmax(), 4.0);
+    
+    // Print ATLAS text on the plot:    
+    TLatex t; t.SetNDC(); t.SetTextColor(kBlack);
+    t.SetTextFont(72); t.SetTextSize(0.05);
+    t.DrawLatex(0.30, 0.86, "ATLAS");
+    t.SetTextFont(42); t.SetTextSize(0.05);
+    t.DrawLatex(0.42, 0.86, m_config->getStr("ATLASLabel"));
+    t.DrawLatex(0.30, 0.80, Form("#sqrt{s} = 13 TeV: %2.1f fb^{-1}",
+				 (m_config->getNum("AnalysisLuminosity")/
+				  1000.0)));
+    t.DrawLatex(0.30, 0.74, Form("%s = %2.2f_{-%2.2f}^{+%2.2f}", 
+				 varToScan.Data(), result[0], result[-1],
+				 result[1]));
+    
+    // Print the canvas:
+    can->Print(Form("%s/scanNLL_%s_%s.eps", m_plotDir.Data(), scanName.Data(),
+		    m_anaType.Data()));
+    can->Print(Form("%s/scanNLL_%s_%s.C", m_plotDir.Data(), scanName.Data(),
+		    m_anaType.Data()));
+    delete line;
+    delete can;
+  }
+  
+  // Also return the NLL scan graph:
+  m_graphNLL = gNLL;// = (TGraph*)gNLL->Clone(scanName);
+
+  // Finish up, return NLL value.
+  printer("DHTestStat: NLL Scan has completed.", false);
+  //delete gNLL;
+  delete gNLLLo;
+  delete gNLLHi;
+  
+  // Return the median and +/-1 sigma values:
+  return result;
+}
+
+/**
+   -----------------------------------------------------------------------------
    Choose to plot ratio or subtraction plot below plot of mass points.
    @param ratioOrSubtraction - "Ratio" or "Subtraction" plot below main plot.
 */
@@ -1458,6 +1616,7 @@ void DHTestStat::setPlotAxis(bool useLogScale, double yMin, double yMax,
    @param directory - The output directory path.
 */
 void DHTestStat::setPlotDirectory(TString directory) {
+  system(Form("mkdir -vp %s", directory.Data()));
   m_plotDir = directory;
   m_doPlot = true;
 }

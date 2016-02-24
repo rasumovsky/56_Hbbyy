@@ -58,11 +58,14 @@ class DHTestStat {
 		       double muTest);
   double getQMuTildeFromNLL(double nllMu, double nllMu0, double nllMuHat,
 			    double muHat, double muTest);
+  double graphIntercept(TGraph *graph, double valueToIntercept);
   void loadStatsFromFile();
+  TGraph *nllScanGraph();
   void resetParamsAfterFit(bool doResetParamsAfterFit);
   void saveSnapshots(bool doSaveSnapshot);
-  //void scanNLL(TString varToScan, std::vector<TString> varsToFix);
-  
+  std::map<int,double> scanNLL(TString scanName, TString datasetName,
+			       TString varToScan,
+			       std::vector<TString> varsToFix);
   void setPlotAxis(bool useLogScale, double yMin, double yMax, 
 		   double GeVPerBin);
   void setPlotDirectory(TString directory);
@@ -115,7 +118,8 @@ class DHTestStat {
   // The workspace for the fits:
   RooWorkspace *m_workspace;
   ModelConfig *m_mc;
-
+  TGraph *m_graphNLL;
+  
   // Store the calculated values:
   std::map<TString,double> m_calculatedValues;
   
