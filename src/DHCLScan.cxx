@@ -396,15 +396,15 @@ int main(int argc, char **argv) {
   
   // Toy graph formatting:
   if (options.Contains("NEvents")) {
-    gCLExp_toy->GetXaxis()->SetTitle("Events");
-    gCLObs_toy->GetXaxis()->SetTitle("Events");
+    gCLExp_toy->GetXaxis()->SetTitle("X#rightarrowhh Events");
+    gCLObs_toy->GetXaxis()->SetTitle("X#rightarrowhh Events");
   }
   else {
     gCLExp_toy->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
     gCLObs_toy->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
   }
-  gCLExp_toy->GetYaxis()->SetTitle("CL limit");
-  gCLObs_toy->GetYaxis()->SetTitle("CL limit");
+  gCLExp_toy->GetYaxis()->SetTitle("CL_{s} value");
+  gCLObs_toy->GetYaxis()->SetTitle("CL_{s} value");
   gCLExp_toy->SetLineColor(kBlack);
   gCLObs_toy->SetLineColor(kBlack);
   gCLExp_toy->SetLineStyle(2);
@@ -417,15 +417,15 @@ int main(int argc, char **argv) {
 
   // Asymptotic graph formatting:
   if (options.Contains("NEvents")) {
-    gCLExp_asym->GetXaxis()->SetTitle("Events");
-    gCLObs_asym->GetXaxis()->SetTitle("Events");
+    gCLExp_asym->GetXaxis()->SetTitle("X#rightarrowhh Events");
+    gCLObs_asym->GetXaxis()->SetTitle("X#rightarrowhh Events");
   }
   else {
     gCLExp_asym->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
     gCLObs_asym->GetXaxis()->SetTitle(config->getStr("CLScanPrintName"));
   }
-  gCLExp_asym->GetYaxis()->SetTitle("CL limit");
-  gCLObs_asym->GetYaxis()->SetTitle("CL limit");
+  gCLExp_asym->GetYaxis()->SetTitle("CL_{s} value");
+  gCLObs_asym->GetYaxis()->SetTitle("CL_{s} value");
   gCLExp_asym->SetLineColor(kBlack);
   gCLObs_asym->SetLineColor(kBlack);
   gCLExp_asym->SetLineStyle(2);
@@ -503,10 +503,6 @@ int main(int argc, char **argv) {
   t.DrawLatex(0.54, 0.48, "ATLAS");
   t.SetTextFont(42); t.SetTextSize(0.05);
   t.DrawLatex(0.66, 0.48, config->getStr("ATLASLabel"));
-  //t.SetTextSize(0.04);
-  //t.DrawLatex(0.54, 0.42, 
-  //	      Form("#sqrt{s} = 13 TeV: #scale[0.7]{#int}Ldt = %2.1f fb^{-1}",
-  //		   (config->getNum("AnalysisLuminosity")/1000.0)));
   t.DrawLatex(0.54, 0.42, Form("#sqrt{s} = 13 TeV, %2.1f fb^{-1}",
 			       (config->getNum("AnalysisLuminosity")/1000.0)));
   

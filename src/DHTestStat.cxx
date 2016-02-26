@@ -247,7 +247,7 @@ void DHTestStat::clearFitParamSettings() {
    @return - A pseudo-dataset.
 */
 RooDataSet* DHTestStat::createPseudoData(int seed, int valPoI, bool fixPoI) {
-  printer(Form("DHTestStatLLcreatePseudoData(seed=%d, PoI=%d, fixPoI=%d)",
+  printer(Form("DHTestStat::createPseudoData(seed=%d, PoI=%d, fixPoI=%d)",
 	       seed, valPoI, (int)fixPoI), false);
   
   // Load the parameters from profiling data to create UNCONDITIONAL ENSEMBLE:
@@ -1097,9 +1097,8 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
       gPad->SetLogy();
       frame->GetYaxis()->SetRangeUser(m_yMin, m_yMax);
     }
+    else frame->GetYaxis()->SetRangeUser(m_yMin, m_yMax);
     
-    //TLatex text; text.SetNDC(); text.SetTextColor(1);
-    //text.DrawLatex(0.6, 0.89, cateNames[i_c]);
     TH1F *histDH = new TH1F("histDH", "histDH", 1, 0, 1);
     TH1F *histSH = new TH1F("histSH", "histSH", 1, 0, 1);
     TH1F *histBkg = new TH1F("histBkg", "histBkg", 1, 0, 1);
@@ -1114,7 +1113,7 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     histBkg->SetLineStyle(2);
     histSig->SetLineStyle(1);
     
-    TLegend leg(0.63, 0.76, 0.92, 0.92);
+    TLegend leg(0.63, 0.69, 0.92, 0.92);
     leg.SetFillColor(0);
     leg.SetTextSize(0.05);
     leg.SetBorderSize(0);
@@ -1131,7 +1130,7 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     t.DrawLatex(0.20, 0.88, "ATLAS");
     t.SetTextFont(42); t.SetTextSize(0.05);
     t.DrawLatex(0.32, 0.88, m_config->getStr("ATLASLabel"));
-    t.DrawLatex(0.20, 0.82, Form("#sqrt{s} = 13 TeV: %2.1f fb^{-1}",
+    t.DrawLatex(0.20, 0.82, Form("#sqrt{s} = 13 TeV, %2.1f fb^{-1}",
 				 (m_config->getNum("AnalysisLuminosity")/
 				  1000.0)));
     
@@ -1560,7 +1559,7 @@ std::map<int,double> DHTestStat::scanNLL(TString scanName, TString datasetName,
     t.DrawLatex(0.30, 0.86, "ATLAS");
     t.SetTextFont(42); t.SetTextSize(0.05);
     t.DrawLatex(0.42, 0.86, m_config->getStr("ATLASLabel"));
-    t.DrawLatex(0.30, 0.80, Form("#sqrt{s} = 13 TeV: %2.1f fb^{-1}",
+    t.DrawLatex(0.30, 0.80, Form("#sqrt{s} = 13 TeV, %2.1f fb^{-1}",
 				 (m_config->getNum("AnalysisLuminosity")/
 				  1000.0)));
     t.DrawLatex(0.30, 0.74, Form("%s = %2.2f_{-%2.2f}^{+%2.2f}", 

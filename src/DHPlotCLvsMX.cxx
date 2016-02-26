@@ -192,9 +192,10 @@ int main(int argc, char **argv) {
   gCLObs_toy->GetXaxis()->SetTitle("m_{X} [GeV]");
   gCLExp_toy_2s->GetXaxis()->SetTitle("m_{X} [GeV]");
   if (options.Contains("NEvents")) {
-    gCLExp_toy->GetYaxis()->SetTitle("95% CL limit on events");
-    gCLObs_toy->GetYaxis()->SetTitle("95% CL limit on events");
-    gCLExp_toy_2s->GetYaxis()->SetTitle("95% CL limit on events");
+    gCLExp_toy->GetYaxis()->SetTitle("95% CL limit on X#rightarrowhh events");
+    gCLObs_toy->GetYaxis()->SetTitle("95% CL limit on X#rightarrowhh events");
+    gCLExp_toy_2s->GetYaxis()
+      ->SetTitle("95% CL limit on X#rightarrowhh events");
   }
   else {
     gCLExp_toy->GetYaxis()
@@ -227,8 +228,8 @@ int main(int argc, char **argv) {
       ->SetTitle("95% CL limit on #sigma_{X#rightarrowhh} [pb]");
   }
   else {
-    gCLExp_asym->GetYaxis()->SetTitle("95% CL limit on events");
-    gCLObs_asym->GetYaxis()->SetTitle("95% CL limit on events");
+    gCLExp_asym->GetYaxis()->SetTitle("95% CL limit on X#rightarrowhh events");
+    gCLObs_asym->GetYaxis()->SetTitle("95% CL limit on X#rightarrowhh events");
     gCLExp_asym_2s->GetYaxis()->SetTitle("95% CL limit on events");
   }
   gCLExp_asym->SetLineColor(kBlack);
@@ -293,10 +294,6 @@ int main(int argc, char **argv) {
   t.DrawLatex(0.2, 0.87, "ATLAS");
   t.SetTextFont(42); t.SetTextSize(0.05);
   t.DrawLatex(0.32, 0.87, config->getStr("ATLASLabel"));
-  //t.SetTextSize(0.04);
-  //t.DrawLatex(0.2, 0.81, 
-  //	      Form("#sqrt{s} = 13 TeV: #scale[0.7]{#int}Ldt = %2.1f fb^{-1}",
-  //		   (config->getNum("AnalysisLuminosity")/1000.0)));
   t.DrawLatex(0.2, 0.81, Form("#sqrt{s} = 13 TeV, %2.1f fb^{-1}",
 			      (config->getNum("AnalysisLuminosity")/1000.0)));
   

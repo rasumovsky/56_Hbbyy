@@ -24,9 +24,6 @@
 //    - ScanNLL                                                               //
 //    - RankNP                                                                //
 //                                                                            //
-//  Need to rethink the SigParam handling of the RooDataSet. Maybe we         //
-//  should just hand it a RooDataSet?                                         //
-//                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "DHMaster.h"
@@ -352,6 +349,8 @@ int main (int argc, char **argv) {
     sysToIgnore.push_back("JET_GroupedNP_2");
     sysToIgnore.push_back("JET_GroupedNP_3");
     sysToIgnore.push_back("MUON");
+    sysToIgnore.push_back("MET");
+    sysToIgnore.push_back("EL_EFF_");
     sys->ignoreSystematics(sysToIgnore);
 
     // Then parameterize the resonant signal uncertainties:
@@ -530,7 +529,7 @@ int main (int argc, char **argv) {
     std::cout << "DHMaster: Step 11.0 - Rank the nuisance parameters" 
 	      << std::endl;
     system(Form("./bin/DHNuisanceParameters %s %s 0", fullConfigPath.Data(),
-		(m_config->getStr("NLLScanOptions")).Data()));
+		(m_config->getStr("RankNPOptions")).Data()));
   }
   
   return 0;

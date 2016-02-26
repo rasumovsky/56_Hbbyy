@@ -61,8 +61,8 @@ int main(int argc, char **argv) {
   
   // Store impact on mu:
   double impactRank[100] = {0};
-  double impactRankErr[100] = {0.5};
-  double points[100] = {0.0};
+  double impactRankPlot[100] = {0};
+  double impactRankErr[100] = {0.25};
   double muLo[100] = {0.0};
   double muHi[100] = {0.0};
   
@@ -90,16 +90,24 @@ int main(int argc, char **argv) {
   //----------------------------------------//
   // Open nuisance parameter values from file:
   if (options.Contains("FromFile")) {
+    std::cout << "DHNuisanceParameters: Loading parameter data from file: " 
+	      << "\n\t" << fileNameNP << std::endl;
     
-    // Open the saved CL values from asymptotics:
-    
-    ifstream inputFile(fileNameNP);
+    std::ifstream inputFile(fileNameNP);
     if (inputFile.is_open()) {
       int i_n = 0; TString currName = "";
-      while (inputFile >> currName >> points[i_n] >> muLo[i_n] >> muHi[i_n]
+      while (inputFile >> currName >> impactRank[i_n] >> muLo[i_n] >> muHi[i_n] 
 	     >> valMu0[i_n] >> errLoMu0[i_n] >> errHiMu0[i_n] >> valMu1[i_n]
 	     >> errLoMu1[i_n] >> errHiMu1[i_n] >> valMuFree[i_n] 
 	     >> errLoMuFree[i_n] >> errHiMuFree[i_n]) {
+	
+	std::cout << currName << " " << impactRank[i_n] << " " << muLo[i_n] 
+		  << " " << muHi[i_n] << " " << valMu0[i_n] << " " 
+		  << errLoMu0[i_n] << " " << errHiMu0[i_n] << " " << valMu1[i_n]
+		  << " " << errLoMu1[i_n] << " " << errHiMu1[i_n] << " " 
+		  << valMuFree[i_n] << " " << errLoMuFree[i_n] << " " 
+		  << errHiMuFree[i_n] << std::endl;
+	
 	paramNames.push_back(currName);
 	i_n++;
       }
@@ -115,6 +123,9 @@ int main(int argc, char **argv) {
   //----------------------------------------//
   // Calculate CL values from scratch and save them:
   else {
+    std::cout << "DHNuisanceParameters: Creating new parameter data!" 
+	      << std::endl;
+
     // Open the workspace:
     TString originFile = Form("%s/%s/DHWorkspace/rootfiles/workspaceDH_%s.root",
 			      (config->getStr("MasterOutput")).Data(), 
@@ -145,7 +156,8 @@ int main(int argc, char **argv) {
     TIterator *iterNuis = nuisParameters->createIterator();
     RooRealVar *currNuis = NULL;
     while ((currNuis = (RooRealVar*)iterNuis->Next())) {
-      paramNames.push_back((TString)(currNuis->GetName()));
+      if (((TString)currNuis->GetName()).Contains("MCStat_")) continue;
+      else paramNames.push_back((TString)(currNuis->GetName()));
     }
     
     //----------------------------------------//
@@ -185,9 +197,11 @@ int main(int argc, char **argv) {
     double nllMuFree = dhts->getFitNLL(dataset, 1, false, profiledPOIVal);
     for (int i_n = 0; i_n < (int)paramNames.size(); i_n++) {
       if (dhts->theWorkspace()->var(paramNames[i_n])) {
-	valMu1[i_n] = dhts->theWorkspace()->var(paramNames[i_n])->getVal();
-	errLoMu1[i_n] =dhts->theWorkspace()->var(paramNames[i_n])->getError();
-	errHiMu1[i_n] =dhts->theWorkspace()->var(paramNames[i_n])->getError();
+	valMuFree[i_n] = dhts->theWorkspace()->var(paramNames[i_n])->getVal();
+	errLoMuFree[i_n]
+	  = dhts->theWorkspace()->var(paramNames[i_n])->getError();
+	errHiMuFree[i_n]
+	  = dhts->theWorkspace()->var(paramNames[i_n])->getError();
       }
       else {
 	std::cout << "DHNuisanceParameters: parameter " << paramNames[i_n]
@@ -206,6 +220,8 @@ int main(int argc, char **argv) {
     
     // Loop over the NP:
     for (int i_n = 0; i_n < (int)paramNames.size(); i_n++) {
+      std::cout << "\nDHNuisanceParameter: assessing impact of parameter " 
+		<< i_n << " = " << paramNames[i_n] << std::endl;
       
       // Set the current parameter constant in the fit:
       std::vector<TString> currParamsToFix;
@@ -220,22 +236,8 @@ int main(int argc, char **argv) {
       // Take the difference with usual error as uncertainty on mu from this NP:
       muLo[i_n] = -1.0 * fabs(mlScan[-1] - currScan[-1]);
       muHi[i_n] = fabs(currScan[1] - mlScan[1]);
-      points[i_n] = i_n;
     }
     allGoodFits = dhts->fitsAllConverged();
-
-    //----------------------------------------//
-    // Write nuisance parameter values to file:
-    ofstream outFile(fileNameNP);
-    for (int i_n = 0; i_n < (int)paramNames.size(); i_n++) {
-      outFile << paramNames[i_n] << " " << points[i_n] << " " << muLo[i_n] 
-	      << " " << muHi[i_n] << " " << valMu0[i_n] << " " << errLoMu0[i_n] 
-	      << " " << errHiMu0[i_n] << " " << valMu1[i_n] << " " 
-	      << errLoMu1[i_n] << " " << errHiMu1[i_n] << " " << valMuFree[i_n] 
-	      << " " << errLoMuFree[i_n] << " " << errHiMuFree[i_n] 
-	      << std::endl;
-    }
-    outFile.close();
     
     delete dhts;
     delete workspace;
@@ -248,6 +250,7 @@ int main(int argc, char **argv) {
 	      << std::endl;
   std::vector<TString> sortedParamNames; sortedParamNames.clear();
   std::vector<double> sortedParamValues; sortedParamValues.clear();
+  
   for (int i_n = 0; i_n < (int)paramNames.size(); i_n++) {
     double currMaxErr = TMath::Max(fabs(muLo[i_n]), fabs(muHi[i_n]));
     if (i_n == 0) {
@@ -276,14 +279,40 @@ int main(int argc, char **argv) {
       }
     }
   }
+
+  // Check that the sorting procedure performed as expected:
+  if (paramNames.size() != sortedParamNames.size()) {
+    std::cout << "DHNuisanceParameters: ERROR! Sorting didn't complete." 
+	      << std::endl;
+    exit(0);
+  }
   
   // Finally, assign the rank of each NP:
   for (int i_n = 0; i_n < (int)paramNames.size(); i_n++) {
-    for (int i_r = 0; i_r < (int)sortedParamNames.size(); i_n++) {
-      if ((sortedParamNames[i_r]).EqualTo(paramNames[i_n])) {
-	impactRank[i_n] = (int)(sortedParamNames.size()) - i_r;
+    for (int rank = 0; rank < (int)sortedParamNames.size(); rank++) {
+      if ((sortedParamNames[rank]).EqualTo(paramNames[i_n])) {
+	impactRank[i_n] = rank + 1;
+	impactRankPlot[i_n] = rank + 0.5;
+	std::cout << "\tParam " << paramNames[i_n] << " has rank " << rank
+		  << std::endl;
+	break;
       }
     }
+  }
+  
+  //----------------------------------------//
+  // Write nuisance parameter values to file:
+  if (!options.Contains("FromFile")) {
+    ofstream outFile(fileNameNP);
+    for (int i_n = 0; i_n < (int)paramNames.size(); i_n++) {
+      outFile << paramNames[i_n] << " " << impactRank[i_n] << " " << muLo[i_n] 
+	      << " " << muHi[i_n] << " " << valMu0[i_n] << " " << errLoMu0[i_n] 
+	      << " " << errHiMu0[i_n] << " " << valMu1[i_n] << " " 
+	      << errLoMu1[i_n] << " " << errHiMu1[i_n] << " " << valMuFree[i_n] 
+	      << " " << errLoMuFree[i_n] << " " << errHiMuFree[i_n] 
+	      << std::endl;
+    }
+    outFile.close();
   }
   
   //----------------------------------------//
@@ -292,66 +321,116 @@ int main(int argc, char **argv) {
 	    << std::endl;
   
   // Start plotting:
-  TCanvas *can = new TCanvas("can","can", 500, 800);
-  gStyle->SetPadLeftMargin(0.2);
+  gStyle->SetPadLeftMargin(0.35);
+  gStyle->SetPadBottomMargin(0.1);
+  TCanvas *can = new TCanvas("can","can", 600, 800);
   can->cd();
   
   // Stupid histogram:
-  TH1F *hTemp = new TH1F("temp", "temp", (int)sortedParamNames.size()+5, 0,
-			 (int)sortedParamNames.size()+5);
-  for (int i_h = 0; i_h < (int)sortedParamNames.size()+5; i_h++) {
+  int nExtraBins = 7;
+  TH1F *hTemp = new TH1F("temp", "temp", 
+			 (int)sortedParamNames.size()+nExtraBins, 0,
+			 (int)sortedParamNames.size()+nExtraBins);
+  //for (int i_b = 1; i_b <= hTemp->GetNbinsX(); i_b++) {
+  //hTemp->GetXaxis()->SetBinLabel(i_b, "");
+  //}
+  for (int i_h = 0; i_h < (int)sortedParamNames.size(); i_h++) {
     hTemp->SetBinContent(i_h+1, 0);
     hTemp->GetXaxis()->SetBinLabel(i_h+1, sortedParamNames[i_h]);
   }
-  hTemp->GetYaxis()->SetTitle("#delta#hat{#mu}");
-  hTemp->GetYaxis()->SetRangeUser(-0.25, 2.5);
+  //hTemp->GetYaxis()->SetTitle("#Delta#hat{#mu}");
+  hTemp->GetYaxis()->SetTitle("(#hat{#theta} - #theta_{0})/#Delta#theta");
+  //hTemp->GetYaxis()->SetRangeUser(-0.05, 0.05);
+  hTemp->GetYaxis()->SetRangeUser(-1.5, 1.5);
+  hTemp->SetLineColor(0);
+  hTemp->SetFillColor(0);
+  hTemp->GetXaxis()->CenterLabels();
+  //hTemp->GetXaxis()->SetTitleOffset(0.5);
+  hTemp->GetXaxis()->SetLabelSize(0.03);
+  hTemp->GetYaxis()->SetLabelSize(0.03);
+  hTemp->GetYaxis()->SetTitleOffset(0.8);
+  hTemp->GetYaxis()->SetTitleSize(0.04);
   hTemp->Draw("hbar");
+  hTemp->Draw("axissame");
   
   // Fill graphs with fit data:
   double zeros[100] = {0.0};
+  double impactRankPlotMu0[100] = {0};
+  double impactRankPlotMu1[100] = {0};
+  for (int i_i = 0; i_i < 100; i_i++) {
+    impactRankPlotMu0[i_i] = impactRankPlot[i_i] + 0.2;
+    impactRankPlotMu1[i_i] = impactRankPlot[i_i] - 0.2;
+  }
+
   TGraphAsymmErrors *gMuRank
-    = new TGraphAsymmErrors((int)paramNames.size(), zeros, impactRank, 
+    = new TGraphAsymmErrors((int)paramNames.size(), zeros, impactRankPlot, 
 			    muLo, muHi, impactRankErr, impactRankErr);
   TGraphAsymmErrors *gFitMu0
-    = new TGraphAsymmErrors((int)paramNames.size(), valMu0, impactRank,
+    = new TGraphAsymmErrors((int)paramNames.size(), valMu0, impactRankPlotMu0,
 			    errLoMu0, errHiMu0, zeros, zeros);
   TGraphAsymmErrors *gFitMu1
-    = new TGraphAsymmErrors((int)paramNames.size(), valMu1, impactRank,
+    = new TGraphAsymmErrors((int)paramNames.size(), valMu1, impactRankPlotMu1,
 			    errLoMu1, errHiMu1, zeros, zeros);
   TGraphAsymmErrors *gFitMuFree
-    = new TGraphAsymmErrors((int)paramNames.size(), valMuFree, impactRank,
+    = new TGraphAsymmErrors((int)paramNames.size(), valMuFree, impactRankPlot,
 			    errLoMuFree, errHiMuFree, zeros, zeros);
   
-  //
-  gMuRank->SetFillColor(kOrange+1);
-  gMuRank->Draw("a2");
+  gFitMu0->SetLineWidth(2);
+  gFitMu1->SetLineWidth(2);
+  gFitMuFree->SetLineWidth(2);
   
+  gFitMu0->SetLineColor(kBlue+1);
+  gFitMu1->SetLineColor(kRed+1);
+  gFitMuFree->SetLineColor(kGreen+2);
+  
+  gFitMu0->SetMarkerStyle(21);
+  gFitMu1->SetMarkerStyle(22);
+  gFitMuFree->SetMarkerStyle(23);
+  
+  gFitMu0->SetMarkerColor(kBlue+1);
+  gFitMu1->SetMarkerColor(kRed+1);
+  gFitMuFree->SetMarkerColor(kGreen+2);
+  
+  gFitMu0->SetMarkerSize(1);
+  gFitMu1->SetMarkerSize(1);
+  gFitMuFree->SetMarkerSize(1);
+
+  gMuRank->SetLineColor(0);
+  gMuRank->SetLineWidth(0);
+  gMuRank->SetFillColor(kOrange+1);
+  gMuRank->SetFillStyle(3001);
+  gMuRank->Draw("3SAME");
+  
+  gFitMu0->Draw("EPSAME");
+  gFitMu1->Draw("EPSAME");
+  gFitMuFree->Draw("EPSAME");
+
   // Print ATLAS text on the plot:    
   TLatex t; t.SetNDC(); t.SetTextColor(kBlack);
-  t.SetTextFont(72); t.SetTextSize(0.05);
-  t.DrawLatex(0.44, 0.48, "ATLAS");
-  t.SetTextFont(42); t.SetTextSize(0.05);
-  t.DrawLatex(0.56, 0.48, config->getStr("ATLASLabel"));
-  t.DrawLatex(0.44, 0.42, Form("#sqrt{s} = 13 TeV, %2.1f fb^{-1}",
+  t.SetTextFont(72); t.SetTextSize(0.04);
+  t.DrawLatex(0.39, 0.9, "ATLAS");
+  t.SetTextFont(42); t.SetTextSize(0.04);
+  t.DrawLatex(0.53, 0.9, config->getStr("ATLASLabel"));
+  t.DrawLatex(0.39, 0.86, Form("#sqrt{s} = 13 TeV, %2.1f fb^{-1}",
 			       (config->getNum("AnalysisLuminosity")/1000.0)));
   
   // Legend:
-  TLegend leg(0.7,0.85,0.9,0.92);
+  TLegend leg(0.73,0.78,0.9,0.93);
   leg.SetBorderSize(0);
   leg.SetFillColor(0);
-  leg.SetTextSize(0.04);
-  leg.AddEntry(gMuRank, "Post-fit #hat{#mu} impact", "F");
+  leg.SetTextSize(0.03);
+  //leg.AddEntry(gMuRank, "#hat{#mu} impact", "F");
   leg.AddEntry(gFitMu0, "Pull, #mu=0", "LEP");
   leg.AddEntry(gFitMu1, "Pull, #mu=1", "LEP");
-  leg.AddEntry(gFitMuFree, "#Pull, #hat{#mu}", "LEP");
+  leg.AddEntry(gFitMuFree, "Pull, #mu=#hat{#mu}", "LEP");
   leg.Draw("SAME");
   
-  // 95% CL Line:
   /*
+  // Line:
   TLine *line = new TLine();
   line->SetLineStyle(1);
   line->SetLineWidth(2);
-  line->SetLineColor(kRed);
+  line->SetLineColor(1);
   if (options.Contains("toy") || options.Contains("both")) {
     line->DrawLine(gCLExp_toy->GetXaxis()->GetXmin(), 0.95,
 		   gCLExp_toy->GetXaxis()->GetXmax(), 0.95);
@@ -361,7 +440,7 @@ int main(int argc, char **argv) {
 		   gCLExp_asym->GetXaxis()->GetXmax(), 0.95);
   }
   */
-    
+  
   // Print the canvas:
   can->Print(Form("%s/plot_parameters_%s.eps", outputDir.Data(), tag.Data()));
   can->Print(Form("%s/plot_parameters_%s.C", outputDir.Data(), tag.Data()));
@@ -369,10 +448,11 @@ int main(int argc, char **argv) {
   // Save graphs to a ROOT file:
   TFile rootFileOutput(Form("%s/nuisance_parameter_graphs_%s.root",
 			    outputDir.Data(), tag.Data()));
-  gMuRank->Write();
-  gFitMu0->Write();
-  gFitMu1->Write();
-  gFitMuFree->Write();
+  //rootFileOutput.cd();
+  gMuRank->Write("gMuRank");
+  gFitMu0->Write("gFitMu0");
+  gFitMu1->Write("gFitMu1");
+  gFitMuFree->Write("gFitMuFree");
   rootFileOutput.Close();
   
   // Print a warning if some fits failed:
