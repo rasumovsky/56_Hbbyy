@@ -1076,7 +1076,7 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     // Plot everything on RooPlot:
     RooPlot* frame = (*m_workspace->var(obsName)).frame(nBinsForPlot);
     if ((m_workspace->pdf("model_"+cateNames[i_c]))) {
-      (*m_workspace->data(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()))).plotOn(frame);
+      (*m_workspace->data(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()))).plotOn(frame,XErrorSize(0));
       if ((m_workspace->pdf("pdf_SigBSM2H_"+cateNames[i_c]))) {
 	(*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_SigBSM2H_"+cateNames[i_c]))), LineColor(6), LineStyle(3));
       }
@@ -1103,17 +1103,21 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     TH1F *histSH = new TH1F("histSH", "histSH", 1, 0, 1);
     TH1F *histBkg = new TH1F("histBkg", "histBkg", 1, 0, 1);
     TH1F *histSig = new TH1F("histSig", "histSig", 1, 0, 1);
+    TH1F *histData = new TH1F("histData", "histData", 1, 0, 1);
     histDH->SetLineColor(6);
     histSH->SetLineColor(3);
     histBkg->SetLineColor(4);
     histSig->SetLineColor(2);
-    
+    histData->SetLineColor(1);
+    histData->SetMarkerColor(1);
+    //histData->SetMarkerSty(1);
+
     histDH->SetLineStyle(3);
     histSH->SetLineStyle(4);
     histBkg->SetLineStyle(2);
     histSig->SetLineStyle(1);
     
-    TLegend leg(0.63, 0.69, 0.92, 0.92);
+    TLegend leg(0.63, 0.62, 0.92, 0.92);
     leg.SetFillColor(0);
     leg.SetTextSize(0.05);
     leg.SetBorderSize(0);
@@ -1122,6 +1126,7 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     leg.AddEntry(histSH, "Single Higgs", "l");
     leg.AddEntry(histBkg, "Continuum Bkg.", "l");
     leg.AddEntry(histSig, "Sum", "l");
+    leg.AddEntry(histData, "Data", "lep");
     leg.Draw("SAME");
     
     // Print ATLAS text on the plot:    

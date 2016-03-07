@@ -369,7 +369,7 @@ void DHToyAnalysis::fillToyHistograms(int muValue, DHToyTree *toyTree) {
       m_histStorage[globKey] = new TH1F(globKey, globKey, 100, -5, 5);
     }
     m_namesNuis.push_back(nameNuis);
-    m_namesNuis.push_back(nameGlob);
+    m_namesGlobs.push_back(nameGlob);
   }
   
   // Also get names of non-systematic parameters:

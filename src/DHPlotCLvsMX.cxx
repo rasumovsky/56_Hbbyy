@@ -192,18 +192,20 @@ int main(int argc, char **argv) {
   gCLObs_toy->GetXaxis()->SetTitle("m_{X} [GeV]");
   gCLExp_toy_2s->GetXaxis()->SetTitle("m_{X} [GeV]");
   if (options.Contains("NEvents")) {
-    gCLExp_toy->GetYaxis()->SetTitle("95% CL limit on X#rightarrowhh events");
-    gCLObs_toy->GetYaxis()->SetTitle("95% CL limit on X#rightarrowhh events");
+    gCLExp_toy->GetYaxis()
+      ->SetTitle("95% CL limit on X#rightarrowhh event yield");
+    gCLObs_toy->GetYaxis()
+      ->SetTitle("95% CL limit on X#rightarrowhh event yield");
     gCLExp_toy_2s->GetYaxis()
-      ->SetTitle("95% CL limit on X#rightarrowhh events");
+      ->SetTitle("95% CL limit on X#rightarrowhh event yield");
   }
   else {
     gCLExp_toy->GetYaxis()
-      ->SetTitle("95% CL limit on #sigma_{X#rightarrowhh} [pb]");
+      ->SetTitle("95% CL limit on #sigma_{X}#timesBR_{X#rightarrowhh} [pb]");
     gCLObs_toy->GetYaxis()
-      ->SetTitle("95% CL limit on #sigma_{X#rightarrowhh} [pb]");
+      ->SetTitle("95% CL limit on #sigma_{X}#timesBR_{X#rightarrowhh} [pb]");
     gCLExp_toy_2s->GetYaxis()
-      ->SetTitle("95% CL limit on #sigma_{X#rightarrowhh} [pb]");
+      ->SetTitle("95% CL limit on #sigma_{X}#timesBR_{X#rightarrowhh} [pb]");
   }
   
   gCLExp_toy->SetLineColor(kBlack);
@@ -228,9 +230,11 @@ int main(int argc, char **argv) {
       ->SetTitle("95% CL limit on #sigma_{X#rightarrowhh} [pb]");
   }
   else {
-    gCLExp_asym->GetYaxis()->SetTitle("95% CL limit on X#rightarrowhh events");
-    gCLObs_asym->GetYaxis()->SetTitle("95% CL limit on X#rightarrowhh events");
-    gCLExp_asym_2s->GetYaxis()->SetTitle("95% CL limit on events");
+    gCLExp_asym->GetYaxis()
+      ->SetTitle("95% CL limit on X#rightarrowhh event yield");
+    gCLObs_asym->GetYaxis()
+      ->SetTitle("95% CL limit on X#rightarrowhh event yield");
+    gCLExp_asym_2s->GetYaxis()->SetTitle("95% CL limit on event yield");
   }
   gCLExp_asym->SetLineColor(kBlack);
   gCLObs_asym->SetLineColor(kBlack);
@@ -242,7 +246,7 @@ int main(int argc, char **argv) {
   gCLExp_asym_1s->SetFillColor(kGreen);
   
   // Legend:
-  TLegend leg(0.61,0.73,0.89,0.91);
+  TLegend leg(0.61,0.68,0.89,0.91);
   leg.SetBorderSize(0);
   leg.SetFillColor(0);
   leg.SetTextSize(0.04);
@@ -253,6 +257,8 @@ int main(int argc, char **argv) {
   
   // Plotting options:
   if (options.Contains("toy")) {
+    //gCLExp_toy_2s->GetYaxis()->SetRangeUser(1.8, 24);
+    //gCLExp_toy_2s->GetYaxis()->SetRangeUser(1.8, 12);
     gCLExp_toy_2s->Draw("A3");
     gCLExp_toy->Draw("Lsame");
     gCLExp_toy_1s->Draw("3same");
