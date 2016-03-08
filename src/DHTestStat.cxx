@@ -1122,7 +1122,7 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     leg.SetTextSize(0.05);
     leg.SetBorderSize(0);
     leg.SetTextFont(42);
-    leg.AddEntry(histDH, "DiHiggs", "l");
+    leg.AddEntry(histDH, "Di-Higgs", "l");
     leg.AddEntry(histSH, "Single Higgs", "l");
     leg.AddEntry(histBkg, "Continuum Bkg.", "l");
     leg.AddEntry(histSig, "Sum", "l");

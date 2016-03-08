@@ -437,14 +437,14 @@ int main(int argc, char **argv) {
   gCLExp_asym_1s->SetFillColor(kGreen);
   
   // Legend:
-  TLegend leg(0.54,0.20,0.79,0.38);
+  TLegend leg(0.64,0.20,0.89,0.38);
   leg.SetBorderSize(0);
   leg.SetFillColor(0);
   leg.SetTextSize(0.04);
-  if (!config->getBool("DoBlind")) leg.AddEntry(gCLObs_toy,"Obs. limit","l");
-  leg.AddEntry(gCLExp_toy,"Exp. limit","l");
-  leg.AddEntry(gCLExp_toy_1s,"Exp. limit #pm1#sigma_{exp}","F");
-  leg.AddEntry(gCLExp_toy_2s,"Exp. limit #pm2#sigma_{exp}","F");
+  if (!config->getBool("DoBlind")) leg.AddEntry(gCLObs_toy,"Obs. CL_{s}","l");
+  leg.AddEntry(gCLExp_toy,"Exp. CL_{s}","l");
+  leg.AddEntry(gCLExp_toy_1s,"Exp. CL_{s} #pm1#sigma_{exp}","F");
+  leg.AddEntry(gCLExp_toy_2s,"Exp. CL_{s} #pm2#sigma_{exp}","F");
   
   // Plotting options:
   if (options.Contains("toy")) {
@@ -500,10 +500,10 @@ int main(int argc, char **argv) {
   // Print ATLAS text on the plot:    
   TLatex t; t.SetNDC(); t.SetTextColor(kBlack);
   t.SetTextFont(72); t.SetTextSize(0.05);
-  t.DrawLatex(0.54, 0.48, "ATLAS");
+  t.DrawLatex(0.64, 0.48, "ATLAS");
   t.SetTextFont(42); t.SetTextSize(0.05);
-  t.DrawLatex(0.66, 0.48, config->getStr("ATLASLabel"));
-  t.DrawLatex(0.54, 0.42, Form("#sqrt{s} = 13 TeV, %2.1f fb^{-1}",
+  t.DrawLatex(0.76, 0.48, config->getStr("ATLASLabel"));
+  t.DrawLatex(0.64, 0.42, Form("#sqrt{s} = 13 TeV, %2.1f fb^{-1}",
 			       (config->getNum("AnalysisLuminosity")/1000.0)));
   
   // Print the canvas:
