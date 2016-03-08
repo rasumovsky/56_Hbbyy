@@ -1126,7 +1126,8 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     leg.AddEntry(histSH, "Single Higgs", "l");
     leg.AddEntry(histBkg, "Continuum Bkg.", "l");
     leg.AddEntry(histSig, "Sum", "l");
-    leg.AddEntry(histData, "Data", "lep");
+    //leg.AddEntry(histData, "Data", "lep");
+    leg.AddEntry(histData, "Data", "ep");
     leg.Draw("SAME");
     
     // Print ATLAS text on the plot:    
