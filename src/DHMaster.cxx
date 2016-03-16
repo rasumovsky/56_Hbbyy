@@ -12,7 +12,7 @@
 //  classes (mass points, signal parameterization), while others will use     //
 //  system commands to submit jobs to various clusters.                       //
 //                                                                            //
-//  MasterOption - Note: Each can be followed by the suffix "New"             //
+//  MasterOption:                                                             //
 //    - Systematics                                                           //
 //    - Workspace                                                             //
 //    - TossPseudoExp                                                         //
