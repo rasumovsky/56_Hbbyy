@@ -9,8 +9,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #include "Config.h"
-#include "DHAnalysis.h"
-#include "DHCheckJobs.h"
 #include "DHSystematics.h"
 #include "DHTestStat.h"
 #include "DHToyAnalysis.h"
