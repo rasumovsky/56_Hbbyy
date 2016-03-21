@@ -41,7 +41,12 @@ source /afs/cern.ch/sw/lcg/contrib/gcc/4.6/x86_64-slc6/setup.sh
 source /afs/cern.ch/sw/lcg/app/releases/ROOT/5.34.09/x86_64-slc6-gcc46-opt/root/bin/thisroot.sh
 ```
 
-To make the executables:
+Alternatively, one can just run the setup script:
+```
+source scripts/package_setup.sh
+```
+
+To compile the executables:
 ```
 make bin/DHMaster
 make bin/DHPseudoExp
