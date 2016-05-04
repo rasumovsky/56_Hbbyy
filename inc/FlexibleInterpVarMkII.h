@@ -37,8 +37,8 @@ public:
   virtual TObject* clone(const char* newname) const { return new FlexibleInterpVarMkII(*this, newname); }
   virtual ~FlexibleInterpVarMkII() ;
 
-  virtual void printMultiline(ostream& os, Int_t contents, Bool_t verbose = kFALSE, TString indent = "") const;
-  virtual void printFlexibleInterpVarMkIIs(ostream& os) const;
+  virtual void printMultiline(std::ostream& os, Int_t contents, Bool_t verbose = kFALSE, TString indent = "") const;
+  virtual void printFlexibleInterpVarMkIIs(std::ostream& os) const;
 
 private:
 

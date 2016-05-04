@@ -224,7 +224,7 @@ double DHToyAnalysis::calculateCLsFromToy(double qMu) {
 	       qMu, pMu, pB, CLs), false);
   
   // Check that it is finite:
-  if (isnan(CLs) || !isfinite(CLs)) {
+  if (std::isnan(CLs) || !std::isfinite(CLs)) {
     CLs = 1.0;
     printer("DHToyAnalysis::converting nan or inf to 1",false);
   }

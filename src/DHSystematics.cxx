@@ -584,7 +584,7 @@ void DHSystematics::printWorkspaceInput() {
   printer(Form("DHSystematics::printWorkspaceInput() --> %s",fileName.Data()),
 	  false);
 
-  ofstream outputFile(fileName);
+  std::ofstream outputFile(fileName);
   
   // First list the nuisance parameters:
   outputFile << "SysSources:		";

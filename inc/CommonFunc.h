@@ -15,11 +15,16 @@ using namespace RooFit;
 const double epsilon=1e-6;
 
 namespace CommonFunc{
-  TH1F* CreateHist(TString title="hist",TString tag=0,TString axisx=0,TString axisy=0,int nbin=100,double xmin=0,double xmax=100,double min=0);
-  TH1D* CreateTH1D(TString title="hist",TString tag=0,TString axisx=0,TString axisy=0,int nbin=100,double xmin=0,double xmax=100,double min=0);
-  TCanvas* CreateCanvas(TString title="canvas",TString tag=0,double ww=800,double wh=600);
-  TPad* CreatePad(TString title="pad",TString tag=0,double x1=0,double y1=0.,double x2=1,double y2=1);
-  THStack* CreateStack(TString title="stack",TString tag=0);
+  //TH1F* CreateHist(TString title="hist",TString tag=0,TString axisx=0,TString axisy=0,int nbin=100,double xmin=0,double xmax=100,double min=0);
+  TH1F* CreateHist(TString title="hist",TString tag="",TString axisx="",TString axisy="",int nbin=100,double xmin=0,double xmax=100,double min=0);
+  //TH1D* CreateTH1D(TString title="hist",TString tag=0,TString axisx=0,TString axisy=0,int nbin=100,double xmin=0,double xmax=100,double min=0);
+  TH1D* CreateTH1D(TString title="hist",TString tag="",TString axisx="",TString axisy="",int nbin=100,double xmin=0,double xmax=100,double min=0);
+  //TCanvas* CreateCanvas(TString title="canvas",TString tag=0,double ww=800,double wh=600);
+  TCanvas* CreateCanvas(TString title="canvas",TString tag="",double ww=800,double wh=600);
+  //TPad* CreatePad(TString title="pad",TString tag=0,double x1=0,double y1=0.,double x2=1,double y2=1);
+  TPad* CreatePad(TString title="pad",TString tag="",double x1=0,double y1=0.,double x2=1,double y2=1);
+  //THStack* CreateStack(TString title="stack",TString tag=0);
+  THStack* CreateStack(TString title="stack",TString tag="");
   TFile* OpenFile(TString fileName="",TString option="read");
   void PrintCanvas(TCanvas* c, TString name);
   bool IsNaN(double var);

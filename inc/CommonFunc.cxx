@@ -240,6 +240,9 @@ TStyle* CommonFunc::AtlasStyle()
   //atlasStyle->SetOptFit(1111);
   atlasStyle->SetOptFit(0);
 
+  //atlasStyle->SetPalette(55);
+  atlasStyle->SetPalette(1);
+  
   // put tick marks on top and RHS of plots
   atlasStyle->SetPadTickX(1);
   atlasStyle->SetPadTickY(1);
