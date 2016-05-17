@@ -1074,9 +1074,11 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
     int nBinsForPlot = (int)((obsMax - obsMin) / m_geVPerBin);
     
     // Plot everything on RooPlot:
-    RooPlot* frame = (*m_workspace->var(obsName)).frame(nBinsForPlot);
+    //RooPlot* frame = (*m_workspace->var(obsName)).frame(nBinsForPlot);
+    RooPlot* frame = (*m_workspace->var(obsName)).frame();
     if ((m_workspace->pdf("model_"+cateNames[i_c]))) {
-      (*m_workspace->data(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()))).plotOn(frame,XErrorSize(0));
+      //(*m_workspace->data(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()))).plotOn(frame,XErrorSize(0));
+      (*m_workspace->data(Form("%s_%s",datasetName.Data(),cateNames[i_c].Data()))).plotOn(frame,XErrorSize(0),Binning(nBinsForPlot));
       if ((m_workspace->pdf("pdf_SigBSM2H_"+cateNames[i_c]))) {
 	(*m_workspace->pdf("model_"+cateNames[i_c])).plotOn(frame, Components((*m_workspace->pdf("pdf_SigBSM2H_"+cateNames[i_c]))), LineColor(6), LineStyle(3));
       }
