@@ -214,6 +214,10 @@ int main (int argc, char **argv) {
     exit(0);
   }
   
+  std::cout << "MIT License\n"
+	    << "Copyright (c) 2016 Andrew Straiton Hard.\n"
+	    << "License details may be found in LICENSE.txt" << std::endl;
+
   // The job name and options (which analysis steps to perform):
   TString masterOption = argv[1];
   TString configFileName = argv[2];

@@ -344,7 +344,6 @@ void DHWorkspace::addSystematic(TString systematicForm) {
       else val.Prepend("-");
       componentsLo[name] = val;
     }
-    
   }
   
   // Print out a summary of the systematic:
@@ -605,13 +604,6 @@ void DHWorkspace::createStupidAsimovData(int valPoI, int nBinsAsimov) {
 		     RooArgSet(*m_ws->var(nameObs), *m_ws->var("wt")),
 		     RooFit::WeightVar(*m_ws->var("wt")));
   
-  if (m_config->getBool("DoExtrapolation")) {
-    double newBkgValue = ((m_config->getNum("LumiForExtrapolation") / 
-			m_config->getNum("AnalysisLuminosity")) *
-		       m_ws->var("n_Total_bbSideBand")->getVal());
-    m_ws->var("n_Total_bbSideBand")->setVal(newBkgValue);
-  }
-  
   // Total number of events in the current model category:
   double totalEvents
     = m_ws->function(Form("n_AllProcesses_%s",m_currCateName.Data()))->getVal();
@@ -726,10 +718,6 @@ void DHWorkspace::createNewWS() {
   // Create a luminosity parameter:
   m_ws->factory(Form("Luminosity[%f]",
 		     m_config->getNum("AnalysisLuminosity")/1000.0));
-  if (m_config->getBool("DoExtrapolation")) {
-    m_ws->var("Luminosity")
-      ->setVal(m_config->getNum("LumiForExtrapolation") / 1000.0);
-  }
   
   // Also create weight parameter for datasets:
   m_ws->factory("wt[1.0]");

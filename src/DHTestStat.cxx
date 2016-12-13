@@ -1211,10 +1211,10 @@ void DHTestStat::plotFits(TString fitType, TString datasetName) {
       subData->Draw("EPSAME");
     }
     
-    can->Print(Form("%s/fitPlot_%s_%s_%s.eps", m_plotDir.Data(),
-		    m_anaType.Data(), fitType.Data(), cateNames[i_c].Data()));
-    can->Print(Form("%s/fitPlot_%s_%s_%s.C", m_plotDir.Data(),
-		    m_anaType.Data(), fitType.Data(), cateNames[i_c].Data()));
+    can->Print(Form("%s/fitPlot_%s_%s_%s_%s.eps", m_plotDir.Data(),
+		    m_anaType.Data(), datasetName.Data(), fitType.Data(), cateNames[i_c].Data()));
+    can->Print(Form("%s/fitPlot_%s_%s_%s_%s.C", m_plotDir.Data(),
+		    m_anaType.Data(), datasetName.Data(), fitType.Data(), cateNames[i_c].Data()));
     delete histDH;
     delete histSH;
     delete histBkg;
